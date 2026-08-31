@@ -10,6 +10,8 @@ interface Business {
   phone: string;
   category: string;
   description?: string;
+  rating?: number | null;
+  reviewCount?: number;
 }
 
 const CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Otros'];
@@ -204,7 +206,7 @@ const Home: React.FC = () => {
 
                       <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <Star size={13} fill="currentColor" /> 4.8
+                          <Star size={13} fill="currentColor" /> {business.rating ? `${business.rating.toFixed(1)}${business.reviewCount ? ` (${business.reviewCount})` : ''}` : 'Nuevo'}
                         </div>
                         <span style={{ color: 'var(--primary-color)', fontWeight: 700, fontSize: '0.85rem' }}>Ver turnos →</span>
                       </div>

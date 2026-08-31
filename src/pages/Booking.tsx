@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Clock, DollarSign, ChevronLeft, ChevronRight, Check, ArrowLeft, MapPin } from 'lucide-react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isBefore, isToday } from 'date-fns';
+import { Clock, DollarSign, ChevronLeft, ChevronRight, Check, ArrowLeft, MapPin, AlertCircle } from 'lucide-react';
+import {
+  format,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameDay,
+  isBefore,
+  isToday
+} from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface Business { id: number; name: string; address: string; description: string; }
@@ -15,6 +27,7 @@ const SLOT_TIMES_AFTERNOON = ['13:00', '13:30', '14:00', '14:30', '15:00', '15:3
 
 const Booking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [business, setBusiness] = useState<Business | null>(null);
@@ -25,8 +38,12 @@ const Booking: React.FC = () => {
   const [step, setStep] = useState<Step>(1);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
+  // Busy slots for selected date
+  const [busySlots, setBusySlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   // Hold state
   const [holdToken, setHoldToken] = useState<string | null>(null);
@@ -36,19 +53,66 @@ const Booking: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // 1. Cargar negocio y servicios + preselección por query param
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bRes, sRes] = await Promise.all([api.get(`/businesses/${id}`), api.get(`/businesses/${id}/services`)]);
+        const [bRes, sRes] = await Promise.all([
+          api.get(`/businesses/${id}`),
+          api.get(`/businesses/${id}/services`)
+        ]);
         setBusiness(bRes.data);
-        setServices(sRes.data.data ?? sRes.data ?? []);
-      } catch { /* ignore */ }
-      finally { setLoading(false); }
+
+        const loadedServices: Service[] = sRes.data.data ?? sRes.data ?? [];
+        setServices(loadedServices);
+
+        // Si viene ?serviceId en la URL, preseleccionar y avanzar directo al paso 2
+        const serviceIdParam = searchParams.get('serviceId');
+        if (serviceIdParam) {
+          const match = loadedServices.find(s => s.id === Number(serviceIdParam));
+          if (match) {
+            setSelectedService(match);
+            setStep(2);
+          }
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setLoading(false);
+      }
     };
     if (id) fetchData();
-  }, [id]);
+  }, [id, searchParams]);
 
-  // Countdown timer
+  // 2. Cargar slots ocupados cuando cambia la fecha seleccionada
+  useEffect(() => {
+    if (!id || !selectedDate) {
+      setBusySlots([]);
+      return;
+    }
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    setLoadingSlots(true);
+    api.get(`/businesses/${id}/busy-slots?date=${dateStr}`)
+      .then(res => {
+        const rawList = res.data.data ?? [];
+        const formattedList = rawList.map((item: string) => {
+          if (item.includes('T')) {
+            const d = new Date(item);
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          }
+          return item;
+        });
+        setBusySlots(formattedList);
+      })
+      .catch(() => {
+        setBusySlots([]);
+      })
+      .finally(() => {
+        setLoadingSlots(false);
+      });
+  }, [id, selectedDate]);
+
+  // Countdown timer para el Hold Token
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     if (expiresAt) {
@@ -56,14 +120,37 @@ const Booking: React.FC = () => {
         const diff = new Date(expiresAt).getTime() - Date.now();
         if (diff <= 0) {
           clearInterval(timer);
-          setHoldToken(null); setExpiresAt(null); setTimeLeft(0);
-          setError('El tiempo expiró. Por favor, selecciona un horario nuevamente.');
+          setHoldToken(null);
+          setExpiresAt(null);
+          setTimeLeft(0);
+          setError('El tiempo de reserva temporal expiró. Por favor, selecciona el horario nuevamente.');
           setStep(2);
-        } else { setTimeLeft(Math.ceil(diff / 1000)); }
+        } else {
+          setTimeLeft(Math.ceil(diff / 1000));
+        }
       }, 1000);
     }
     return () => clearInterval(timer);
   }, [expiresAt]);
+
+  // Construye la fecha y hora exacta en la zona horaria del cliente
+  const getSelectedDateTime = () => {
+    if (!selectedDate || !selectedTime) return null;
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const dt = new Date(selectedDate);
+    dt.setHours(hours, minutes, 0, 0);
+    return dt;
+  };
+
+  // Helper para verificar si un slot ya pasó hoy
+  const isSlotPast = (slotTime: string) => {
+    if (!selectedDate || !isToday(selectedDate)) return false;
+    const [slotH, slotM] = slotTime.split(':').map(Number);
+    const now = new Date();
+    const currentH = now.getHours();
+    const currentM = now.getMinutes();
+    return slotH < currentH || (slotH === currentH && slotM <= currentM);
+  };
 
   // Calendar helpers
   const calendarDays = (() => {
@@ -80,39 +167,62 @@ const Booking: React.FC = () => {
 
   const handleHold = async () => {
     if (!selectedDate || !selectedTime || !selectedService) return;
-    setSubmitting(true); setError('');
+
+    const localDateTime = getSelectedDateTime();
+    if (!localDateTime) return;
+
+    if (localDateTime.getTime() <= Date.now()) {
+      setError('El horario seleccionado ya ha transcurrido. Por favor, elige un horario futuro.');
+      return;
+    }
+
+    if (busySlots.includes(selectedTime)) {
+      setError('El horario seleccionado ya está ocupado. Por favor, elige otro horario.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const res = await api.post('/appointments/hold', {
         businessId: Number(id),
         serviceId: selectedService.id,
         date: `${dateStr}T00:00:00.000Z`,
-        time: `${dateStr}T${selectedTime}:00.000Z`,
+        time: localDateTime.toISOString(),
       });
       setHoldToken(res.data.holdToken);
       setExpiresAt(res.data.expiresAt);
       setStep(3);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al reservar el horario.');
-    } finally { setSubmitting(false); }
+      setError(err.response?.data?.message || err.response?.data?.detail || 'Error al reservar el horario.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleConfirm = async () => {
     if (!holdToken || !selectedDate || !selectedTime || !selectedService) return;
-    setSubmitting(true); setError('');
+    const localDateTime = getSelectedDateTime();
+    if (!localDateTime) return;
+
+    setSubmitting(true);
+    setError('');
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       await api.post('/appointments', {
         businessId: Number(id),
         serviceId: selectedService.id,
         date: `${dateStr}T00:00:00.000Z`,
-        time: `${dateStr}T${selectedTime}:00.000Z`,
+        time: localDateTime.toISOString(),
         holdToken,
       });
       navigate('/my-appointments');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al confirmar el turno.');
-    } finally { setSubmitting(false); }
+      setError(err.response?.data?.message || err.response?.data?.detail || 'Error al confirmar el turno.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '4rem' }} className="text-muted">Cargando...</div>;
@@ -181,9 +291,14 @@ const Booking: React.FC = () => {
 
         {/* Contenido del wizard */}
         <div className="wizard-content">
-          {error && <div className="alert-danger" style={{ marginBottom: '1rem' }}>{error}</div>}
+          {error && (
+            <div className="alert-danger" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
 
-          {/* PASO 1: Servicios */}
+          {/* PASO 1: Selección de Servicio */}
           {step === 1 && (
             <>
               <h4 style={{ fontWeight: 800, color: 'var(--text-title)', marginBottom: '4px' }}>Elige un Servicio</h4>
@@ -222,11 +337,11 @@ const Booking: React.FC = () => {
             </>
           )}
 
-          {/* PASO 2: Calendario + Slots */}
+          {/* PASO 2: Calendario + Horarios */}
           {step === 2 && (
             <>
               <h4 style={{ fontWeight: 800, color: 'var(--text-title)', marginBottom: '4px' }}>Fecha y Hora</h4>
-              <p className="text-muted text-sm" style={{ marginBottom: '1.25rem' }}>Elige el día y selecciona un horario de atención disponible.</p>
+              <p className="text-muted text-sm" style={{ marginBottom: '1.25rem' }}>Elige el día y selecciona un horario disponible.</p>
 
               {/* Calendario mensual */}
               <div className="calendar-wrapper" style={{ marginBottom: '1.25rem' }}>
@@ -255,7 +370,10 @@ const Booking: React.FC = () => {
                         key={i}
                         className={`calendar-day-btn ${outOfMonth ? 'empty' : ''} ${isAvailable ? 'available' : ''} ${isSelected ? 'selected' : ''} ${todayDay ? 'today' : ''}`}
                         disabled={!isAvailable}
-                        onClick={() => { setSelectedDate(day); setSelectedTime(null); }}
+                        onClick={() => {
+                          setSelectedDate(day);
+                          setSelectedTime(null);
+                        }}
                         style={{ color: outOfMonth ? '#cbd5e1' : undefined }}
                       >
                         {format(day, 'd')}
@@ -268,24 +386,71 @@ const Booking: React.FC = () => {
               {/* Slots de horarios */}
               {selectedDate && (
                 <div>
+                  {loadingSlots ? (
+                    <p className="text-muted text-xs" style={{ marginBottom: '0.5rem' }}>Cargando disponibilidad...</p>
+                  ) : null}
+
                   <div style={{ marginBottom: '0.625rem' }}>
                     <p className="slots-section-title">☀ Mañana (09:00 – 13:00)</p>
                     <div className="slots-flex">
-                      {SLOT_TIMES_MORNING.map(t => (
-                        <button key={t} className={`btn-slot-pill ${selectedTime === t ? 'active' : ''}`} onClick={() => setSelectedTime(t)}>
-                          {t}
-                        </button>
-                      ))}
+                      {SLOT_TIMES_MORNING.map(t => {
+                        const isPastTime = isSlotPast(t);
+                        const isBusy = busySlots.includes(t);
+                        const isDisabled = isPastTime || isBusy;
+                        const isSelected = selectedTime === t;
+
+                        return (
+                          <button
+                            key={t}
+                            disabled={isDisabled}
+                            className={`btn-slot-pill ${isSelected ? 'active' : ''}`}
+                            onClick={() => !isDisabled && setSelectedTime(t)}
+                            title={isBusy ? 'Horario ocupado' : isPastTime ? 'Horario pasado' : 'Disponible'}
+                            style={isDisabled ? {
+                              opacity: 0.35,
+                              cursor: 'not-allowed',
+                              background: '#f1f5f9',
+                              borderColor: '#cbd5e1',
+                              color: '#94a3b8',
+                              textDecoration: 'line-through'
+                            } : {}}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
+
                   <div style={{ marginTop: '0.875rem' }}>
                     <p className="slots-section-title">🌆 Tarde (13:00 – 18:00)</p>
                     <div className="slots-flex">
-                      {SLOT_TIMES_AFTERNOON.map(t => (
-                        <button key={t} className={`btn-slot-pill ${selectedTime === t ? 'active' : ''}`} onClick={() => setSelectedTime(t)}>
-                          {t}
-                        </button>
-                      ))}
+                      {SLOT_TIMES_AFTERNOON.map(t => {
+                        const isPastTime = isSlotPast(t);
+                        const isBusy = busySlots.includes(t);
+                        const isDisabled = isPastTime || isBusy;
+                        const isSelected = selectedTime === t;
+
+                        return (
+                          <button
+                            key={t}
+                            disabled={isDisabled}
+                            className={`btn-slot-pill ${isSelected ? 'active' : ''}`}
+                            onClick={() => !isDisabled && setSelectedTime(t)}
+                            title={isBusy ? 'Horario ocupado' : isPastTime ? 'Horario pasado' : 'Disponible'}
+                            style={isDisabled ? {
+                              opacity: 0.35,
+                              cursor: 'not-allowed',
+                              background: '#f1f5f9',
+                              borderColor: '#cbd5e1',
+                              color: '#94a3b8',
+                              textDecoration: 'line-through'
+                            } : {}}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -307,7 +472,7 @@ const Booking: React.FC = () => {
             </>
           )}
 
-          {/* PASO 3: Confirmación */}
+          {/* PASO 3: Confirmación Final */}
           {step === 3 && selectedService && selectedDate && selectedTime && (
             <>
               <h4 style={{ fontWeight: 800, color: 'var(--text-title)', marginBottom: '4px' }}>Confirmar Reserva</h4>
@@ -315,7 +480,7 @@ const Booking: React.FC = () => {
 
               {timeLeft > 0 && (
                 <div className="alert-info" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
-                  ⏱ Horario reservado — Te quedan{' '}
+                  ⏱ Horario bloqueado — Te quedan{' '}
                   <strong>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</strong> min para confirmar
                 </div>
               )}

@@ -2,18 +2,45 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
-  CalendarDays, Briefcase, Clock, Users, Plus, Trash2, ChevronLeft, ChevronRight, Building2, Settings
+  CalendarDays,
+  Clock,
+  Plus,
+  Trash2,
+  Settings,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Building2,
+  Star,
+  MessageSquare,
+  User,
+  Check
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-interface Business { id: number; name: string; address: string; description: string; category: string; phone: string; }
+interface Business { id: number; name: string; description: string; address: string; phone: string; category: string; }
 interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
 interface Schedule { id: number; dayOfWeek: number; startTime: string; endTime: string; }
 interface Appointment {
-  id: number; date: string; time: string; status: string;
+  id: number;
+  date: string;
+  time: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  cancelledReason?: string;
   user?: { name: string; email: string };
-  service?: { name: string; durationMinutes: number };
+  service?: { name: string; price: number };
+}
+interface Review {
+  id: number;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
+  appointment?: {
+    user?: { id: number; name: string };
+    service?: { id: number; name: string };
+  };
 }
 
 const DAY_NAMES = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -26,8 +53,8 @@ const formatTime = (timeStr: string) => {
   try {
     const d = new Date(timeStr);
     if (isNaN(d.getTime())) return timeStr;
-    const hours = String(d.getUTCHours()).padStart(2, '0');
-    const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
   } catch {
     return timeStr;
@@ -39,7 +66,7 @@ const Dashboard: React.FC = () => {
 
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBiz, setSelectedBiz] = useState<Business | null>(null);
-  const [activeTab, setActiveTab] = useState<'agenda' | 'services' | 'schedules' | 'settings'>('agenda');
+  const [activeTab, setActiveTab] = useState<'agenda' | 'services' | 'schedules' | 'reviews' | 'settings'>('agenda');
 
   const [agendaDate, setAgendaDate] = useState(new Date());
   const [agendaAppointments, setAgendaAppointments] = useState<Appointment[]>([]);
@@ -47,6 +74,11 @@ const Dashboard: React.FC = () => {
 
   const [services, setServices] = useState<Service[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+
+  // Reviews
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsStats, setReviewsStats] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Forms
   const [serviceForm, setServiceForm] = useState({ name: '', description: '', durationMinutes: 30, price: 0 });
@@ -70,7 +102,7 @@ const Dashboard: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // When business changes, load services and schedules
+  // When business changes, load services, schedules and reviews
   useEffect(() => {
     if (!selectedBiz) return;
     setSettingsForm({
@@ -82,10 +114,13 @@ const Dashboard: React.FC = () => {
     });
     Promise.all([
       api.get(`/businesses/${selectedBiz.id}/services`),
-      api.get(`/businesses/${selectedBiz.id}/schedules`)
-    ]).then(([sRes, schRes]) => {
+      api.get(`/businesses/${selectedBiz.id}/schedules`),
+      api.get(`/businesses/${selectedBiz.id}/reviews`)
+    ]).then(([sRes, schRes, rRes]) => {
       setServices(sRes.data.data ?? sRes.data ?? []);
       setSchedules(schRes.data ?? []);
+      setReviews(rRes.data.data ?? []);
+      setReviewsStats(rRes.data.stats ?? { average: 0, count: 0 });
     });
   }, [selectedBiz]);
 
@@ -100,73 +135,81 @@ const Dashboard: React.FC = () => {
       .finally(() => setAgendaLoading(false));
   }, [selectedBiz, agendaDate]);
 
+  const handleCompleteAppointment = async (aptId: number) => {
+    try {
+      await api.patch(`/appointments/${aptId}/status`, { status: 'COMPLETED' });
+      showToast('✓ Turno marcado como completado');
+      setAgendaAppointments(prev =>
+        prev.map(a => (a.id === aptId ? { ...a, status: 'COMPLETED' } : a))
+      );
+      // Actualizar reviews si se carga
+      if (selectedBiz) {
+        api.get(`/businesses/${selectedBiz.id}/reviews`).then(rRes => {
+          setReviews(rRes.data.data ?? []);
+          setReviewsStats(rRes.data.stats ?? { average: 0, count: 0 });
+        });
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al completar el turno');
+    }
+  };
+
   const handleCreateBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       const res = await api.post('/businesses', noBusinessForm);
-      setBusinesses(prev => [...prev, res.data]);
+      setBusinesses([res.data]);
       setSelectedBiz(res.data);
-      showToast('✓ Negocio registrado exitosamente');
-      // Refresh user info from server to reflect 'owner' role upgrade
-      const meRes = await api.get('/users/me');
-      localStorage.setItem('user', JSON.stringify(meRes.data));
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Error al crear negocio');
+      showToast('¡Negocio creado con éxito!');
+    } catch {
+      showToast('Error al crear negocio.');
     } finally { setSubmitting(false); }
   };
 
-  const handleAddService = async (e: React.FormEvent) => {
+  const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBiz) return;
     setSubmitting(true);
     try {
       const res = await api.post(`/businesses/${selectedBiz.id}/services`, serviceForm);
-      setServices(prev => [...prev, res.data]);
+      setServices(s => [...s, res.data]);
       setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
-      showToast('✓ Servicio agregado');
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Error al crear servicio');
+      showToast('Servicio agregado.');
+    } catch {
+      showToast('Error al crear servicio.');
     } finally { setSubmitting(false); }
   };
 
-  const handleDeleteService = async (serviceId: number) => {
+  const handleDeleteService = async (svcId: number) => {
     if (!selectedBiz || !confirm('¿Eliminar este servicio?')) return;
     try {
-      await api.delete(`/businesses/${selectedBiz.id}/services/${serviceId}`);
-      setServices(prev => prev.filter(s => s.id !== serviceId));
-      showToast('✓ Servicio eliminado');
-    } catch { showToast('Error al eliminar'); }
+      await api.delete(`/businesses/${selectedBiz.id}/services/${svcId}`);
+      setServices(s => s.filter(x => x.id !== svcId));
+      showToast('Servicio eliminado.');
+    } catch { showToast('Error al eliminar.'); }
   };
 
-  const handleAddSchedule = async (e: React.FormEvent) => {
+  const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBiz) return;
     setSubmitting(true);
     try {
-      const dateBase = '2000-01-01';
-      const res = await api.post(`/businesses/${selectedBiz.id}/schedules`, {
-        dayOfWeek: scheduleForm.dayOfWeek,
-        startTime: `${dateBase}T${scheduleForm.startTime}:00.000Z`,
-        endTime: `${dateBase}T${scheduleForm.endTime}:00.000Z`,
-      });
-      setSchedules(prev => [...prev, res.data]);
-      showToast('✓ Horario guardado');
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Error al guardar horario');
+      const res = await api.post(`/businesses/${selectedBiz.id}/schedules`, scheduleForm);
+      setSchedules(s => [...s, res.data]);
+      showToast('Horario agregado.');
+    } catch {
+      showToast('Error al crear horario.');
     } finally { setSubmitting(false); }
   };
 
-  const handleDeleteSchedule = async (scheduleId: number) => {
+  const handleDeleteSchedule = async (schId: number) => {
     if (!selectedBiz || !confirm('¿Eliminar este horario?')) return;
     try {
-      await api.delete(`/businesses/${selectedBiz.id}/schedules/${scheduleId}`);
-      setSchedules(prev => prev.filter(s => s.id !== scheduleId));
-      showToast('✓ Horario eliminado');
-    } catch { showToast('Error al eliminar'); }
+      await api.delete(`/businesses/${selectedBiz.id}/schedules/${schId}`);
+      setSchedules(s => s.filter(x => x.id !== schId));
+      showToast('Horario eliminado.');
+    } catch { showToast('Error al eliminar.'); }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -176,54 +219,64 @@ const Dashboard: React.FC = () => {
     try {
       const res = await api.patch(`/businesses/${selectedBiz.id}`, settingsForm);
       setSelectedBiz(res.data);
-      setBusinesses(prev => prev.map(b => b.id === res.data.id ? res.data : b));
-      showToast('✓ Configuración guardada');
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Error al guardar');
-    } finally { setSubmitting(false); }
+      setBusinesses(bs => bs.map(b => b.id === res.data.id ? res.data : b));
+      showToast('Configuración guardada.');
+    } catch { showToast('Error al guardar.'); }
+    finally { setSubmitting(false); }
+  };
+
+  const formatDateReview = (dateStr: string) => {
+    try {
+      return format(new Date(dateStr), "d 'de' MMMM, yyyy", { locale: es });
+    } catch {
+      return dateStr;
+    }
   };
 
   const TABS = [
-    { id: 'agenda', icon: <CalendarDays size={16} />, label: 'Agenda Diaria' },
-    { id: 'services', icon: <Briefcase size={16} />, label: 'Mis Servicios' },
-    { id: 'schedules', icon: <Clock size={16} />, label: 'Horarios' },
-    { id: 'settings', icon: <Settings size={16} />, label: 'Configurar' },
-  ] as const;
+    { id: 'agenda' as const, label: 'Agenda de Turnos', icon: <CalendarDays size={16} /> },
+    { id: 'services' as const, label: 'Servicios', icon: <Briefcase size={16} /> },
+    { id: 'schedules' as const, label: 'Horarios de Atención', icon: <Clock size={16} /> },
+    { id: 'reviews' as const, label: `Opiniones y Reseñas (${reviewsStats.count})`, icon: <Star size={16} /> },
+    { id: 'settings' as const, label: 'Configuración', icon: <Settings size={16} /> },
+  ];
 
   return (
     <div>
-      {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', top: '5rem', right: '1.5rem', zIndex: 2000, background: '#1e293b', color: 'white', padding: '12px 20px', borderRadius: '10px', fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', animation: 'slideUp 0.2s ease' }}>
+        <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999, background: '#1e293b', color: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', fontSize: '0.9rem', fontWeight: 600 }}>
           {toast}
         </div>
       )}
 
-      {/* Header + selector de negocio */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* Header del Dashboard */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ color: 'var(--text-title)', fontSize: '1.75rem', fontWeight: 800, marginBottom: '2px' }}>
-            Panel de Administración
+          <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
+            Panel de Control
           </h1>
-          <p className="text-muted text-sm">Bienvenido, <strong>{user?.name}</strong> — Rol: <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>Dueño</span></p>
+          <p className="text-muted text-sm" style={{ margin: '2px 0 0 0' }}>
+            Gestiona la agenda, servicios, opiniones y configuración de tu local.
+          </p>
         </div>
 
         {businesses.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label className="form-label" style={{ marginBottom: 0 }}>Negocio activo:</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="text-muted text-sm fw-semibold">Local:</span>
             <select
               className="form-control"
-              style={{ width: 'auto' }}
+              style={{ width: 'auto', padding: '6px 12px', fontSize: '0.88rem' }}
               value={selectedBiz?.id}
-              onChange={e => setSelectedBiz(businesses.find(b => b.id === parseInt(e.target.value)) || null)}
+              onChange={e => setSelectedBiz(businesses.find(b => b.id === Number(e.target.value)) || null)}
             >
-              {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {businesses.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
             </select>
           </div>
         )}
       </div>
 
-      {/* Estado: sin negocios */}
       {businesses.length === 0 && (
         <div className="ml-card" style={{ padding: '3rem', textAlign: 'center' }}>
           <Building2 size={56} color="var(--primary-color)" style={{ marginBottom: '1rem' }} />
@@ -259,6 +312,7 @@ const Dashboard: React.FC = () => {
               { icon: <CalendarDays size={22} />, label: 'Turnos de Hoy', value: agendaAppointments.length },
               { icon: <Briefcase size={22} />, label: 'Servicios Activos', value: services.length },
               { icon: <Clock size={22} />, label: 'Horarios Configurados', value: schedules.length },
+              { icon: <Star size={22} />, label: 'Calificación de Clientes', value: reviewsStats.average > 0 ? `${reviewsStats.average.toFixed(1)} ★ (${reviewsStats.count})` : 'Nuevo' },
             ].map((m, i) => (
               <div key={i} className="metric-card">
                 <div className="metric-icon">{m.icon}</div>
@@ -293,45 +347,74 @@ const Dashboard: React.FC = () => {
           {/* ======= AGENDA ======= */}
           {activeTab === 'agenda' && (
             <div className="ml-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <h3 style={{ fontWeight: 700, color: 'var(--text-title)' }}>Planilla de Reservas</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button className="btn btn-light" style={{ padding: '6px 12px' }} onClick={() => setAgendaDate(d => subDays(d, 1))}>
-                    <ChevronLeft size={16} /> Anterior
+                  <button className="btn btn-light" style={{ padding: '6px 10px' }} onClick={() => setAgendaDate(d => subDays(d, 1))}>
+                    <ChevronLeft size={16} />
                   </button>
-                  <input type="date" className="form-control" style={{ width: '155px', textAlign: 'center', fontWeight: 600 }}
-                    value={format(agendaDate, 'yyyy-MM-dd')}
-                    onChange={e => setAgendaDate(new Date(e.target.value + 'T12:00:00'))}
-                  />
-                  <button className="btn btn-light" style={{ padding: '6px 12px' }} onClick={() => setAgendaDate(d => addDays(d, 1))}>
-                    Siguiente <ChevronRight size={16} />
+                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-title)' }}>
+                    {format(agendaDate, "EEEE d 'de' MMMM, yyyy", { locale: es })}
+                  </h3>
+                  <button className="btn btn-light" style={{ padding: '6px 10px' }} onClick={() => setAgendaDate(d => addDays(d, 1))}>
+                    <ChevronRight size={16} />
+                  </button>
+                  <button className="btn btn-light" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setAgendaDate(new Date())}>
+                    Hoy
                   </button>
                 </div>
+                <span className="badge badge-pending" style={{ fontSize: '0.82rem' }}>
+                  {agendaAppointments.length} turnos agendados
+                </span>
               </div>
 
               {agendaLoading ? (
-                <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>Cargando agenda...</p>
+                <div style={{ textAlign: 'center', padding: '3rem' }} className="text-muted">Cargando agenda...</div>
               ) : agendaAppointments.length === 0 ? (
                 <div className="empty-state">
-                  <p className="text-muted">No hay turnos para el {format(agendaDate, "d 'de' MMMM", { locale: es })}.</p>
+                  <CalendarDays size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
+                  <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px' }}>Sin turnos para esta fecha</p>
+                  <p className="text-muted text-sm">No hay clientes agendados para este día.</p>
                 </div>
               ) : (
-                <div className="timeline-container">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {agendaAppointments.map(apt => (
-                    <div key={apt.id} className="timeline-item">
-                      <div style={{ fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px', fontSize: '1rem' }}>
-                        {formatTime(apt.time)}
-                      </div>
-                      <div className="timeline-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <p style={{ fontWeight: 700, marginBottom: '2px' }}>{apt.user?.name || 'Cliente'}</p>
-                            <p className="text-muted text-sm">{apt.service?.name}</p>
-                          </div>
-                          <span className={`badge ${apt.status === 'CONFIRMED' ? 'badge-confirmed' : apt.status === 'CANCELLED' ? 'badge-cancelled' : 'badge-pending'}`}>
-                            {STATUS_MAP[apt.status] || apt.status}
-                          </span>
+                    <div
+                      key={apt.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '1rem 1.25rem', border: '1px solid var(--border-default)',
+                        borderRadius: '10px', flexWrap: 'wrap', gap: '1rem',
+                        background: apt.status === 'COMPLETED' ? '#f8fafc' : 'white'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ width: '60px', fontWeight: 800, color: 'var(--primary-color)', fontSize: '1.1rem' }}>
+                          {formatTime(apt.time)}
                         </div>
+                        <div>
+                          <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '2px' }}>
+                            {apt.user?.name || 'Cliente'}
+                          </p>
+                          <p className="text-muted text-xs">
+                            {apt.service?.name} · ${apt.service?.price}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <span className={`badge badge-${apt.status.toLowerCase()}`}>
+                          {STATUS_MAP[apt.status] || apt.status}
+                        </span>
+
+                        {apt.status === 'CONFIRMED' && (
+                          <button
+                            className="btn btn-success-fill"
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => handleCompleteAppointment(apt.id)}
+                          >
+                            <Check size={14} /> Marcar como Completado
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -342,100 +425,70 @@ const Dashboard: React.FC = () => {
 
           {/* ======= SERVICIOS ======= */}
           {activeTab === 'services' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
               <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text-title)' }}>Agregar Servicio</h3>
-                <form onSubmit={handleAddService}>
+                <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Servicios Publicados ({services.length})</h3>
+                {services.length === 0 ? (
+                  <div className="empty-state">No hay servicios creados aún.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {services.map(svc => (
+                      <div key={svc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--border-default)', borderRadius: '10px' }}>
+                        <div>
+                          <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '2px' }}>{svc.name}</p>
+                          <p className="text-muted text-xs" style={{ marginBottom: '4px' }}>{svc.description}</p>
+                          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>⏱ {svc.durationMinutes} min</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1.1rem' }}>${svc.price}</span>
+                          <button className="btn btn-light-danger" style={{ padding: '6px 10px' }} onClick={() => handleDeleteService(svc.id)}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Formulario nuevo servicio */}
+              <div className="ml-card" style={{ padding: '1.5rem' }}>
+                <h4 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Agregar Servicio</h4>
+                <form onSubmit={handleCreateService}>
                   <div className="form-group">
-                    <label className="form-label">Nombre</label>
-                    <input className="form-control" placeholder="Ej. Corte clásico" value={serviceForm.name} onChange={e => setServiceForm(f => ({ ...f, name: e.target.value }))} required />
+                    <label className="form-label">Nombre del servicio *</label>
+                    <input className="form-control" placeholder="Ej. Corte y Peinado" value={serviceForm.name} onChange={e => setServiceForm(f => ({ ...f, name: e.target.value }))} required />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Descripción</label>
-                    <textarea className="form-control" rows={2} value={serviceForm.description} onChange={e => setServiceForm(f => ({ ...f, description: e.target.value }))} />
+                    <textarea className="form-control" rows={2} placeholder="Detalles del servicio..." value={serviceForm.description} onChange={e => setServiceForm(f => ({ ...f, description: e.target.value }))} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div className="form-group">
-                      <label className="form-label">Duración (min)</label>
-                      <input type="number" className="form-control" value={serviceForm.durationMinutes} onChange={e => setServiceForm(f => ({ ...f, durationMinutes: parseInt(e.target.value) }))} required />
+                      <label className="form-label">Duración (min) *</label>
+                      <input type="number" min={10} step={5} className="form-control" value={serviceForm.durationMinutes} onChange={e => setServiceForm(f => ({ ...f, durationMinutes: Number(e.target.value) }))} required />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Precio ($)</label>
-                      <input type="number" step="0.01" className="form-control" value={serviceForm.price} onChange={e => setServiceForm(f => ({ ...f, price: parseFloat(e.target.value) }))} required />
+                      <label className="form-label">Precio ($) *</label>
+                      <input type="number" min={0} className="form-control" value={serviceForm.price} onChange={e => setServiceForm(f => ({ ...f, price: Number(e.target.value) }))} required />
                     </div>
                   </div>
                   <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-                    <Plus size={16} /> {submitting ? 'Guardando...' : 'Guardar Servicio'}
+                    <Plus size={16} /> {submitting ? 'Agregando...' : 'Crear Servicio'}
                   </button>
                 </form>
-              </div>
-
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text-title)' }}>Servicios Configurados</h3>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--background-app)', borderRadius: '8px' }}>
-                        {['Servicio', 'Duración', 'Precio', 'Acciones'].map(h => (
-                          <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {services.length === 0 ? (
-                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No hay servicios registrados.</td></tr>
-                      ) : services.map(svc => (
-                        <tr key={svc.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
-                          <td style={{ padding: '12px 14px' }}>
-                            <p style={{ fontWeight: 600 }}>{svc.name}</p>
-                            <p className="text-muted text-xs">{svc.description}</p>
-                          </td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-main)' }}>{svc.durationMinutes} min</td>
-                          <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--status-success-text)' }}>${svc.price}</td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <button className="btn btn-light-danger" style={{ padding: '6px 10px' }} onClick={() => handleDeleteService(svc.id)}>
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             </div>
           )}
 
           {/* ======= HORARIOS ======= */}
           {activeTab === 'schedules' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
               <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text-title)' }}>Definir Horario</h3>
-                <form onSubmit={handleAddSchedule}>
-                  <div className="form-group">
-                    <label className="form-label">Día de la semana</label>
-                    <select className="form-control" value={scheduleForm.dayOfWeek} onChange={e => setScheduleForm(f => ({ ...f, dayOfWeek: parseInt(e.target.value) }))}>
-                      {DAY_NAMES.slice(1).map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Horario de apertura y cierre</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input type="time" className="form-control" value={scheduleForm.startTime} onChange={e => setScheduleForm(f => ({ ...f, startTime: e.target.value }))} required />
-                      <input type="time" className="form-control" value={scheduleForm.endTime} onChange={e => setScheduleForm(f => ({ ...f, endTime: e.target.value }))} required />
-                    </div>
-                  </div>
-                  <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-                    <Plus size={16} /> Guardar Horario
-                  </button>
-                </form>
-              </div>
-
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text-title)' }}>Horarios Activos</h3>
+                <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Horarios de Atención Configurados</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: 'var(--background-app)' }}>
+                    <tr style={{ borderBottom: '2px solid var(--border-default)' }}>
                       {['Día', 'Apertura', 'Cierre', 'Acciones'].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{h}</th>
                       ))}
@@ -458,6 +511,164 @@ const Dashboard: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Formulario nuevo horario */}
+              <div className="ml-card" style={{ padding: '1.5rem' }}>
+                <h4 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Agregar Día y Horario</h4>
+                <form onSubmit={handleCreateSchedule}>
+                  <div className="form-group">
+                    <label className="form-label">Día de la semana *</label>
+                    <select className="form-control" value={scheduleForm.dayOfWeek} onChange={e => setScheduleForm(f => ({ ...f, dayOfWeek: Number(e.target.value) }))}>
+                      {[1, 2, 3, 4, 5, 6, 7].map(d => (
+                        <option key={d} value={d}>{DAY_NAMES[d]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Apertura *</label>
+                      <input type="time" className="form-control" value={scheduleForm.startTime} onChange={e => setScheduleForm(f => ({ ...f, startTime: e.target.value }))} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Cierre *</label>
+                      <input type="time" className="form-control" value={scheduleForm.endTime} onChange={e => setScheduleForm(f => ({ ...f, endTime: e.target.value }))} required />
+                    </div>
+                  </div>
+                  <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
+                    <Plus size={16} /> {submitting ? 'Guardando...' : 'Guardar Horario'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ======= OPINIONES Y RESEÑAS ======= */}
+          {activeTab === 'reviews' && (
+            <div>
+              {/* Score card resumen */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
+                border: '1px solid #a7f3d0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1.5rem',
+                flexWrap: 'wrap',
+                gap: '1rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '2.8rem', fontWeight: 800, color: '#065f46', lineHeight: 1 }}>
+                      {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : '5.0'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '2px', marginTop: '6px', justifyContent: 'center' }}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star
+                          key={star}
+                          size={18}
+                          fill={star <= Math.round(reviewsStats.average || 5) ? '#f59e0b' : 'none'}
+                          color={star <= Math.round(reviewsStats.average || 5) ? '#f59e0b' : '#cbd5e1'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 style={{ fontWeight: 800, color: '#065f46', margin: 0, fontSize: '1.25rem' }}>
+                      Calificación General del Comercio
+                    </h3>
+                    <p style={{ color: '#047857', margin: '4px 0 0 0', fontSize: '0.88rem' }}>
+                      Basado en <strong>{reviewsStats.count}</strong> {reviewsStats.count === 1 ? 'opinión de cliente verificado' : 'opiniones de clientes verificados'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Reseñas */}
+              <div className="ml-card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ fontWeight: 800, marginBottom: '1.25rem', color: 'var(--text-title)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={20} color="var(--primary-color)" /> Comentarios y Feedback Recibido
+                </h3>
+
+                {reviews.length === 0 ? (
+                  <div className="empty-state" style={{ padding: '3rem 1rem' }}>
+                    <MessageSquare size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
+                    <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px' }}>Aún no has recibido opiniones</p>
+                    <p className="text-muted text-sm">Cuando tus clientes completen sus turnos, podrán dejarte calificaciones y comentarios aquí.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {reviews.map(rev => (
+                      <div
+                        key={rev.id}
+                        style={{
+                          border: '1px solid var(--border-default)',
+                          borderRadius: '10px',
+                          padding: '1.25rem',
+                          background: 'white'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              background: '#e0f2fe',
+                              color: 'var(--primary-color)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '1rem'
+                            }}>
+                              {rev.appointment?.user?.name ? rev.appointment.user.name[0].toUpperCase() : <User size={18} />}
+                            </div>
+                            <div>
+                              <p style={{ fontWeight: 700, fontSize: '0.98rem', margin: 0, color: 'var(--text-title)' }}>
+                                {rev.appointment?.user?.name || 'Cliente'}
+                              </p>
+                              {rev.appointment?.service?.name && (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                  Servicio realizado: <strong>{rev.appointment.service.name}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                              {[1, 2, 3, 4, 5].map(s => (
+                                <Star
+                                  key={s}
+                                  size={16}
+                                  fill={s <= rev.rating ? '#f59e0b' : 'none'}
+                                  color={s <= rev.rating ? '#f59e0b' : '#cbd5e1'}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-muted text-xs">{formatDateReview(rev.createdAt)}</span>
+                          </div>
+                        </div>
+
+                        {rev.comment ? (
+                          <div style={{ margin: '10px 0 0 0', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--primary-color)' }}>
+                            <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                              "{rev.comment}"
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-muted text-xs" style={{ margin: '6px 0 0 0', fontStyle: 'italic' }}>
+                            El cliente calificó con {rev.rating} estrellas sin comentario escrito.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
