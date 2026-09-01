@@ -16,6 +16,7 @@ import {
   isToday
 } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatTimeToHHMM, toISOTimeString } from '../utils/timeHelper';
 
 interface Business { id: number; name: string; address: string; description: string; }
 interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
@@ -95,13 +96,7 @@ const Booking: React.FC = () => {
     api.get(`/businesses/${id}/busy-slots?date=${dateStr}`)
       .then(res => {
         const rawList = res.data.data ?? [];
-        const formattedList = rawList.map((item: string) => {
-          if (item.includes('T')) {
-            const d = new Date(item);
-            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          }
-          return item;
-        });
+        const formattedList = rawList.map((item: string) => formatTimeToHHMM(item));
         setBusySlots(formattedList);
       })
       .catch(() => {
@@ -189,7 +184,7 @@ const Booking: React.FC = () => {
         businessId: Number(id),
         serviceId: selectedService.id,
         date: `${dateStr}T00:00:00.000Z`,
-        time: localDateTime.toISOString(),
+        time: toISOTimeString(selectedTime),
       });
       setHoldToken(res.data.holdToken);
       setExpiresAt(res.data.expiresAt);
@@ -203,8 +198,6 @@ const Booking: React.FC = () => {
 
   const handleConfirm = async () => {
     if (!holdToken || !selectedDate || !selectedTime || !selectedService) return;
-    const localDateTime = getSelectedDateTime();
-    if (!localDateTime) return;
 
     setSubmitting(true);
     setError('');
@@ -214,7 +207,7 @@ const Booking: React.FC = () => {
         businessId: Number(id),
         serviceId: selectedService.id,
         date: `${dateStr}T00:00:00.000Z`,
-        time: localDateTime.toISOString(),
+        time: toISOTimeString(selectedTime),
         holdToken,
       });
       navigate('/my-appointments');

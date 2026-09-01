@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatTimeToHHMM } from '../utils/timeHelper';
 
 interface Business { id: number; name: string; description: string; address: string; phone: string; category: string; }
 interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
@@ -51,16 +52,7 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 const formatTime = (timeStr: string) => {
-  if (!timeStr) return '--';
-  try {
-    const d = new Date(timeStr);
-    if (isNaN(d.getTime())) return timeStr;
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
-  } catch {
-    return timeStr;
-  }
+  return formatTimeToHHMM(timeStr);
 };
 
 const Dashboard: React.FC = () => {
