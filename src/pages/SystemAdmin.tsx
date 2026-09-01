@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatTimeToHHMM } from '../utils/timeHelper';
 
 interface User { id: number; name: string; email: string; role: string; phone: string; createdAt: string; }
 interface Business { id: number; name: string; address: string; owner?: { name: string }; }
@@ -273,10 +274,8 @@ const SystemAdmin: React.FC = () => {
                       {(() => {
                         try {
                           const datePart = format(new Date(apt.date), 'd MMM yyyy', { locale: es });
-                          const d = new Date(apt.time);
-                          const hours = String(d.getUTCHours()).padStart(2, '0');
-                          const minutes = String(d.getUTCMinutes()).padStart(2, '0');
-                          return `${datePart} – ${hours}:${minutes}`;
+                          const timePart = formatTimeToHHMM(apt.time);
+                          return `${datePart} – ${timePart}`;
                         } catch { return '—'; }
                       })()}
                     </td>

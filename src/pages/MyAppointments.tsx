@@ -3,6 +3,7 @@ import api from '../services/api';
 import { Calendar as CalendarIcon, Clock, XCircle, Info, Star, CheckCircle, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatTimeToHHMM, getHoursUntilAppointment } from '../utils/timeHelper';
 
 interface Review {
   id: number;
@@ -81,19 +82,7 @@ const MyAppointments: React.FC = () => {
   const filtered = statusFilter === 'ALL' ? appointments : appointments.filter(a => a.status === statusFilter);
 
   const getHoursUntil = (dateStr: string, timeStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      const t = new Date(timeStr);
-      const year = d.getUTCFullYear();
-      const month = d.getUTCMonth();
-      const day = d.getUTCDate();
-      const hours = t.getUTCHours();
-      const minutes = t.getUTCMinutes();
-      const start = new Date(Date.UTC(year, month, day, hours, minutes));
-      return (start.getTime() - Date.now()) / (1000 * 60 * 60);
-    } catch {
-      return 0;
-    }
+    return getHoursUntilAppointment(dateStr, timeStr);
   };
 
   const handleCancel = async (e: React.FormEvent) => {
@@ -150,16 +139,7 @@ const MyAppointments: React.FC = () => {
   };
 
   const formatTime = (timeStr: string) => {
-    if (!timeStr) return '--';
-    try {
-      const d = new Date(timeStr);
-      if (isNaN(d.getTime())) return timeStr;
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      return `${hours}:${minutes}`;
-    } catch {
-      return timeStr;
-    }
+    return formatTimeToHHMM(timeStr);
   };
 
   const formatDate = (dateStr: string) => {
