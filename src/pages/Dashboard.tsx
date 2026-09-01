@@ -15,7 +15,9 @@ import {
   Star,
   MessageSquare,
   User,
-  Check
+  Check,
+  Pencil,
+  X
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -81,6 +83,7 @@ const Dashboard: React.FC = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Forms
+  const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
   const [serviceForm, setServiceForm] = useState({ name: '', description: '', durationMinutes: 30, price: 0 });
   const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
   const [settingsForm, setSettingsForm] = useState({ name: '', description: '', address: '', phone: '', category: '' });
@@ -90,6 +93,21 @@ const Dashboard: React.FC = () => {
   const [noBusinessForm, setNoBusinessForm] = useState({ name: '', description: '', address: '' });
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const handleStartEditService = (svc: Service) => {
+    setEditingServiceId(svc.id);
+    setServiceForm({
+      name: svc.name,
+      description: svc.description || '',
+      durationMinutes: svc.durationMinutes,
+      price: Number(svc.price)
+    });
+  };
+
+  const handleCancelEditService = () => {
+    setEditingServiceId(null);
+    setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
+  };
 
   // Load my businesses
   useEffect(() => {
@@ -104,6 +122,7 @@ const Dashboard: React.FC = () => {
 
   // When business changes, load services, schedules and reviews
   useEffect(() => {
+    handleCancelEditService();
     if (!selectedBiz) return;
     setSettingsForm({
       name: selectedBiz.name || '',
@@ -167,17 +186,24 @@ const Dashboard: React.FC = () => {
     } finally { setSubmitting(false); }
   };
 
-  const handleCreateService = async (e: React.FormEvent) => {
+  const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBiz) return;
     setSubmitting(true);
     try {
-      const res = await api.post(`/businesses/${selectedBiz.id}/services`, serviceForm);
-      setServices(s => [...s, res.data]);
-      setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
-      showToast('Servicio agregado.');
-    } catch {
-      showToast('Error al crear servicio.');
+      if (editingServiceId) {
+        const res = await api.put(`/businesses/${selectedBiz.id}/services/${editingServiceId}`, serviceForm);
+        setServices(s => s.map(x => (x.id === editingServiceId ? res.data : x)));
+        handleCancelEditService();
+        showToast('✓ Servicio actualizado correctamente.');
+      } else {
+        const res = await api.post(`/businesses/${selectedBiz.id}/services`, serviceForm);
+        setServices(s => [...s, res.data]);
+        setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
+        showToast('Servicio agregado.');
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.message || (editingServiceId ? 'Error al actualizar servicio.' : 'Error al crear servicio.'));
     } finally { setSubmitting(false); }
   };
 
@@ -186,6 +212,9 @@ const Dashboard: React.FC = () => {
     try {
       await api.delete(`/businesses/${selectedBiz.id}/services/${svcId}`);
       setServices(s => s.filter(x => x.id !== svcId));
+      if (editingServiceId === svcId) {
+        handleCancelEditService();
+      }
       showToast('Servicio eliminado.');
     } catch { showToast('Error al eliminar.'); }
   };
@@ -432,29 +461,107 @@ const Dashboard: React.FC = () => {
                   <div className="empty-state">No hay servicios creados aún.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {services.map(svc => (
-                      <div key={svc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--border-default)', borderRadius: '10px' }}>
-                        <div>
-                          <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '2px' }}>{svc.name}</p>
-                          <p className="text-muted text-xs" style={{ marginBottom: '4px' }}>{svc.description}</p>
-                          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>⏱ {svc.durationMinutes} min</span>
+                    {services.map(svc => {
+                      const isEditing = editingServiceId === svc.id;
+                      return (
+                        <div
+                          key={svc.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            border: `1px solid ${isEditing ? 'var(--primary-color)' : 'var(--border-default)'}`,
+                            backgroundColor: isEditing ? '#f0f9ff' : 'var(--bg-card)',
+                            borderRadius: '10px',
+                            transition: 'all 0.2s ease',
+                            boxShadow: isEditing ? '0 0 0 2px rgba(0, 158, 227, 0.15)' : 'none'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                              <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: 0 }}>{svc.name}</p>
+                              {isEditing && (
+                                <span style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  backgroundColor: 'var(--primary-color)',
+                                  color: '#fff',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}>
+                                  Editando
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-muted text-xs" style={{ marginBottom: '4px' }}>{svc.description || 'Sin descripción'}</p>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>⏱ {svc.durationMinutes} min</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1.1rem', marginRight: '0.5rem' }}>${svc.price}</span>
+                            <button
+                              type="button"
+                              className="btn btn-light"
+                              style={{
+                                padding: '6px 10px',
+                                borderColor: isEditing ? 'var(--primary-color)' : undefined,
+                                color: isEditing ? 'var(--primary-color)' : undefined
+                              }}
+                              title="Editar servicio"
+                              onClick={() => handleStartEditService(svc)}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-light-danger"
+                              style={{ padding: '6px 10px' }}
+                              title="Eliminar servicio"
+                              onClick={() => handleDeleteService(svc.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                          <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1.1rem' }}>${svc.price}</span>
-                          <button className="btn btn-light-danger" style={{ padding: '6px 10px' }} onClick={() => handleDeleteService(svc.id)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
-              {/* Formulario nuevo servicio */}
+              {/* Formulario nuevo / editar servicio */}
               <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h4 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Agregar Servicio</h4>
-                <form onSubmit={handleCreateService}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontWeight: 700, margin: 0, color: 'var(--text-title)' }}>
+                    {editingServiceId ? 'Editar Servicio' : 'Agregar Servicio'}
+                  </h4>
+                  {editingServiceId && (
+                    <button
+                      type="button"
+                      className="btn btn-light"
+                      style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      onClick={handleCancelEditService}
+                    >
+                      <X size={12} /> Cancelar
+                    </button>
+                  )}
+                </div>
+
+                {editingServiceId && (
+                  <div style={{
+                    backgroundColor: '#e0f2fe',
+                    color: '#0369a1',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    marginBottom: '1rem',
+                    fontWeight: 500
+                  }}>
+                    Modifica los datos del servicio y haz clic en "Guardar Cambios".
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveService}>
                   <div className="form-group">
                     <label className="form-label">Nombre del servicio *</label>
                     <input className="form-control" placeholder="Ej. Corte y Peinado" value={serviceForm.name} onChange={e => setServiceForm(f => ({ ...f, name: e.target.value }))} required />
@@ -473,9 +580,25 @@ const Dashboard: React.FC = () => {
                       <input type="number" min={0} className="form-control" value={serviceForm.price} onChange={e => setServiceForm(f => ({ ...f, price: Number(e.target.value) }))} required />
                     </div>
                   </div>
-                  <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-                    <Plus size={16} /> {submitting ? 'Agregando...' : 'Crear Servicio'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
+                      {editingServiceId ? (
+                        <><Check size={16} /> {submitting ? 'Guardando...' : 'Guardar Cambios'}</>
+                      ) : (
+                        <><Plus size={16} /> {submitting ? 'Agregando...' : 'Crear Servicio'}</>
+                      )}
+                    </button>
+                    {editingServiceId && (
+                      <button
+                        type="button"
+                        className="btn btn-light"
+                        onClick={handleCancelEditService}
+                        disabled={submitting}
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
                 </form>
               </div>
             </div>
