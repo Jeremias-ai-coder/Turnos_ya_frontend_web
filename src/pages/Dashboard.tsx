@@ -85,6 +85,7 @@ const Dashboard: React.FC = () => {
   // Forms
   const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
   const [serviceForm, setServiceForm] = useState({ name: '', description: '', durationMinutes: 30, price: 0 });
+  const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
   const [settingsForm, setSettingsForm] = useState({ name: '', description: '', address: '', phone: '', category: '' });
 
@@ -93,6 +94,12 @@ const Dashboard: React.FC = () => {
   const [noBusinessForm, setNoBusinessForm] = useState({ name: '', description: '', address: '' });
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const getFormattedTimeForInput = (timeVal: string) => {
+    if (!timeVal) return '09:00';
+    if (/^\d{2}:\d{2}$/.test(timeVal)) return timeVal;
+    return formatTime(timeVal);
+  };
 
   const handleStartEditService = (svc: Service) => {
     setEditingServiceId(svc.id);
@@ -109,6 +116,20 @@ const Dashboard: React.FC = () => {
     setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
   };
 
+  const handleStartEditSchedule = (sch: Schedule) => {
+    setEditingScheduleId(sch.id);
+    setScheduleForm({
+      dayOfWeek: sch.dayOfWeek,
+      startTime: getFormattedTimeForInput(sch.startTime),
+      endTime: getFormattedTimeForInput(sch.endTime)
+    });
+  };
+
+  const handleCancelEditSchedule = () => {
+    setEditingScheduleId(null);
+    setScheduleForm({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
+  };
+
   // Load my businesses
   useEffect(() => {
     api.get('/businesses/my').then(res => {
@@ -123,6 +144,7 @@ const Dashboard: React.FC = () => {
   // When business changes, load services, schedules and reviews
   useEffect(() => {
     handleCancelEditService();
+    handleCancelEditSchedule();
     if (!selectedBiz) return;
     setSettingsForm({
       name: selectedBiz.name || '',
@@ -219,16 +241,28 @@ const Dashboard: React.FC = () => {
     } catch { showToast('Error al eliminar.'); }
   };
 
-  const handleCreateSchedule = async (e: React.FormEvent) => {
+  const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBiz) return;
     setSubmitting(true);
     try {
-      const res = await api.post(`/businesses/${selectedBiz.id}/schedules`, scheduleForm);
-      setSchedules(s => [...s, res.data]);
-      showToast('Horario agregado.');
-    } catch {
-      showToast('Error al crear horario.');
+      if (editingScheduleId) {
+        const res = await api.put(`/businesses/${selectedBiz.id}/schedules/${editingScheduleId}`, scheduleForm);
+        setSchedules(s =>
+          s.map(x => (x.id === editingScheduleId ? res.data : x))
+        );
+        handleCancelEditSchedule();
+        showToast('✓ Horario actualizado correctamente.');
+      } else {
+        const res = await api.post(`/businesses/${selectedBiz.id}/schedules`, scheduleForm);
+        setSchedules(s =>
+          [...s, res.data].sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(b.startTime)))
+        );
+        setScheduleForm({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
+        showToast('Horario agregado.');
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.message || (editingScheduleId ? 'Error al actualizar horario.' : 'Error al crear horario.'));
     } finally { setSubmitting(false); }
   };
 
@@ -237,6 +271,9 @@ const Dashboard: React.FC = () => {
     try {
       await api.delete(`/businesses/${selectedBiz.id}/schedules/${schId}`);
       setSchedules(s => s.filter(x => x.id !== schId));
+      if (editingScheduleId === schId) {
+        handleCancelEditSchedule();
+      }
       showToast('Horario eliminado.');
     } catch { showToast('Error al eliminar.'); }
   };
@@ -620,26 +657,104 @@ const Dashboard: React.FC = () => {
                   <tbody>
                     {schedules.length === 0 ? (
                       <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No hay horarios configurados.</td></tr>
-                    ) : schedules.map(sch => (
-                      <tr key={sch.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 600 }}>{DAY_NAMES[sch.dayOfWeek]}</td>
-                        <td style={{ padding: '12px 14px' }}>{formatTime(sch.startTime)}</td>
-                        <td style={{ padding: '12px 14px' }}>{formatTime(sch.endTime)}</td>
-                        <td style={{ padding: '12px 14px' }}>
-                          <button className="btn btn-light-danger" style={{ padding: '6px 10px' }} onClick={() => handleDeleteSchedule(sch.id)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    ) : [...schedules]
+                        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(b.startTime)))
+                        .map(sch => {
+                          const isEditing = editingScheduleId === sch.id;
+                          return (
+                            <tr
+                              key={sch.id}
+                              style={{
+                                borderBottom: '1px solid var(--border-default)',
+                                backgroundColor: isEditing ? '#f0f9ff' : 'transparent',
+                                transition: 'background-color 0.2s'
+                              }}
+                            >
+                              <td style={{ padding: '12px 14px', fontWeight: 600 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {DAY_NAMES[sch.dayOfWeek]}
+                                  {isEditing && (
+                                    <span style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: 600,
+                                      backgroundColor: 'var(--primary-color)',
+                                      color: '#fff',
+                                      padding: '1px 5px',
+                                      borderRadius: '3px'
+                                    }}>
+                                      Editando
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>{formatTime(sch.startTime)}</td>
+                              <td style={{ padding: '12px 14px' }}>{formatTime(sch.endTime)}</td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-light"
+                                    style={{
+                                      padding: '6px 10px',
+                                      borderColor: isEditing ? 'var(--primary-color)' : undefined,
+                                      color: isEditing ? 'var(--primary-color)' : undefined
+                                    }}
+                                    title="Editar horario"
+                                    onClick={() => handleStartEditSchedule(sch)}
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-light-danger"
+                                    style={{ padding: '6px 10px' }}
+                                    title="Eliminar horario"
+                                    onClick={() => handleDeleteSchedule(sch.id)}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                   </tbody>
                 </table>
               </div>
 
-              {/* Formulario nuevo horario */}
+              {/* Formulario nuevo / editar horario */}
               <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h4 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Agregar Día y Horario</h4>
-                <form onSubmit={handleCreateSchedule}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontWeight: 700, margin: 0, color: 'var(--text-title)' }}>
+                    {editingScheduleId ? 'Editar Horario' : 'Agregar Día y Horario'}
+                  </h4>
+                  {editingScheduleId && (
+                    <button
+                      type="button"
+                      className="btn btn-light"
+                      style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      onClick={handleCancelEditSchedule}
+                    >
+                      <X size={12} /> Cancelar
+                    </button>
+                  )}
+                </div>
+
+                {editingScheduleId && (
+                  <div style={{
+                    backgroundColor: '#e0f2fe',
+                    color: '#0369a1',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    marginBottom: '1rem',
+                    fontWeight: 500
+                  }}>
+                    Modifica el día u horario y haz clic en "Guardar Cambios".
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveSchedule}>
                   <div className="form-group">
                     <label className="form-label">Día de la semana *</label>
                     <select className="form-control" value={scheduleForm.dayOfWeek} onChange={e => setScheduleForm(f => ({ ...f, dayOfWeek: Number(e.target.value) }))}>
@@ -658,9 +773,25 @@ const Dashboard: React.FC = () => {
                       <input type="time" className="form-control" value={scheduleForm.endTime} onChange={e => setScheduleForm(f => ({ ...f, endTime: e.target.value }))} required />
                     </div>
                   </div>
-                  <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-                    <Plus size={16} /> {submitting ? 'Guardando...' : 'Guardar Horario'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
+                      {editingScheduleId ? (
+                        <><Check size={16} /> {submitting ? 'Guardando...' : 'Guardar Cambios'}</>
+                      ) : (
+                        <><Plus size={16} /> {submitting ? 'Guardando...' : 'Guardar Horario'}</>
+                      )}
+                    </button>
+                    {editingScheduleId && (
+                      <button
+                        type="button"
+                        className="btn btn-light"
+                        onClick={handleCancelEditSchedule}
+                        disabled={submitting}
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
                 </form>
               </div>
             </div>
