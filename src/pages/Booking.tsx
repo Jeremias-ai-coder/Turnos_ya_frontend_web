@@ -13,18 +13,17 @@ import {
   eachDayOfInterval,
   isSameDay,
   isBefore,
-  isToday
+  isToday,
+  addDays
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { formatTimeToHHMM, toISOTimeString } from '../utils/timeHelper';
+import { formatTimeToHHMM, toISOTimeString, generateSlotsForSchedule, getEffectiveDurationMinutes } from '../utils/timeHelper';
 
 interface Business { id: number; name: string; address: string; description: string; }
 interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
+interface Schedule { id: number; dayOfWeek: number; startTime: string; endTime: string; }
 
 type Step = 1 | 2 | 3;
-
-const SLOT_TIMES_MORNING = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30'];
-const SLOT_TIMES_AFTERNOON = ['13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'];
 
 const Booking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +32,7 @@ const Booking: React.FC = () => {
 
   const [business, setBusiness] = useState<Business | null>(null);
   const [services, setServices] = useState<Service[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Wizard state
@@ -54,18 +54,22 @@ const Booking: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Cargar negocio y servicios + preselección por query param
+  // 1. Cargar negocio, servicios y horarios de atención + preselección por query param
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bRes, sRes] = await Promise.all([
+        const [bRes, sRes, schRes] = await Promise.all([
           api.get(`/businesses/${id}`),
-          api.get(`/businesses/${id}/services`)
+          api.get(`/businesses/${id}/services`),
+          api.get(`/businesses/${id}/schedules`)
         ]);
         setBusiness(bRes.data);
 
         const loadedServices: Service[] = sRes.data.data ?? sRes.data ?? [];
         setServices(loadedServices);
+
+        const loadedSchedules: Schedule[] = schRes.data.data ?? schRes.data ?? [];
+        setSchedules(loadedSchedules);
 
         // Si viene ?serviceId en la URL, preseleccionar y avanzar directo al paso 2
         const serviceIdParam = searchParams.get('serviceId');
@@ -156,9 +160,96 @@ const Booking: React.FC = () => {
     return eachDayOfInterval({ start: calStart, end: calEnd });
   })();
 
+  const getBusinessDayOfWeek = (d: Date): number => {
+    const jsDay = d.getDay();
+    return jsDay === 0 ? 7 : jsDay;
+  };
+
   const isPast = (d: Date) => isBefore(d, new Date()) && !isToday(d);
-  const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
   const isOutOfMonth = (d: Date) => d.getMonth() !== currentMonth.getMonth();
+
+  const isDayAvailable = (d: Date) => {
+    if (isOutOfMonth(d) || isPast(d)) return false;
+    if (schedules.length === 0) return true;
+    const dow = getBusinessDayOfWeek(d);
+    return schedules.some(s => s.dayOfWeek === dow);
+  };
+
+  // Si hoy no atiende o no está disponible, seleccionar automáticamente el primer día hábil
+  useEffect(() => {
+    if (schedules.length > 0 && selectedDate && !isDayAvailable(selectedDate)) {
+      const today = new Date();
+      for (let i = 0; i < 30; i++) {
+        const candidate = addDays(today, i);
+        if (isDayAvailable(candidate)) {
+          setSelectedDate(candidate);
+          setCurrentMonth(candidate);
+          break;
+        }
+      }
+    }
+  }, [schedules]);
+
+  const currentDaySchedules = React.useMemo(() => {
+    if (!selectedDate) return [];
+    const dow = getBusinessDayOfWeek(selectedDate);
+    return schedules
+      .filter(s => s.dayOfWeek === dow)
+      .sort((a, b) => {
+        const aTime = formatTimeToHHMM(a.startTime);
+        const bTime = formatTimeToHHMM(b.startTime);
+        return aTime.localeCompare(bTime);
+      });
+  }, [selectedDate, schedules]);
+
+  const slotGroups = React.useMemo(() => {
+    if (!selectedDate || !selectedService) return [];
+    const duration = selectedService.durationMinutes || 30;
+
+    if (currentDaySchedules.length > 0) {
+      return currentDaySchedules.map(sch => {
+        const startStr = formatTimeToHHMM(sch.startTime);
+        const endStr = formatTimeToHHMM(sch.endTime);
+        const [startH] = startStr.split(':').map(Number);
+        const isMorning = startH < 13;
+        const title = isMorning
+          ? `☀ Mañana (${startStr} – ${endStr})`
+          : `🌆 Tarde (${startStr} – ${endStr})`;
+        const slots = generateSlotsForSchedule(sch.startTime, sch.endTime, duration);
+        return { title, slots };
+      }).filter(g => g.slots.length > 0);
+    }
+
+    if (schedules.length === 0) {
+      const morningSlots = generateSlotsForSchedule('09:00', '13:00', duration);
+      const afternoonSlots = generateSlotsForSchedule('13:00', '18:00', duration);
+      return [
+        { title: '☀ Mañana (09:00 – 13:00)', slots: morningSlots },
+        { title: '🌆 Tarde (13:00 – 18:00)', slots: afternoonSlots }
+      ];
+    }
+
+    return [];
+  }, [selectedDate, selectedService, currentDaySchedules, schedules]);
+
+  const isSlotUnavailable = (slotTime: string) => {
+    if (!selectedService) return true;
+    const effectiveDuration = getEffectiveDurationMinutes(selectedService.durationMinutes);
+    const slotsCount = effectiveDuration / 30;
+    const [h, m] = slotTime.split(':').map(Number);
+    const startM = h * 60 + m;
+
+    for (let i = 0; i < slotsCount; i++) {
+      const curM = startM + i * 30;
+      const curH = Math.floor(curM / 60);
+      const curMin = curM % 60;
+      const subSlot = `${String(curH).padStart(2, '0')}:${String(curMin).padStart(2, '0')}`;
+      if (isSlotPast(subSlot) || busySlots.includes(subSlot)) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   const handleHold = async () => {
     if (!selectedDate || !selectedTime || !selectedService) return;
@@ -171,8 +262,8 @@ const Booking: React.FC = () => {
       return;
     }
 
-    if (busySlots.includes(selectedTime)) {
-      setError('El horario seleccionado ya está ocupado. Por favor, elige otro horario.');
+    if (isSlotUnavailable(selectedTime)) {
+      setError('El horario seleccionado no cuenta con los bloques de tiempo libres requeridos.');
       return;
     }
 
@@ -353,11 +444,9 @@ const Booking: React.FC = () => {
                   ))}
                   {calendarDays.map((day, i) => {
                     const outOfMonth = isOutOfMonth(day);
-                    const past = isPast(day);
-                    const weekend = isWeekend(day);
+                    const isAvailable = isDayAvailable(day);
                     const todayDay = isToday(day);
                     const isSelected = selectedDate && isSameDay(day, selectedDate);
-                    const isAvailable = !outOfMonth && !past && !weekend;
                     return (
                       <button
                         key={i}
@@ -383,69 +472,45 @@ const Booking: React.FC = () => {
                     <p className="text-muted text-xs" style={{ marginBottom: '0.5rem' }}>Cargando disponibilidad...</p>
                   ) : null}
 
-                  <div style={{ marginBottom: '0.625rem' }}>
-                    <p className="slots-section-title">☀ Mañana (09:00 – 13:00)</p>
-                    <div className="slots-flex">
-                      {SLOT_TIMES_MORNING.map(t => {
-                        const isPastTime = isSlotPast(t);
-                        const isBusy = busySlots.includes(t);
-                        const isDisabled = isPastTime || isBusy;
-                        const isSelected = selectedTime === t;
-
-                        return (
-                          <button
-                            key={t}
-                            disabled={isDisabled}
-                            className={`btn-slot-pill ${isSelected ? 'active' : ''}`}
-                            onClick={() => !isDisabled && setSelectedTime(t)}
-                            title={isBusy ? 'Horario ocupado' : isPastTime ? 'Horario pasado' : 'Disponible'}
-                            style={isDisabled ? {
-                              opacity: 0.35,
-                              cursor: 'not-allowed',
-                              background: '#f1f5f9',
-                              borderColor: '#cbd5e1',
-                              color: '#94a3b8',
-                              textDecoration: 'line-through'
-                            } : {}}
-                          >
-                            {t}
-                          </button>
-                        );
-                      })}
+                  {slotGroups.length === 0 ? (
+                    <div style={{ padding: '1.5rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--border-color)', margin: '1rem 0' }}>
+                      <Clock size={28} style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }} />
+                      <p style={{ fontWeight: 600, color: 'var(--text-title)', marginBottom: '4px' }}>No hay turnos disponibles para este día</p>
+                      <p className="text-muted text-xs">El negocio no atiende en la fecha seleccionada o la duración del servicio ({selectedService?.durationMinutes} min) excede el horario de atención.</p>
                     </div>
-                  </div>
+                  ) : (
+                    slotGroups.map((group, gIdx) => (
+                      <div key={gIdx} style={{ marginTop: gIdx > 0 ? '0.875rem' : '0.25rem', marginBottom: '0.625rem' }}>
+                        <p className="slots-section-title">{group.title}</p>
+                        <div className="slots-flex">
+                          {group.slots.map(t => {
+                            const isDisabled = isSlotUnavailable(t);
+                            const isSelected = selectedTime === t;
 
-                  <div style={{ marginTop: '0.875rem' }}>
-                    <p className="slots-section-title">🌆 Tarde (13:00 – 18:00)</p>
-                    <div className="slots-flex">
-                      {SLOT_TIMES_AFTERNOON.map(t => {
-                        const isPastTime = isSlotPast(t);
-                        const isBusy = busySlots.includes(t);
-                        const isDisabled = isPastTime || isBusy;
-                        const isSelected = selectedTime === t;
-
-                        return (
-                          <button
-                            key={t}
-                            disabled={isDisabled}
-                            className={`btn-slot-pill ${isSelected ? 'active' : ''}`}
-                            onClick={() => !isDisabled && setSelectedTime(t)}
-                            title={isBusy ? 'Horario ocupado' : isPastTime ? 'Horario pasado' : 'Disponible'}
-                            style={isDisabled ? {
-                              opacity: 0.35,
-                              cursor: 'not-allowed',
-                              background: '#f1f5f9',
-                              borderColor: '#cbd5e1',
-                              color: '#94a3b8',
-                              textDecoration: 'line-through'
-                            } : {}}
-                          >
-                            {t}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                            return (
+                              <button
+                                key={t}
+                                disabled={isDisabled}
+                                className={`btn-slot-pill ${isSelected ? 'active' : ''}`}
+                                onClick={() => !isDisabled && setSelectedTime(t)}
+                                title={isDisabled ? 'Horario no disponible' : 'Disponible'}
+                                style={isDisabled ? {
+                                  opacity: 0.35,
+                                  cursor: 'not-allowed',
+                                  background: '#f1f5f9',
+                                  borderColor: '#cbd5e1',
+                                  color: '#94a3b8',
+                                  textDecoration: 'line-through'
+                                } : {}}
+                              >
+                                {t}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 
