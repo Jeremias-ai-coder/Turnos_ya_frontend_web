@@ -56,9 +56,9 @@ export function getHoursUntilAppointment(dateStr: string, timeStr: string): numb
     const timeFormatted = formatTimeToHHMM(timeStr);
     const [hours, minutes] = timeFormatted.split(':').map(Number);
 
-    const startUtc = new Date(Date.UTC(year, month - 1, day, hours || 0, minutes || 0, 0));
-    const nowUtc = new Date();
-    return (startUtc.getTime() - nowUtc.getTime()) / (1000 * 60 * 60);
+    const startLocal = new Date(year, month - 1, day, hours || 0, minutes || 0, 0);
+    const now = new Date();
+    return (startLocal.getTime() - now.getTime()) / (1000 * 60 * 60);
   } catch {
     return 0;
   }
