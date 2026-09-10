@@ -42,7 +42,8 @@ const Home: React.FC = () => {
     const fetchBusinesses = async () => {
       try {
         const res = await api.get('/businesses');
-        const data = res.data.data ?? res.data ?? [];
+        const raw = res.data?.data ?? res.data;
+        const data = Array.isArray(raw) ? raw : [];
         setBusinesses(data);
         setFiltered(data);
       } catch {
@@ -56,24 +57,25 @@ const Home: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    let result = businesses;
+    let result = Array.isArray(businesses) ? [...businesses] : [];
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(b =>
-        b.name?.toLowerCase().includes(q) ||
-        b.category?.toLowerCase().includes(q) ||
-        b.address?.toLowerCase().includes(q)
+        b?.name?.toLowerCase().includes(q) ||
+        b?.category?.toLowerCase().includes(q) ||
+        b?.address?.toLowerCase().includes(q)
       );
     }
     if (selectedCategory !== 'Todos') {
-      result = result.filter(b => b.category === selectedCategory);
+      result = result.filter(b => b?.category === selectedCategory);
     }
     setFiltered(result);
     setPage(1);
   }, [searchQuery, selectedCategory, businesses]);
 
-  const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const safeFiltered = Array.isArray(filtered) ? filtered : [];
+  const totalPages = Math.ceil(safeFiltered.length / PER_PAGE);
+  const paginated = safeFiltered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   return (
     <div>
@@ -138,7 +140,7 @@ const Home: React.FC = () => {
                 {selectedCategory === 'Todos' ? 'Todos los negocios' : selectedCategory}
               </h1>
               {!loading && (
-                <p className="text-muted text-sm">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
+                <p className="text-muted text-sm">{safeFiltered.length} resultado{safeFiltered.length !== 1 ? 's' : ''} encontrado{safeFiltered.length !== 1 ? 's' : ''}</p>
               )}
             </div>
             <div style={{ position: 'relative' }}>

@@ -26,6 +26,10 @@ api.interceptors.request.use(
 // Interceptor de Respuesta (Response): Manejo centralizado de respuestas y errores
 api.interceptors.response.use(
   (response) => {
+    // Si la respuesta es HTML (por ejemplo si una ruta 404 devuelve index.html en Vercel)
+    if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
+      return Promise.reject(new Error('Respuesta no válida del backend: se recibió HTML en lugar de JSON. Verifica la variable VITE_API_URL.'));
+    }
     return response;
   },
   (error) => {
