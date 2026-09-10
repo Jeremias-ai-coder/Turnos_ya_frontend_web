@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import {
   CalendarDays,
   Clock,
@@ -10,7 +9,6 @@ import {
   Briefcase,
   ChevronLeft,
   ChevronRight,
-  AlertCircle,
   Building2,
   Star,
   MessageSquare,
@@ -56,8 +54,6 @@ const formatTime = (timeStr: string) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
-
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBiz, setSelectedBiz] = useState<Business | null>(null);
   const [activeTab, setActiveTab] = useState<'agenda' | 'services' | 'schedules' | 'reviews' | 'settings'>('agenda');
@@ -72,7 +68,6 @@ const Dashboard: React.FC = () => {
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsStats, setReviewsStats] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
-  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Forms
   const [editingServiceId, setEditingServiceId] = useState<number | null>(null);

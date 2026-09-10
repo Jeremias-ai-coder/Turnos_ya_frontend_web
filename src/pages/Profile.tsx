@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { User, Bell, Phone, Save, LogOut } from 'lucide-react';
+import { User, Bell, Save, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ProfileData {
