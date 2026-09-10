@@ -27,7 +27,7 @@ Turnos_ya_frontend_web-main/
 │   ├── components/         # Componentes estructurales y reutilizables
 │   │   └── Layout.tsx      # Estructura base con Header/Navbar, Footer y navegación responsiva
 │   ├── context/            # Proveedores de estado global (Context API)
-│   │   └── AuthContext.tsx # Estado global de autenticación, usuario actual y persistencia de JWT
+│   │   └── AuthContext.tsx # Estado global de autenticación, usuario actual y            persistencia de JWT
 │   ├── pages/              # Vistas y pantallas principales de la aplicación
 │   │   ├── Home.tsx            # Landing page con buscador, filtros por categoría y listado de comercios
 │   │   ├── Login.tsx           # Formulario de inicio de sesión de usuarios
