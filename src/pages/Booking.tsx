@@ -18,6 +18,8 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatTimeToHHMM, toISOTimeString, generateSlotsForSchedule, getEffectiveDurationMinutes } from '../utils/timeHelper';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import { SkeletonDetail } from '../components/common/SkeletonLoaders';
 
 interface Business { id: number; name: string; address: string; description: string; }
 interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
@@ -309,7 +311,7 @@ const Booking: React.FC = () => {
     }
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '4rem' }} className="text-muted">Cargando...</div>;
+  if (loading) return <SkeletonDetail />;
   if (!business) return <div>Negocio no encontrado</div>;
 
   const businessInitials = business.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -469,7 +471,9 @@ const Booking: React.FC = () => {
               {selectedDate && (
                 <div>
                   {loadingSlots ? (
-                    <p className="text-muted text-xs" style={{ marginBottom: '0.5rem' }}>Cargando disponibilidad...</p>
+                    <div style={{ padding: '0.5rem 0', display: 'flex', alignItems: 'center' }}>
+                      <LoadingSpinner size="sm" inline text="Actualizando horarios disponibles..." />
+                    </div>
                   ) : null}
 
                   {slotGroups.length === 0 ? (
@@ -579,7 +583,11 @@ const Booking: React.FC = () => {
                 disabled={submitting || timeLeft === 0}
                 onClick={handleConfirm}
               >
-                {submitting ? 'Confirmando...' : '✓ Confirmar Turno Definitivamente'}
+                {submitting ? (
+                  <LoadingSpinner size="sm" inline text="Confirmando turno..." color="white" />
+                ) : (
+                  '✓ Confirmar Turno Definitivamente'
+                )}
               </button>
             </>
           )}

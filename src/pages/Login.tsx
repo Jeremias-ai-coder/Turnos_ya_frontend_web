@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -91,8 +92,13 @@ const Login: React.FC = () => {
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" style={{ padding: '0.75rem', fontSize: '1rem' }} disabled={loading}>
-              <LogIn size={18} />
-              {loading ? 'Ingresando...' : 'Ingresar'}
+              {loading ? (
+                <LoadingSpinner size="sm" inline text="Ingresando..." color="white" />
+              ) : (
+                <>
+                  <LogIn size={18} /> Ingresar
+                </>
+              )}
             </button>
           </form>
 

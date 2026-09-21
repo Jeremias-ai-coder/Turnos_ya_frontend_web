@@ -1,0 +1,169 @@
+/* ====== LOADING & SKELETON STYLES ====== */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+  display: block;
+}
+
+.spinner-icon {
+  display: inline-block;
+  animation: spin 0.75s linear infinite;
+}
+
+/* Spinner component wrapper */
+.spinner-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.spinner-wrapper.inline {
+  display: inline-flex;
+  flex-direction: row;
+}
+
+.spinner-wrapper.block {
+  padding: 3rem 1rem;
+  width: 100%;
+}
+
+.spinner-text {
+  font-size: 0.88rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Skeleton Card (Negocios / Tickets) */
+.skeleton-card-container {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* Skeleton Table (Tablas de Administración / Dashboard) */
+.skeleton-table-wrapper {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.skeleton-table-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.skeleton-table-row:last-child {
+  border-bottom: none;
+}
+
+/* ====== PAGINATION STYLES ====== */
+
+.pagination-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  width: 100%;
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  user-select: none;
+}
+
+.pagination-btn:hover:not(:disabled):not(.active) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.pagination-btn.active {
+  background: var(--primary-color, #aa3bff);
+  border-color: var(--primary-color, #aa3bff);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(170, 59, 255, 0.25);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 36px;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 0.9rem;
+}

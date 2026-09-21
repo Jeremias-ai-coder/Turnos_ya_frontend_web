@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { Building2, MapPin, SlidersHorizontal, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, MapPin, SlidersHorizontal, Star } from 'lucide-react';
+import { SkeletonCard } from '../components/common/SkeletonLoaders';
+import { Pagination } from '../components/common/Pagination';
 
 interface Business {
   id: number;
@@ -16,18 +18,6 @@ interface Business {
 
 const CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Otros'];
 
-const SkeletonCard = () => (
-  <div className="ml-card skeleton" style={{ overflow: 'hidden' }}>
-    <div style={{ height: '120px', background: '#f0f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="skeleton-block" style={{ width: '64px', height: '64px', borderRadius: '50%' }} />
-    </div>
-    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <div className="skeleton-block" style={{ height: '16px', width: '70%' }} />
-      <div className="skeleton-block" style={{ height: '12px', width: '90%' }} />
-      <div className="skeleton-block" style={{ height: '12px', width: '55%' }} />
-    </div>
-  </div>
-);
 
 const Home: React.FC = () => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -218,35 +208,14 @@ const Home: React.FC = () => {
               </div>
 
               {/* Paginación */}
-              {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '2rem' }}>
-                  <button className="btn btn-light" style={{ padding: '6px 12px' }} disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                    <ChevronLeft size={16} />
-                  </button>
-                  {[...Array(totalPages)].map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setPage(i + 1)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '8px',
-                        border: '1px solid',
-                        borderColor: page === i + 1 ? 'var(--primary-color)' : 'var(--border-input)',
-                        background: page === i + 1 ? 'var(--primary-color)' : 'white',
-                        color: page === i + 1 ? 'white' : 'var(--text-main)',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-family-base)',
-                      }}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button className="btn btn-light" style={{ padding: '6px 12px' }} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              )}
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={safeFiltered.length}
+                itemsPerPage={PER_PAGE}
+                onPageChange={setPage}
+                itemLabel="negocios"
+              />
             </>
           )}
         </div>

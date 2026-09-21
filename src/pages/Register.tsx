@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { UserPlus } from 'lucide-react';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const Register: React.FC = () => {
   const [name, setName] = useState('');
@@ -91,8 +92,13 @@ const Register: React.FC = () => {
           </div>
           
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={loading}>
-            <UserPlus size={20} />
-            {loading ? 'Registrando...' : 'Comenzar ahora'}
+            {loading ? (
+              <LoadingSpinner size="sm" inline text="Registrando..." color="white" />
+            ) : (
+              <>
+                <UserPlus size={20} /> Comenzar ahora
+              </>
+            )}
           </button>
         </form>
 
