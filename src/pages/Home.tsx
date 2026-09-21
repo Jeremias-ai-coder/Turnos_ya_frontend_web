@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { Building2, MapPin, SlidersHorizontal, Star } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
@@ -18,12 +18,15 @@ interface Business {
 
 const CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Otros'];
 
+const normalizeText = (text: string = '') =>
+  text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const Home: React.FC = () => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [filtered, setFiltered] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') || '';
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [page, setPage] = useState(1);
   const PER_PAGE = 9;
@@ -49,19 +52,37 @@ const Home: React.FC = () => {
   useEffect(() => {
     let result = Array.isArray(businesses) ? [...businesses] : [];
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+      const q = normalizeText(searchQuery);
       result = result.filter(b =>
-        b?.name?.toLowerCase().includes(q) ||
-        b?.category?.toLowerCase().includes(q) ||
-        b?.address?.toLowerCase().includes(q)
+        normalizeText(b?.name).includes(q) ||
+        normalizeText(b?.category).includes(q) ||
+        normalizeText(b?.address).includes(q) ||
+        normalizeText(b?.description).includes(q)
       );
     }
     if (selectedCategory !== 'Todos') {
-      result = result.filter(b => b?.category === selectedCategory);
+      const normCat = normalizeText(selectedCategory);
+      result = result.filter(b => normalizeText(b?.category) === normCat);
     }
     setFiltered(result);
     setPage(1);
   }, [searchQuery, selectedCategory, businesses]);
+
+  const getCategoryCount = (cat: string) => {
+    let list = Array.isArray(businesses) ? businesses : [];
+    if (searchQuery) {
+      const q = normalizeText(searchQuery);
+      list = list.filter(b =>
+        normalizeText(b?.name).includes(q) ||
+        normalizeText(b?.category).includes(q) ||
+        normalizeText(b?.address).includes(q) ||
+        normalizeText(b?.description).includes(q)
+      );
+    }
+    if (cat === 'Todos') return list.length;
+    const normCat = normalizeText(cat);
+    return list.filter(b => normalizeText(b?.category) === normCat).length;
+  };
 
   const safeFiltered = Array.isArray(filtered) ? filtered : [];
   const totalPages = Math.ceil(safeFiltered.length / PER_PAGE);
@@ -93,57 +114,94 @@ const Home: React.FC = () => {
           <div className="divider" />
 
           <div>
-            <div className="filter-section-title" style={{ fontSize: '0.78rem' }}>Categoría</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  style={{
-                    background: selectedCategory === cat ? 'var(--status-pending-bg)' : 'none',
-                    border: '1px solid',
-                    borderColor: selectedCategory === cat ? 'var(--primary-color)' : 'transparent',
-                    color: selectedCategory === cat ? 'var(--primary-color)' : 'var(--text-main)',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontWeight: selectedCategory === cat ? 700 : 500,
-                    fontSize: '0.88rem',
-                    fontFamily: 'var(--font-family-base)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {cat}
-                </button>
-              ))}
+            <div className="filter-section-title" style={{ fontSize: '0.78rem', marginBottom: '0.6rem' }}>Categoría</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {CATEGORIES.map(cat => {
+                const count = getCategoryCount(cat);
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: isSelected ? 'var(--status-pending-bg)' : 'transparent',
+                      border: '1px solid',
+                      borderColor: isSelected ? 'var(--primary-color)' : 'transparent',
+                      color: isSelected ? 'var(--primary-color)' : 'var(--text-main)',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: isSelected ? 700 : 500,
+                      fontSize: '0.88rem',
+                      fontFamily: 'var(--font-family-base)',
+                      transition: 'all 0.15s ease',
+                      width: '100%',
+                    }}
+                  >
+                    <span>{cat}</span>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: isSelected ? 'var(--primary-color)' : '#f1f5f9',
+                        color: isSelected ? '#ffffff' : '#64748b',
+                        minWidth: '22px',
+                        textAlign: 'center',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </aside>
 
         {/* Columna de negocios */}
         <div>
-          {/* Barra de búsqueda y resultados */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '2px' }}>
-                {selectedCategory === 'Todos' ? 'Todos los negocios' : selectedCategory}
-              </h1>
-              {!loading && (
-                <p className="text-muted text-sm">{safeFiltered.length} resultado{safeFiltered.length !== 1 ? 's' : ''} encontrado{safeFiltered.length !== 1 ? 's' : ''}</p>
-              )}
+          {searchQuery && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              background: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '10px',
+              marginBottom: '1.25rem',
+              fontSize: '0.88rem',
+              color: '#0369a1',
+            }}>
+              <span>
+                Resultados para: <strong>"{searchQuery}"</strong> ({safeFiltered.length} {safeFiltered.length === 1 ? 'encontrado' : 'encontrados'})
+              </span>
+              <button
+                onClick={() => {
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('q');
+                  setSearchParams(newParams);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#0284c7',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.82rem',
+                  textDecoration: 'underline',
+                }}
+              >
+                Limpiar búsqueda
+              </button>
             </div>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Buscar..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{ paddingLeft: '14px', minWidth: '220px' }}
-              />
-            </div>
-          </div>
+          )}
 
           {loading ? (
             <div className="business-grid">
