@@ -2,6 +2,8 @@ import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Search } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
+
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -47,6 +49,7 @@ export const Layout: React.FC = () => {
                   {user.role === 'administrator' && (
                     <Link to="/system" className="navbar-link" style={{ opacity: 0.8 }}>⚙ Sistema</Link>
                   )}
+                  <NotificationBell />
                   <div className="navbar-separator" />
                   <Link to="/profile" className="user-avatar-nav" title={user.name}>{initials}</Link>
                   <span style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{user.name.split(' ')[0]}</span>
