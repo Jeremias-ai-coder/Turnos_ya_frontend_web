@@ -984,7 +984,7 @@ const Dashboard: React.FC = () => {
                   <label className="form-label">Categoría</label>
                   <select className="form-control" value={settingsForm.category} onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))}>
                     <option value="">Seleccionar categoría...</option>
-                    {['Peluquería', 'Estética', 'Salud', 'Deportes', 'Otros'].map(c => <option key={c}>{c}</option>)}
+                    {['Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'].map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting} style={{ padding: '0.75rem 2rem' }}>

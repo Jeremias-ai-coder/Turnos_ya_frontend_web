@@ -16,7 +16,7 @@ interface Business {
   reviewCount?: number;
 }
 
-const CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Otros'];
+const CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'];
 
 const normalizeText = (text: string = '') =>
   text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
