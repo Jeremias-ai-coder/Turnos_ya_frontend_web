@@ -20,6 +20,9 @@ import {
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatTimeToHHMM } from '../utils/timeHelper';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import Pagination from '../components/common/Pagination';
+import { SkeletonTicket } from '../components/common/SkeletonLoaders';
 
 interface Business { id: number; name: string; description: string; address: string; phone: string; category: string; }
 interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
@@ -68,6 +71,11 @@ const Dashboard: React.FC = () => {
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsStats, setReviewsStats] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const REVIEWS_PER_PAGE = 5;
+
+  // Initial load
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Forms
   const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
@@ -119,13 +127,15 @@ const Dashboard: React.FC = () => {
 
   // Load my businesses
   useEffect(() => {
+    setInitialLoading(true);
     api.get('/businesses/my').then(res => {
       const bizList = res.data.data ?? [];
       setBusinesses(bizList);
       if (bizList.length > 0) {
         setSelectedBiz(bizList[0]);
       }
-    }).catch(() => {});
+    }).catch(() => {})
+      .finally(() => setInitialLoading(false));
   }, []);
 
   // When business changes, load services, schedules and reviews
@@ -330,7 +340,16 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {businesses.length === 0 && (
+      {initialLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+            {[1, 2, 3, 4].map(n => (
+              <div key={n} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />
+            ))}
+          </div>
+          <div className="skeleton-box" style={{ height: '360px', borderRadius: '12px' }} />
+        </div>
+      ) : businesses.length === 0 ? (
         <div className="ml-card" style={{ padding: '3rem', textAlign: 'center' }}>
           <Building2 size={56} color="var(--primary-color)" style={{ marginBottom: '1rem' }} />
           <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.5rem' }}>¡Bienvenido a Turnos Ya!</h2>
@@ -351,11 +370,15 @@ const Dashboard: React.FC = () => {
               <input className="form-control" placeholder="Av. de Mayo 1234, CABA" value={noBusinessForm.address} onChange={e => setNoBusinessForm(f => ({ ...f, address: e.target.value }))} />
             </div>
             <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? 'Creando...' : 'Guardar negocio e iniciar'}
+              {submitting ? (
+                <LoadingSpinner size="sm" inline text="Guardando negocio..." color="white" />
+              ) : (
+                'Guardar negocio e iniciar'
+              )}
             </button>
           </form>
         </div>
-      )}
+      ) : null}
 
       {selectedBiz && (
         <>
@@ -421,7 +444,11 @@ const Dashboard: React.FC = () => {
               </div>
 
               {agendaLoading ? (
-                <div style={{ textAlign: 'center', padding: '3rem' }} className="text-muted">Cargando agenda...</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {[1, 2, 3].map(n => (
+                    <SkeletonTicket key={n} />
+                  ))}
+                </div>
               ) : agendaAppointments.length === 0 ? (
                 <div className="empty-state">
                   <CalendarDays size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
@@ -606,10 +633,12 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
-                      {editingServiceId ? (
-                        <><Check size={16} /> {submitting ? 'Guardando...' : 'Guardar Cambios'}</>
+                      {submitting ? (
+                        <LoadingSpinner size="sm" inline text="Guardando..." color="white" />
+                      ) : editingServiceId ? (
+                        <><Check size={16} /> Guardar Cambios</>
                       ) : (
-                        <><Plus size={16} /> {submitting ? 'Agregando...' : 'Crear Servicio'}</>
+                        <><Plus size={16} /> Crear Servicio</>
                       )}
                     </button>
                     {editingServiceId && (
@@ -762,10 +791,12 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
-                      {editingScheduleId ? (
-                        <><Check size={16} /> {submitting ? 'Guardando...' : 'Guardar Cambios'}</>
+                      {submitting ? (
+                        <LoadingSpinner size="sm" inline text="Guardando..." color="white" />
+                      ) : editingScheduleId ? (
+                        <><Check size={16} /> Guardar Cambios</>
                       ) : (
-                        <><Plus size={16} /> {submitting ? 'Guardando...' : 'Guardar Horario'}</>
+                        <><Plus size={16} /> Guardar Horario</>
                       )}
                     </button>
                     {editingScheduleId && (
@@ -841,74 +872,86 @@ const Dashboard: React.FC = () => {
                     <p className="text-muted text-sm">Cuando tus clientes completen sus turnos, podrán dejarte calificaciones y comentarios aquí.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {reviews.map(rev => (
-                      <div
-                        key={rev.id}
-                        style={{
-                          border: '1px solid var(--border-default)',
-                          borderRadius: '10px',
-                          padding: '1.25rem',
-                          background: 'white'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              background: '#e0f2fe',
-                              color: 'var(--primary-color)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 700,
-                              fontSize: '1rem'
-                            }}>
-                              {rev.appointment?.user?.name ? rev.appointment.user.name[0].toUpperCase() : <User size={18} />}
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                      {reviews
+                        .slice((reviewsPage - 1) * REVIEWS_PER_PAGE, reviewsPage * REVIEWS_PER_PAGE)
+                        .map(rev => (
+                          <div
+                            key={rev.id}
+                            style={{
+                              border: '1px solid var(--border-default)',
+                              borderRadius: '10px',
+                              padding: '1.25rem',
+                              background: 'white'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '50%',
+                                  background: '#e0f2fe',
+                                  color: 'var(--primary-color)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '1rem'
+                                }}>
+                                  {rev.appointment?.user?.name ? rev.appointment.user.name[0].toUpperCase() : <User size={18} />}
+                                </div>
+                                <div>
+                                  <p style={{ fontWeight: 700, fontSize: '0.98rem', margin: 0, color: 'var(--text-title)' }}>
+                                    {rev.appointment?.user?.name || 'Cliente'}
+                                  </p>
+                                  {rev.appointment?.service?.name && (
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                      Servicio realizado: <strong>{rev.appointment.service.name}</strong>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                                  {[1, 2, 3, 4, 5].map(s => (
+                                    <Star
+                                      key={s}
+                                      size={16}
+                                      fill={s <= rev.rating ? '#f59e0b' : 'none'}
+                                      color={s <= rev.rating ? '#f59e0b' : '#cbd5e1'}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-muted text-xs">{formatDateReview(rev.createdAt)}</span>
+                              </div>
                             </div>
-                            <div>
-                              <p style={{ fontWeight: 700, fontSize: '0.98rem', margin: 0, color: 'var(--text-title)' }}>
-                                {rev.appointment?.user?.name || 'Cliente'}
+
+                            {rev.comment ? (
+                              <div style={{ margin: '10px 0 0 0', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--primary-color)' }}>
+                                <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                                  "{rev.comment}"
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-muted text-xs" style={{ margin: '6px 0 0 0', fontStyle: 'italic' }}>
+                                El cliente calificó con {rev.rating} estrellas sin comentario escrito.
                               </p>
-                              {rev.appointment?.service?.name && (
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                  Servicio realizado: <strong>{rev.appointment.service.name}</strong>
-                                </span>
-                              )}
-                            </div>
+                            )}
                           </div>
+                        ))}
+                    </div>
 
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '4px' }}>
-                              {[1, 2, 3, 4, 5].map(s => (
-                                <Star
-                                  key={s}
-                                  size={16}
-                                  fill={s <= rev.rating ? '#f59e0b' : 'none'}
-                                  color={s <= rev.rating ? '#f59e0b' : '#cbd5e1'}
-                                />
-                              ))}
-                            </div>
-                            <span className="text-muted text-xs">{formatDateReview(rev.createdAt)}</span>
-                          </div>
-                        </div>
-
-                        {rev.comment ? (
-                          <div style={{ margin: '10px 0 0 0', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--primary-color)' }}>
-                            <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.5 }}>
-                              "{rev.comment}"
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-muted text-xs" style={{ margin: '6px 0 0 0', fontStyle: 'italic' }}>
-                            El cliente calificó con {rev.rating} estrellas sin comentario escrito.
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                    <Pagination
+                      currentPage={reviewsPage}
+                      totalPages={Math.ceil(reviews.length / REVIEWS_PER_PAGE)}
+                      onPageChange={setReviewsPage}
+                      totalItems={reviews.length}
+                      itemsPerPage={REVIEWS_PER_PAGE}
+                    />
+                  </>
                 )}
               </div>
             </div>
@@ -941,11 +984,15 @@ const Dashboard: React.FC = () => {
                   <label className="form-label">Categoría</label>
                   <select className="form-control" value={settingsForm.category} onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))}>
                     <option value="">Seleccionar categoría...</option>
-                    {['Peluquería', 'Estética', 'Salud', 'Deportes', 'Otros'].map(c => <option key={c}>{c}</option>)}
+                    {['Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'].map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting} style={{ padding: '0.75rem 2rem' }}>
-                  <Settings size={16} /> {submitting ? 'Guardando...' : 'Guardar Configuración'}
+                  {submitting ? (
+                    <LoadingSpinner size="sm" inline text="Guardando..." color="white" />
+                  ) : (
+                    <><Settings size={16} /> Guardar Configuración</>
+                  )}
                 </button>
               </form>
             </div>

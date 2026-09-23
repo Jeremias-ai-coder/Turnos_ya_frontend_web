@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { User, Bell, Save, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import { SkeletonCard } from '../components/common/SkeletonLoaders';
 
 interface ProfileData {
   name: string;
@@ -27,6 +29,7 @@ const Profile: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,6 +46,7 @@ const Profile: React.FC = () => {
           whatsappNotifications: res.data.whatsappNotifications ?? false,
         });
       } catch { /* ignore */ }
+      finally { setInitialLoading(false); }
     };
     fetchMe();
   }, []);
@@ -88,21 +92,27 @@ const Profile: React.FC = () => {
       <p className="text-muted text-sm" style={{ marginBottom: '2rem' }}>Administra tu cuenta y preferencias de notificación.</p>
 
       {/* Banner de identidad */}
-      <div className="ml-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-        <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #009ee3, #0081bb)', color: 'white', fontWeight: 800, fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {form.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+      {initialLoading ? (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <SkeletonCard />
         </div>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontWeight: 800, color: 'var(--text-title)', marginBottom: '4px' }}>{form.name}</h2>
-          <p className="text-muted text-sm">{form.email}</p>
-          <span className={`badge ${form.role === 'administrator' ? 'badge-pending' : form.role === 'owner' ? 'badge-confirmed' : 'badge-completed'}`} style={{ marginTop: '6px' }}>
-            {ROLE_LABELS[form.role] || form.role}
-          </span>
+      ) : (
+        <div className="ml-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #009ee3, #0081bb)', color: 'white', fontWeight: 800, fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {form.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontWeight: 800, color: 'var(--text-title)', marginBottom: '4px' }}>{form.name}</h2>
+            <p className="text-muted text-sm">{form.email}</p>
+            <span className={`badge ${form.role === 'administrator' ? 'badge-pending' : form.role === 'owner' ? 'badge-confirmed' : 'badge-completed'}`} style={{ marginTop: '6px' }}>
+              {ROLE_LABELS[form.role] || form.role}
+            </span>
+          </div>
+          <button className="btn btn-light" style={{ fontSize: '0.85rem', color: 'var(--status-danger-text)' }} onClick={handleLogout}>
+            <LogOut size={15} /> Cerrar Sesión
+          </button>
         </div>
-        <button className="btn btn-light" style={{ fontSize: '0.85rem', color: 'var(--status-danger-text)' }} onClick={handleLogout}>
-          <LogOut size={15} /> Cerrar Sesión
-        </button>
-      </div>
+      )}
 
       {/* Formulario */}
       <div className="ml-card" style={{ padding: '2rem' }}>
@@ -178,8 +188,13 @@ const Profile: React.FC = () => {
           </div>
 
           <button type="submit" className="btn btn-primary btn-full" style={{ padding: '0.75rem' }} disabled={loading}>
-            <Save size={18} />
-            {loading ? 'Guardando...' : 'Guardar Cambios'}
+            {loading ? (
+              <LoadingSpinner size="sm" inline text="Guardando cambios..." color="white" />
+            ) : (
+              <>
+                <Save size={18} /> Guardar Cambios
+              </>
+            )}
           </button>
         </form>
       </div>

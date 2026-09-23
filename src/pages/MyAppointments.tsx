@@ -4,6 +4,9 @@ import { Calendar as CalendarIcon, Clock, XCircle, Info, Star, CheckCircle, Aler
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatTimeToHHMM, getHoursUntilAppointment } from '../utils/timeHelper';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { SkeletonTicket } from '../components/common/SkeletonLoaders';
+import { Pagination } from '../components/common/Pagination';
 
 interface Review {
   id: number;
@@ -47,6 +50,9 @@ const MyAppointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 6;
+
 
   // Cancel modal state
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -168,7 +174,10 @@ const MyAppointments: React.FC = () => {
         {FILTERS.map(f => (
           <button
             key={f.value}
-            onClick={() => setStatusFilter(f.value)}
+            onClick={() => {
+              setStatusFilter(f.value);
+              setPage(1);
+            }}
             style={{
               padding: '7px 16px',
               borderRadius: '20px',
@@ -189,7 +198,11 @@ const MyAppointments: React.FC = () => {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem' }} className="text-muted">Cargando tus turnos...</div>
+        <div className="skeleton-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonTicket key={i} />
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <Info size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
@@ -199,8 +212,10 @@ const MyAppointments: React.FC = () => {
           <p className="text-muted text-sm">Explora los negocios disponibles y reserva tu primer turno.</p>
         </div>
       ) : (
-        <div className="appointments-grid">
-          {filtered.map(apt => {
+        <>
+          <div className="appointments-grid">
+            {filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE).map(apt => {
+
             const hoursUntil = getHoursUntil(apt.date, apt.time);
             const noticeHours = apt.service?.minCancellationNoticeHours ?? 24;
             const canCancel = (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && hoursUntil >= noticeHours;
@@ -313,6 +328,15 @@ const MyAppointments: React.FC = () => {
             );
           })}
         </div>
+          <Pagination
+            currentPage={page}
+            totalPages={Math.ceil(filtered.length / PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={PER_PAGE}
+            onPageChange={setPage}
+            itemLabel="turnos"
+          />
+        </>
       )}
 
       {/* Modal de Cancelación */}
@@ -347,7 +371,13 @@ const MyAppointments: React.FC = () => {
                   Volver
                 </button>
                 <button type="submit" className="btn btn-light-danger" style={{ flex: 1 }} disabled={submitting}>
-                  <XCircle size={16} /> {submitting ? 'Cancelando...' : 'Confirmar cancelación'}
+                  {submitting ? (
+                    <LoadingSpinner size="sm" inline text="Cancelando..." color="#dc2626" />
+                  ) : (
+                    <>
+                      <XCircle size={16} /> Confirmar cancelación
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -432,7 +462,13 @@ const MyAppointments: React.FC = () => {
                   style={{ flex: 1, background: '#f59e0b', borderColor: '#d97706' }}
                   disabled={reviewSubmitting}
                 >
-                  <CheckCircle size={16} /> {reviewSubmitting ? 'Enviando...' : 'Publicar Reseña'}
+                  {reviewSubmitting ? (
+                    <LoadingSpinner size="sm" inline text="Publicando..." color="white" />
+                  ) : (
+                    <>
+                      <CheckCircle size={16} /> Publicar Reseña
+                    </>
+                  )}
                 </button>
               </div>
             </form>

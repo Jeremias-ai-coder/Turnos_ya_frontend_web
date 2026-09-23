@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { SkeletonDetail } from '../components/common/SkeletonLoaders';
+
 
 interface Business {
   id: number;
@@ -79,8 +81,9 @@ const BusinessDetail: React.FC = () => {
     if (id) fetchData();
   }, [id]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '4rem' }} className="text-muted">Cargando...</div>;
+  if (loading) return <SkeletonDetail />;
   if (!business) return <div>Negocio no encontrado.</div>;
+
 
   const initials = business.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
