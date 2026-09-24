@@ -1,0 +1,38 @@
+:root {
+  /* Colors */
+  --primary-color: #009ee3;
+  --primary-hover: #0081bb;
+  --background-app: #f5f8fa;
+  --white: #ffffff;
+
+  /* Text & Borders */
+  --text-main: #1e293b;
+  --text-title: #0f172a;
+  --text-secondary: #64748b;
+  --text-disabled: #94a3b8;
+  --border-default: #e2e8f0;
+  --border-input: #cbd5e1;
+
+  /* Status Badges */
+  --status-pending-bg: #e6f5fc;
+  --status-pending-text: #009ee3;
+  --status-pending-border: #cce9f8;
+
+  --status-success-bg: #e6f7ed;
+  --status-success-text: #00a650;
+  --status-success-border: #ccefdc;
+
+  --status-danger-bg: #fbebee;
+  --status-danger-text: #d93838;
+  --status-danger-border: #f6ccd2;
+
+  --status-secondary-bg: #f1f5f9;
+  --status-secondary-text: #475569;
+  --status-secondary-border: #e2e8f0;
+
+  /* Ratings */
+  --star-color: #ffb800;
+
+  /* Typography */
+  --font-family-base: 'Plus Jakarta Sans', sans-serif;
+}
