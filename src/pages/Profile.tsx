@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { User, Bell, Save, LogOut } from 'lucide-react';
+import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import { SkeletonCard } from '../components/common/SkeletonLoaders';
+
+type ActiveTab = 'profile' | 'security' | 'notifications' | 'privacy';
 
 interface ProfileData {
   name: string;
@@ -15,63 +15,200 @@ interface ProfileData {
   whatsappNotifications: boolean;
 }
 
+interface SecurityForm {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+interface PrivacySettings {
+  sharePhone: boolean;
+  systemContact: boolean;
+  basicVisibility: boolean;
+}
+
+const defaultPrivacy: PrivacySettings = {
+  sharePhone: false,
+  systemContact: true,
+  basicVisibility: true,
+};
+
+const tabs: { id: ActiveTab; label: string; icon: any }[] = [
+  { id: 'profile', label: 'Perfil', icon: User },
+  { id: 'security', label: 'Seguridad', icon: ShieldCheck },
+  { id: 'notifications', label: 'Notificaciones', icon: Bell },
+  { id: 'privacy', label: 'Privacidad', icon: Settings2 },
+];
+
 const Profile: React.FC = () => {
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState<ProfileData>({
+  const [activeTab, setActiveTab] = useState<ActiveTab>('profile');
+  const [profileForm, setProfileForm] = useState<ProfileData>({
     name: user?.name || '',
     email: user?.email || '',
-    phone: '',
+    phone: user?.phone || '',
     role: user?.role || '',
-    emailNotifications: true,
-    whatsappNotifications: false,
+    emailNotifications: user?.emailNotifications ?? true,
+    whatsappNotifications: user?.whatsappNotifications ?? false,
   });
 
+  const [securityForm, setSecurityForm] = useState<SecurityForm>({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
+
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [securityMessage, setSecurityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const refreshProfileFromServer = async () => {
+    const res = await api.get('/users/me');
+    const freshUser = res.data;
+
+    setProfileForm({
+      name: freshUser.name || '',
+      email: freshUser.email || '',
+      phone: freshUser.phone || '',
+      role: freshUser.role || '',
+      emailNotifications: freshUser.emailNotifications ?? true,
+      whatsappNotifications: freshUser.whatsappNotifications ?? false,
+    });
+
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      login(storedToken, freshUser);
+    }
+
+    return freshUser;
+  };
 
   useEffect(() => {
     const fetchMe = async () => {
       try {
-        const res = await api.get('/users/me');
-        setForm({
-          name: res.data.name || '',
-          email: res.data.email || '',
-          phone: res.data.phone || '',
-          role: res.data.role || '',
-          emailNotifications: res.data.emailNotifications ?? true,
-          whatsappNotifications: res.data.whatsappNotifications ?? false,
-        });
-      } catch { /* ignore */ }
-      finally { setInitialLoading(false); }
+        await refreshProfileFromServer();
+      } catch {
+        // noop
+      }
     };
+
     fetchMe();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-    setSaved(false);
+    setProfileMessage(null);
+
     try {
       const res = await api.patch('/auth/profile', {
-        name: form.name,
-        phone: form.phone,
-        emailNotifications: form.emailNotifications,
-        whatsappNotifications: form.whatsappNotifications,
+        name: profileForm.name,
+        phone: profileForm.phone,
       });
-      // Update stored user
-      const stored = localStorage.getItem('token');
-      if (stored) login(stored, res.data);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+
+      setProfileForm({
+        name: res.data.name || profileForm.name,
+        email: res.data.email || profileForm.email,
+        phone: res.data.phone || '',
+        role: res.data.role || profileForm.role,
+        emailNotifications: res.data.emailNotifications ?? profileForm.emailNotifications,
+        whatsappNotifications: res.data.whatsappNotifications ?? profileForm.whatsappNotifications,
+      });
+
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        login(storedToken, res.data);
+      }
+
+      await refreshProfileFromServer();
+
+      setProfileMessage({
+        type: 'success',
+        text: 'Tus datos personales se actualizaron correctamente.',
+      });
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al guardar los cambios.');
+      setProfileMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No pudimos guardar los cambios.',
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSecuritySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityMessage(null);
+
+    if (!securityForm.currentPassword || !securityForm.newPassword || !securityForm.confirmPassword) {
+      setSecurityMessage({ type: 'error', text: 'Completá los tres campos para cambiar la contraseña.' });
+      return;
+    }
+
+    if (securityForm.newPassword.length < 8) {
+      setSecurityMessage({ type: 'error', text: 'La nueva contraseña debe tener al menos 8 caracteres.' });
+      return;
+    }
+
+    if (securityForm.newPassword !== securityForm.confirmPassword) {
+      setSecurityMessage({ type: 'error', text: 'La confirmación de la contraseña no coincide.' });
+      return;
+    }
+
+    try {
+      await api.patch('/auth/change-password', {
+        currentPassword: securityForm.currentPassword,
+        newPassword: securityForm.newPassword,
+        confirmPassword: securityForm.confirmPassword,
+      });
+
+      setSecurityMessage({
+        type: 'success',
+        text: 'La contraseña se actualizó correctamente.',
+      });
+
+      setSecurityForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (err: any) {
+      setSecurityMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo actualizar la contraseña.',
+      });
+    }
+  };
+
+  const handleNotificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileMessage(null);
+
+    try {
+      const res = await api.patch('/auth/profile', {
+        emailNotifications: profileForm.emailNotifications,
+        whatsappNotifications: profileForm.whatsappNotifications,
+      });
+
+      setProfileForm((prev) => ({
+        ...prev,
+        emailNotifications: res.data.emailNotifications ?? prev.emailNotifications,
+        whatsappNotifications: res.data.whatsappNotifications ?? prev.whatsappNotifications,
+      }));
+
+      setProfileMessage({
+        type: 'success',
+        text: 'Las preferencias de notificaciones se actualizaron correctamente.',
+      });
+    } catch (err: any) {
+      setProfileMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No pudimos actualizar las notificaciones.',
+      });
     }
   };
 
@@ -80,143 +217,263 @@ const Profile: React.FC = () => {
     navigate('/login');
   };
 
+  const handleLogoutAll = () => {
+    setSecurityMessage({
+      type: 'success',
+      text: 'La opción de cerrar todas las sesiones estará disponible cuando se conecte el backend.',
+    });
+  };
+
   const ROLE_LABELS: Record<string, string> = {
     client: 'Cliente',
-    owner: 'Dueño de Negocio',
-    administrator: 'Administrador del Sistema',
+    owner: 'Dueño de negocio',
+    administrator: 'Administrador del sistema',
   };
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto' }}>
-      <h1 style={{ color: 'var(--text-title)', fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.375rem' }}>Mi Perfil</h1>
-      <p className="text-muted text-sm" style={{ marginBottom: '2rem' }}>Administra tu cuenta y preferencias de notificación.</p>
-
-      {/* Banner de identidad */}
-      {initialLoading ? (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <SkeletonCard />
+    <div style={{ maxWidth: '1080px', margin: '0 auto', paddingBottom: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ margin: 0, color: 'var(--text-title)', fontSize: '1.9rem', fontWeight: 800 }}>Configuración</h1>
+          <p className="text-muted" style={{ marginTop: '0.35rem', marginBottom: 0 }}>Administra tu cuenta, seguridad y preferencias.</p>
         </div>
-      ) : (
-        <div className="ml-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #009ee3, #0081bb)', color: 'white', fontWeight: 800, fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {form.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
-          </div>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontWeight: 800, color: 'var(--text-title)', marginBottom: '4px' }}>{form.name}</h2>
-            <p className="text-muted text-sm">{form.email}</p>
-            <span className={`badge ${form.role === 'administrator' ? 'badge-pending' : form.role === 'owner' ? 'badge-confirmed' : 'badge-completed'}`} style={{ marginTop: '6px' }}>
-              {ROLE_LABELS[form.role] || form.role}
-            </span>
-          </div>
-          <button className="btn btn-light" style={{ fontSize: '0.85rem', color: 'var(--status-danger-text)' }} onClick={handleLogout}>
-            <LogOut size={15} /> Cerrar Sesión
-          </button>
-        </div>
-      )}
 
-      {/* Formulario */}
-      <div className="ml-card" style={{ padding: '2rem' }}>
-        <h3 style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <User size={18} color="var(--primary-color)" /> Información Personal
-        </h3>
-
-        {error && <div className="alert-danger" style={{ marginBottom: '1rem' }}>{error}</div>}
-        {saved && <div className="alert-success" style={{ marginBottom: '1rem' }}>✓ Cambios guardados correctamente.</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">Nombre Completo</label>
-              <input
-                type="text"
-                className="form-control"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Teléfono / WhatsApp</label>
-              <input
-                type="tel"
-                className="form-control"
-                placeholder="+54 9 11 1234-5678"
-                value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Correo Electrónico</label>
-            <input type="email" className="form-control" value={form.email} disabled style={{ opacity: 0.7, background: '#f8fafc' }} />
-            <p className="text-muted" style={{ fontSize: '0.78rem', marginTop: '4px' }}>El email no puede modificarse desde el perfil.</p>
-          </div>
-
-          <div className="divider" />
-
-          <h3 style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Bell size={18} color="var(--primary-color)" /> Preferencias de Notificación
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '1rem', background: 'var(--background-app)', borderRadius: '10px', border: '1px solid var(--border-default)' }}>
-              <input
-                type="checkbox"
-                checked={form.emailNotifications}
-                onChange={e => setForm(f => ({ ...f, emailNotifications: e.target.checked }))}
-                style={{ width: '18px', height: '18px' }}
-              />
-              <div>
-                <p style={{ fontWeight: 600, marginBottom: '2px' }}>Notificaciones por Email</p>
-                <p className="text-muted text-xs">Recibir recordatorios y confirmaciones de turnos por correo.</p>
-              </div>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '1rem', background: 'var(--background-app)', borderRadius: '10px', border: '1px solid var(--border-default)' }}>
-              <input
-                type="checkbox"
-                checked={form.whatsappNotifications}
-                onChange={e => setForm(f => ({ ...f, whatsappNotifications: e.target.checked }))}
-                style={{ width: '18px', height: '18px' }}
-              />
-              <div>
-                <p style={{ fontWeight: 600, marginBottom: '2px' }}>Notificaciones por WhatsApp</p>
-                <p className="text-muted text-xs">Recibir alertas directas al número de WhatsApp configurado.</p>
-              </div>
-            </label>
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-full" style={{ padding: '0.75rem' }} disabled={loading}>
-            {loading ? (
-              <LoadingSpinner size="sm" inline text="Guardando cambios..." color="white" />
-            ) : (
-              <>
-                <Save size={18} /> Guardar Cambios
-              </>
-            )}
-          </button>
-        </form>
+        <button className="btn btn-light" style={{ fontSize: '0.85rem', color: 'var(--status-danger-text)' }} onClick={handleLogout}>
+          <LogOut size={15} /> Cerrar sesión
+        </button>
       </div>
 
-      {/* Accesos rápidos según rol */}
-      {(form.role === 'owner' || form.role === 'administrator') && (
-        <div className="ml-card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
-          <h3 style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '1rem' }}>Acceso Rápido</h3>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {(form.role === 'owner' || form.role === 'administrator') && (
-              <a href="/dashboard" className="btn btn-outline-primary" style={{ fontSize: '0.88rem' }}>
-                🏪 Panel de mi Negocio
-              </a>
-            )}
-            {form.role === 'administrator' && (
-              <a href="/system" className="btn btn-light" style={{ fontSize: '0.88rem', fontWeight: 700 }}>
-                ⚙ Administración del Sistema
-              </a>
-            )}
+      <div className="ml-card" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '620px', overflow: 'hidden' }}>
+        <aside style={{ background: 'var(--background-app)', borderRight: '1px solid var(--border-default)', padding: '1.2rem 0.8rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  width: '100%',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  borderRadius: '12px',
+                  padding: '0.85rem 0.9rem',
+                  fontWeight: activeTab === id ? 700 : 600,
+                  color: activeTab === id ? 'var(--primary-color)' : 'var(--text-title)',
+                  background: activeTab === id ? 'rgba(0, 158, 227, 0.08)' : 'transparent',
+                }}
+              >
+                <Icon size={17} />
+                {label}
+              </button>
+            ))}
           </div>
-        </div>
-      )}
+        </aside>
+
+        <main style={{ padding: '1.8rem' }}>
+          {activeTab === 'profile' && (
+            <div>
+              <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #009ee3, #0081bb)', color: 'white', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
+                  {profileForm.name ? profileForm.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, color: 'var(--text-title)', fontWeight: 800 }}>{profileForm.name || 'Usuario'}</h2>
+                  <p className="text-muted" style={{ margin: '0.25rem 0 0' }}>{profileForm.email || 'Sin email'}</p>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <span className="badge badge-confirmed" style={{ fontSize: '0.78rem' }}>
+                  {ROLE_LABELS[profileForm.role] || 'Cliente'}
+                </span>
+              </div>
+
+              {profileMessage && (
+                <div className={profileMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1rem' }}>
+                  {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {profileMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={handleProfileSubmit}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Nombre</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Teléfono</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      value={profileForm.phone}
+                      placeholder="Ej: +54 9 11 1234-5678"
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={profileForm.email}
+                    disabled
+                    style={{ background: '#f8fafc', opacity: 0.75 }}
+                  />
+                  <small className="text-muted">El email se actualiza desde la validación de cuenta o un flujo separado.</small>
+                </div>
+
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  <Save size={16} /> {loading ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text-title)', fontWeight: 800 }}>Seguridad</h2>
+              <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Cambia tu contraseña y controla el acceso a tu cuenta.</p>
+
+              {securityMessage && (
+                <div className={securityMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1rem' }}>
+                  {securityMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {securityMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={handleSecuritySubmit}>
+                <div className="form-group">
+                  <label className="form-label">Contraseña actual</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    value={securityForm.currentPassword}
+                    onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Nueva contraseña</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    value={securityForm.newPassword}
+                    onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Confirmar nueva contraseña</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    value={securityForm.confirmPassword}
+                    onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                  <button type="submit" className="btn btn-primary">
+                    <Lock size={16} /> Cambiar contraseña
+                  </button>
+
+                  <button type="button" className="btn btn-light" onClick={handleLogout}>
+                    <LogOut size={16} /> Cerrar sesión
+                  </button>
+
+                  <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
+                    Cerrar todas las sesiones
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text-title)', fontWeight: 800 }}>Notificaciones</h2>
+              <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Controla cómo querés recibir los avisos del sistema y los recordatorios de turnos.</p>
+
+              {profileMessage && (
+                <div className={profileMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1rem' }}>
+                  {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {profileMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={handleNotificationSubmit}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.9rem 1rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-title)' }}>Notificaciones por email</div>
+                      <small className="text-muted">Recibir avisos y recordatorios por correo.</small>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={profileForm.emailNotifications}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, emailNotifications: e.target.checked }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.9rem 1rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-title)' }}>Notificaciones por WhatsApp</div>
+                      <small className="text-muted">Recibir avisos y recordatorios por WhatsApp.</small>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={profileForm.whatsappNotifications}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, whatsappNotifications: e.target.checked }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ marginTop: '1.5rem' }}>
+                  <button type="submit" className="btn btn-primary">
+                    <Bell size={16} /> Guardar preferencias
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'privacy' && (
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text-title)', fontWeight: 800 }}>Privacidad</h2>
+              <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Esqueleto para futuras configuraciones de datos y contacto.</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                {[
+                  ['Permitir que el negocio vea mi teléfono', privacy.sharePhone, () => setPrivacy((prev) => ({ ...prev, sharePhone: !prev.sharePhone }))],
+                  ['Permitir contacto del sistema', privacy.systemContact, () => setPrivacy((prev) => ({ ...prev, systemContact: !prev.systemContact }))],
+                  ['Mostrar datos básicos para atención', privacy.basicVisibility, () => setPrivacy((prev) => ({ ...prev, basicVisibility: !prev.basicVisibility }))],
+                ].map(([label, checked, onToggle]) => (
+                  <label key={String(label)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.9rem 1rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-title)' }}>{String(label)}</span>
+                    <input type="checkbox" checked={Boolean(checked)} onChange={onToggle as any} style={{ width: '18px', height: '18px' }} />
+                  </label>
+                ))}
+              </div>
+
+              <div className="alert-warning" style={{ marginTop: '1.5rem' }}>
+                Esta sección queda preparada para el backend y la política de privacidad cuando se decida su alcance real.
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 };

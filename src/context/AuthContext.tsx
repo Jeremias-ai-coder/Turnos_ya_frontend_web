@@ -6,6 +6,9 @@ interface User {
   name: string;
   email: string;
   role: string;
+  phone?: string;
+  emailNotifications?: boolean;
+  whatsappNotifications?: boolean;
 }
 
 interface AuthContextType {
