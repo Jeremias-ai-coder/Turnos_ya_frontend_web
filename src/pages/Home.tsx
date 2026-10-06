@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Building2, MapPin, SlidersHorizontal, Star } from 'lucide-react';
+import { Building2, MapPin, SlidersHorizontal, Sparkles, Star } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
+
+interface BusinessService {
+  id: number;
+  name: string;
+  description?: string;
+  price?: number;
+  durationMinutes?: number;
+}
 
 interface Business {
   id: number;
@@ -11,9 +19,11 @@ interface Business {
   address: string;
   phone: string;
   category: string;
+  categoryId?: number;
   description?: string;
   rating?: number | null;
   reviewCount?: number;
+  services?: BusinessService[];
 }
 
 const DEFAULT_CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'];
@@ -68,12 +78,17 @@ const Home: React.FC = () => {
     let result = Array.isArray(businesses) ? [...businesses] : [];
     if (searchQuery) {
       const q = normalizeText(searchQuery);
-      result = result.filter(b =>
-        normalizeText(b?.name).includes(q) ||
-        normalizeText(b?.category).includes(q) ||
-        normalizeText(b?.address).includes(q) ||
-        normalizeText(b?.description).includes(q)
-      );
+      result = result.filter(b => {
+        const inName = normalizeText(b?.name).includes(q);
+        const inCat = normalizeText(b?.category).includes(q);
+        const inAddr = normalizeText(b?.address).includes(q);
+        const inDesc = normalizeText(b?.description).includes(q);
+        const inServices = b?.services?.some(s =>
+          normalizeText(s?.name).includes(q) ||
+          normalizeText(s?.description).includes(q)
+        );
+        return inName || inCat || inAddr || inDesc || inServices;
+      });
     }
     if (selectedCategory !== 'Todos') {
       const normCat = normalizeText(selectedCategory);
@@ -87,12 +102,17 @@ const Home: React.FC = () => {
     let list = Array.isArray(businesses) ? businesses : [];
     if (searchQuery) {
       const q = normalizeText(searchQuery);
-      list = list.filter(b =>
-        normalizeText(b?.name).includes(q) ||
-        normalizeText(b?.category).includes(q) ||
-        normalizeText(b?.address).includes(q) ||
-        normalizeText(b?.description).includes(q)
-      );
+      list = list.filter(b => {
+        const inName = normalizeText(b?.name).includes(q);
+        const inCat = normalizeText(b?.category).includes(q);
+        const inAddr = normalizeText(b?.address).includes(q);
+        const inDesc = normalizeText(b?.description).includes(q);
+        const inServices = b?.services?.some(s =>
+          normalizeText(s?.name).includes(q) ||
+          normalizeText(s?.description).includes(q)
+        );
+        return inName || inCat || inAddr || inDesc || inServices;
+      });
     }
     if (cat === 'Todos') return list.length;
     const normCat = normalizeText(cat);
@@ -256,6 +276,75 @@ const Home: React.FC = () => {
                           <span className="badge badge-confirmed" style={{ marginBottom: '6px', fontSize: '0.75rem', alignSelf: 'flex-start' }}>
                             {business.category}
                           </span>
+                        )}
+                        {business.description && (
+                          <p className="text-muted text-sm" style={{
+                            marginBottom: '8px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            lineHeight: 1.35
+                          }}>
+                            {business.description}
+                          </p>
+                        )}
+
+                        {/* Coincidencia destacada de servicio cuando se busca */}
+                        {searchQuery && business.services && business.services.length > 0 && (() => {
+                          const q = normalizeText(searchQuery);
+                          const matching = business.services.filter(s =>
+                            normalizeText(s.name).includes(q) || (s.description && normalizeText(s.description).includes(q))
+                          );
+                          if (matching.length === 0) return null;
+                          return (
+                            <div style={{
+                              marginBottom: '8px',
+                              padding: '5px 8px',
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: '6px',
+                              fontSize: '0.74rem',
+                              color: '#166534',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Sparkles size={12} color="#16a34a" />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                Servicio: {matching.map(s => s.name).join(', ')}
+                              </span>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Chips de vista previa de servicios cuando no hay búsqueda */}
+                        {!searchQuery && business.services && business.services.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+                            {business.services.slice(0, 2).map(s => (
+                              <span key={s.id} style={{
+                                fontSize: '0.70rem',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                color: '#475569',
+                                borderRadius: '4px',
+                                padding: '1px 6px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '140px',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {s.name}
+                              </span>
+                            ))}
+                            {business.services.length > 2 && (
+                              <span style={{ fontSize: '0.70rem', color: '#94a3b8', alignSelf: 'center' }}>
+                                +{business.services.length - 2}
+                              </span>
+                            )}
+                          </div>
                         )}
                         {business.address && (
                           <p className="text-muted text-sm" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto' }}>
