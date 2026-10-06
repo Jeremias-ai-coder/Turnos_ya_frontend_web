@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { Eye, EyeOff, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const Register: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [role, setRole] = useState('client');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,21 +19,12 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Las contraseñas deben coincidir');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/register', { name, email, password, confirmPassword, role });
+      // Nota: Asumiendo que existe el endpoint /auth/register en backend o lo simulas
+      // Si el backend aún no tiene register, esto podría dar 404, pero se deja estructurado
+      const response = await api.post('/auth/register', { name, email, password, role });
       // Si auto-loguea después de registrar:
       if (response.data.token) {
         login(response.data.token, response.data.user);
@@ -86,46 +75,13 @@ const Register: React.FC = () => {
           </div>
           <div className="form-group">
             <label className="form-label">Contraseña</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-control"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                required
-                style={{ paddingRight: '3rem' }}
-              />
-              <button
-                type="button"
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Repetir contraseña</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                className="form-control"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                style={{ paddingRight: '3rem' }}
-              />
-              <button
-                type="button"
-                aria-label={showConfirmPassword ? 'Ocultar confirmación de contraseña' : 'Mostrar confirmación de contraseña'}
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+            <input 
+              type="password" 
+              className="form-control" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
           </div>
           <div className="form-group">
             <label className="form-label">¿Qué deseas hacer?</label>
@@ -136,8 +92,13 @@ const Register: React.FC = () => {
           </div>
           
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={loading}>
-            <UserPlus size={20} />
-            {loading ? 'Registrando...' : 'Comenzar ahora'}
+            {loading ? (
+              <LoadingSpinner size="sm" inline text="Registrando..." color="white" />
+            ) : (
+              <>
+                <UserPlus size={20} /> Comenzar ahora
+              </>
+            )}
           </button>
         </form>
 

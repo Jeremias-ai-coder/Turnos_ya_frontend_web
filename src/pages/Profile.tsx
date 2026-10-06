@@ -11,6 +11,8 @@ interface ProfileData {
   email: string;
   phone: string;
   role: string;
+  emailNotifications: boolean;
+  whatsappNotifications: boolean;
 }
 
 interface SecurityForm {
@@ -19,25 +21,11 @@ interface SecurityForm {
   confirmPassword: string;
 }
 
-interface NotificationSettings {
-  remindersEmail: boolean;
-  remindersSms: boolean;
-  reservationConfirmation: boolean;
-  scheduleChanges: boolean;
-}
-
 interface PrivacySettings {
   sharePhone: boolean;
   systemContact: boolean;
   basicVisibility: boolean;
 }
-
-const defaultNotifications: NotificationSettings = {
-  remindersEmail: true,
-  remindersSms: false,
-  reservationConfirmation: true,
-  scheduleChanges: true,
-};
 
 const defaultPrivacy: PrivacySettings = {
   sharePhone: false,
@@ -62,6 +50,8 @@ const Profile: React.FC = () => {
     email: user?.email || '',
     phone: user?.phone || '',
     role: user?.role || '',
+    emailNotifications: user?.emailNotifications ?? true,
+    whatsappNotifications: user?.whatsappNotifications ?? false,
   });
 
   const [securityForm, setSecurityForm] = useState<SecurityForm>({
@@ -70,7 +60,6 @@ const Profile: React.FC = () => {
     confirmPassword: '',
   });
 
-  const [notifications, setNotifications] = useState<NotificationSettings>(defaultNotifications);
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
 
   const [loading, setLoading] = useState(false);
@@ -78,7 +67,7 @@ const Profile: React.FC = () => {
   const [securityMessage, setSecurityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const refreshProfileFromServer = async () => {
-    const res = await api.get('/auth/me');
+    const res = await api.get('/users/me');
     const freshUser = res.data;
 
     setProfileForm({
@@ -86,6 +75,8 @@ const Profile: React.FC = () => {
       email: freshUser.email || '',
       phone: freshUser.phone || '',
       role: freshUser.role || '',
+      emailNotifications: freshUser.emailNotifications ?? true,
+      whatsappNotifications: freshUser.whatsappNotifications ?? false,
     });
 
     const storedToken = localStorage.getItem('token');
@@ -101,7 +92,7 @@ const Profile: React.FC = () => {
       try {
         await refreshProfileFromServer();
       } catch {
-        // Silenciar por ahora.
+        // noop
       }
     };
 
@@ -124,6 +115,8 @@ const Profile: React.FC = () => {
         email: res.data.email || profileForm.email,
         phone: res.data.phone || '',
         role: res.data.role || profileForm.role,
+        emailNotifications: res.data.emailNotifications ?? profileForm.emailNotifications,
+        whatsappNotifications: res.data.whatsappNotifications ?? profileForm.whatsappNotifications,
       });
 
       const storedToken = localStorage.getItem('token');
@@ -131,11 +124,11 @@ const Profile: React.FC = () => {
         login(storedToken, res.data);
       }
 
-      const freshUser = await refreshProfileFromServer();
+      await refreshProfileFromServer();
 
       setProfileMessage({
         type: 'success',
-        text: `Tus datos se guardaron correctamente. Teléfono actual: ${freshUser.phone || 'sin teléfono'}`,
+        text: 'Tus datos personales se actualizaron correctamente.',
       });
     } catch (err: any) {
       setProfileMessage({
@@ -187,6 +180,34 @@ const Profile: React.FC = () => {
       setSecurityMessage({
         type: 'error',
         text: err.response?.data?.message || 'No se pudo actualizar la contraseña.',
+      });
+    }
+  };
+
+  const handleNotificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileMessage(null);
+
+    try {
+      const res = await api.patch('/auth/profile', {
+        emailNotifications: profileForm.emailNotifications,
+        whatsappNotifications: profileForm.whatsappNotifications,
+      });
+
+      setProfileForm((prev) => ({
+        ...prev,
+        emailNotifications: res.data.emailNotifications ?? prev.emailNotifications,
+        whatsappNotifications: res.data.whatsappNotifications ?? prev.whatsappNotifications,
+      }));
+
+      setProfileMessage({
+        type: 'success',
+        text: 'Las preferencias de notificaciones se actualizaron correctamente.',
+      });
+    } catch (err: any) {
+      setProfileMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No pudimos actualizar las notificaciones.',
       });
     }
   };
@@ -382,25 +403,49 @@ const Profile: React.FC = () => {
           {activeTab === 'notifications' && (
             <div>
               <h2 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text-title)', fontWeight: 800 }}>Notificaciones</h2>
-              <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Esqueleto de configuración para futuras opciones activas.</p>
+              <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Controla cómo querés recibir los avisos del sistema y los recordatorios de turnos.</p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                {[
-                  ['Recordatorios por email', notifications.remindersEmail, () => setNotifications((prev) => ({ ...prev, remindersEmail: !prev.remindersEmail }))],
-                  ['Recordatorios por SMS', notifications.remindersSms, () => setNotifications((prev) => ({ ...prev, remindersSms: !prev.remindersSms }))],
-                  ['Confirmación de reserva', notifications.reservationConfirmation, () => setNotifications((prev) => ({ ...prev, reservationConfirmation: !prev.reservationConfirmation }))],
-                  ['Avisos de cambios de horario', notifications.scheduleChanges, () => setNotifications((prev) => ({ ...prev, scheduleChanges: !prev.scheduleChanges }))],
-                ].map(([label, checked, onToggle]) => (
-                  <label key={String(label)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.9rem 1rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-title)' }}>{String(label)}</span>
-                    <input type="checkbox" checked={Boolean(checked)} onChange={onToggle as any} style={{ width: '18px', height: '18px' }} />
+              {profileMessage && (
+                <div className={profileMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1rem' }}>
+                  {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {profileMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={handleNotificationSubmit}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.9rem 1rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-title)' }}>Notificaciones por email</div>
+                      <small className="text-muted">Recibir avisos y recordatorios por correo.</small>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={profileForm.emailNotifications}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, emailNotifications: e.target.checked }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
                   </label>
-                ))}
-              </div>
 
-              <div className="alert-warning" style={{ marginTop: '1.5rem' }}>
-                Esta sección está preparada para cuando se conecte la lógica real de notificaciones.
-              </div>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.9rem 1rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-title)' }}>Notificaciones por WhatsApp</div>
+                      <small className="text-muted">Recibir avisos y recordatorios por WhatsApp.</small>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={profileForm.whatsappNotifications}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, whatsappNotifications: e.target.checked }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ marginTop: '1.5rem' }}>
+                  <button type="submit" className="btn btn-primary">
+                    <Bell size={16} /> Guardar preferencias
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
