@@ -83,6 +83,9 @@ const Dashboard: React.FC = () => {
   const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
   const [settingsForm, setSettingsForm] = useState({ name: '', description: '', address: '', phone: '', category: '' });
+  const [availableCategories, setAvailableCategories] = useState<string[]>([
+    'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'
+  ]);
 
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState('');
@@ -125,7 +128,7 @@ const Dashboard: React.FC = () => {
     setScheduleForm({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
   };
 
-  // Load my businesses
+  // Load my businesses and categories
   useEffect(() => {
     setInitialLoading(true);
     api.get('/businesses/my').then(res => {
@@ -136,6 +139,13 @@ const Dashboard: React.FC = () => {
       }
     }).catch(() => {})
       .finally(() => setInitialLoading(false));
+
+    api.get('/categories').then(res => {
+      const list = res.data?.data ?? res.data;
+      if (Array.isArray(list) && list.length > 0) {
+        setAvailableCategories(list.map((c: any) => c.name));
+      }
+    }).catch(() => {});
   }, []);
 
   // When business changes, load services, schedules and reviews
@@ -984,7 +994,7 @@ const Dashboard: React.FC = () => {
                   <label className="form-label">Categoría</label>
                   <select className="form-control" value={settingsForm.category} onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))}>
                     <option value="">Seleccionar categoría...</option>
-                    {['Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'].map(c => <option key={c}>{c}</option>)}
+                    {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting} style={{ padding: '0.75rem 2rem' }}>

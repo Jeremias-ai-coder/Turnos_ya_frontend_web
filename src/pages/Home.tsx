@@ -16,7 +16,7 @@ interface Business {
   reviewCount?: number;
 }
 
-const CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'];
+const DEFAULT_CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'];
 
 const normalizeText = (text: string = '') =>
   text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -24,6 +24,7 @@ const normalizeText = (text: string = '') =>
 const Home: React.FC = () => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [filtered, setFiltered] = useState<Business[]>([]);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') || '';
@@ -46,7 +47,21 @@ const Home: React.FC = () => {
         setLoading(false);
       }
     };
+
+    const fetchCategories = async () => {
+      try {
+        const res = await api.get('/categories');
+        const raw = res.data?.data ?? res.data;
+        if (Array.isArray(raw) && raw.length > 0) {
+          setCategories(['Todos', ...raw.map((c: any) => c.name)]);
+        }
+      } catch {
+        // Fallback to DEFAULT_CATEGORIES
+      }
+    };
+
     fetchBusinesses();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -116,7 +131,7 @@ const Home: React.FC = () => {
           <div>
             <div className="filter-section-title" style={{ fontSize: '0.78rem', marginBottom: '0.6rem' }}>Categoría</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {CATEGORIES.map(cat => {
+              {categories.map(cat => {
                 const count = getCategoryCount(cat);
                 const isSelected = selectedCategory === cat;
                 return (
