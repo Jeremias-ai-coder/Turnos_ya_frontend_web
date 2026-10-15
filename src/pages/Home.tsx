@@ -11,30 +11,7 @@ import {
   DEFAULT_DEMO_COORDS,
 } from '../utils/locationHelper';
 import { filterAndSortBusinesses } from '../utils/businessFilterHelper';
-
-interface BusinessService {
-  id: number;
-  name: string;
-  description?: string;
-  price?: number;
-  durationMinutes?: number;
-}
-
-interface Business {
-  id: number;
-  name: string;
-  address: string;
-  phone: string;
-  category: string;
-  categoryId?: number;
-  description?: string;
-  rating?: number | null;
-  reviewCount?: number;
-  services?: BusinessService[];
-  latitude?: number | string | null;
-  longitude?: number | string | null;
-  distanceKm?: number;
-}
+import { type Business } from '../types';
 
 const DEFAULT_CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'];
 

@@ -20,10 +20,7 @@ import { es } from 'date-fns/locale';
 import { formatTimeToHHMM, toISOTimeString, generateSlotsForSchedule, getEffectiveDurationMinutes } from '../utils/timeHelper';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { SkeletonDetail } from '../components/common/SkeletonLoaders';
-
-interface Business { id: number; name: string; address: string; description: string; }
-interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
-interface Schedule { id: number; dayOfWeek: number; startTime: string; endTime: string; }
+import { type Business, type BusinessService as Service, type Schedule } from '../types';
 
 type Step = 1 | 2 | 3;
 

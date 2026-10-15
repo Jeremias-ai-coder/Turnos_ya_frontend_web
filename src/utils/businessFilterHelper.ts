@@ -1,16 +1,11 @@
 import { type Coordinates, calculateDistanceKm } from './locationHelper';
+import { type Business } from '../types';
 
-export interface BusinessItem {
+export type BusinessItem = Omit<Partial<Business>, 'services'> & {
   id: number;
   name: string;
-  address?: string;
-  category?: string;
-  description?: string;
-  latitude?: number | string | null;
-  longitude?: number | string | null;
-  distanceKm?: number;
-  services?: Array<{ name: string; description?: string }>;
-}
+  services?: Array<{ id?: number; name: string; description?: string }>;
+};
 
 export interface FilterOptions {
   searchQuery?: string;

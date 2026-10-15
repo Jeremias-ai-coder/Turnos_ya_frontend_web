@@ -16,26 +16,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SkeletonDetail } from '../components/common/SkeletonLoaders';
-
-
-interface Business {
-  id: number;
-  name: string;
-  address: string;
-  phone: string;
-  description: string;
-  category: string;
-  rating?: number | null;
-  reviewCount?: number;
-}
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  durationMinutes: number;
-  price: number;
-}
+import { type Business, type BusinessService as Service } from '../types';
 
 interface Review {
   id: number;

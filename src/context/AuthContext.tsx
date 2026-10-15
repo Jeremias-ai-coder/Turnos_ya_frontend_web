@@ -1,15 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  phone?: string;
-  emailNotifications?: boolean;
-  whatsappNotifications?: boolean;
-}
+import { type User } from '../types';
 
 interface AuthContextType {
   user: User | null;
