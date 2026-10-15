@@ -6,11 +6,11 @@ import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
 import {
   type Coordinates,
-  calculateDistanceKm,
   formatDistance,
   requestBrowserLocation,
   DEFAULT_DEMO_COORDS,
 } from '../utils/locationHelper';
+import { filterAndSortBusinesses } from '../utils/businessFilterHelper';
 
 interface BusinessService {
   id: number;
@@ -126,54 +126,14 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    let result = Array.isArray(businesses) ? [...businesses] : [];
-
-    // Calcular distancia si tenemos coordenadas del usuario
-    if (userCoords) {
-      result = result.map(b => {
-        if (b.latitude != null && b.longitude != null) {
-          const lat = Number(b.latitude);
-          const lon = Number(b.longitude);
-          if (!isNaN(lat) && !isNaN(lon)) {
-            const dist = calculateDistanceKm(userCoords.latitude, userCoords.longitude, lat, lon);
-            return { ...b, distanceKm: dist };
-          }
-        }
-        return b;
-      });
-    }
-
-    if (searchQuery) {
-      const q = normalizeText(searchQuery);
-      result = result.filter(b => {
-        const inName = normalizeText(b?.name).includes(q);
-        const inCat = normalizeText(b?.category).includes(q);
-        const inAddr = normalizeText(b?.address).includes(q);
-        const inDesc = normalizeText(b?.description).includes(q);
-        const inServices = b?.services?.some(s =>
-          normalizeText(s?.name).includes(q) ||
-          normalizeText(s?.description).includes(q)
-        );
-        return inName || inCat || inAddr || inDesc || inServices;
-      });
-    }
-
-    if (selectedCategory !== 'Todos') {
-      const normCat = normalizeText(selectedCategory);
-      result = result.filter(b => normalizeText(b?.category) === normCat);
-    }
-
-    // Filtro por radio de distancia en km
-    if (sortByProximity && maxDistanceKm !== null) {
-      result = result.filter(b => b.distanceKm !== undefined && b.distanceKm <= maxDistanceKm);
-    }
-
-    // Ordenar de menor a mayor distancia si la cercanía está activa
-    if (sortByProximity) {
-      result.sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
-    }
-
-    setFiltered(result);
+    const result = filterAndSortBusinesses(businesses, {
+      searchQuery,
+      selectedCategory,
+      userCoords,
+      sortByProximity,
+      maxDistanceKm,
+    });
+    setFiltered(result as Business[]);
     setPage(1);
   }, [searchQuery, selectedCategory, businesses, userCoords, sortByProximity, maxDistanceKm]);
 
