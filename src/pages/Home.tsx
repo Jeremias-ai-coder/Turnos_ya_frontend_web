@@ -1,30 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Building2, MapPin, SlidersHorizontal, Sparkles, Star } from 'lucide-react';
+import { Building2, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
-
-interface BusinessService {
-  id: number;
-  name: string;
-  description?: string;
-  price?: number;
-  durationMinutes?: number;
-}
-
-interface Business {
-  id: number;
-  name: string;
-  address: string;
-  phone: string;
-  category: string;
-  categoryId?: number;
-  description?: string;
-  rating?: number | null;
-  reviewCount?: number;
-  services?: BusinessService[];
-}
+import {
+  type Coordinates,
+  formatDistance,
+  requestBrowserLocation,
+  DEFAULT_DEMO_COORDS,
+} from '../utils/locationHelper';
+import { filterAndSortBusinesses } from '../utils/businessFilterHelper';
+import { type Business } from '../types';
 
 const DEFAULT_CATEGORIES = ['Todos', 'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'];
 
@@ -41,6 +28,13 @@ const Home: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [page, setPage] = useState(1);
   const PER_PAGE = 9;
+
+  // Estados de Ubicación y Cercanía
+  const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
+  const [sortByProximity, setSortByProximity] = useState(false);
+  const [maxDistanceKm, setMaxDistanceKm] = useState<number | null>(null);
+  const [locatingUser, setLocatingUser] = useState(false);
+  const [locationLabel, setLocationLabel] = useState<string>('');
 
   useEffect(() => {
     const fetchBusinesses = async () => {
@@ -74,29 +68,51 @@ const Home: React.FC = () => {
     fetchCategories();
   }, []);
 
+  const handleGetLocation = async () => {
+    setLocatingUser(true);
+    const result = await requestBrowserLocation();
+    setLocatingUser(false);
+
+    if (result.status === 'granted' && result.coords) {
+      setUserCoords(result.coords);
+      setSortByProximity(true);
+      setLocationLabel('Tu ubicación actual');
+    } else {
+      const useDemo = window.confirm(
+        `${result.errorMessage || 'No se pudo obtener tu ubicación.'}\n\n¿Deseás activar el filtro de cercanía usando como referencia el Centro de CABA (Obelisco)?`
+      );
+      if (useDemo) {
+        setUserCoords(DEFAULT_DEMO_COORDS);
+        setSortByProximity(true);
+        setLocationLabel('Centro CABA (Demo)');
+      }
+    }
+  };
+
+  const handleUseDemoLocation = () => {
+    setUserCoords(DEFAULT_DEMO_COORDS);
+    setSortByProximity(true);
+    setLocationLabel('Centro CABA (Demo)');
+  };
+
+  const handleClearLocation = () => {
+    setSortByProximity(false);
+    setMaxDistanceKm(null);
+    setUserCoords(null);
+    setLocationLabel('');
+  };
+
   useEffect(() => {
-    let result = Array.isArray(businesses) ? [...businesses] : [];
-    if (searchQuery) {
-      const q = normalizeText(searchQuery);
-      result = result.filter(b => {
-        const inName = normalizeText(b?.name).includes(q);
-        const inCat = normalizeText(b?.category).includes(q);
-        const inAddr = normalizeText(b?.address).includes(q);
-        const inDesc = normalizeText(b?.description).includes(q);
-        const inServices = b?.services?.some(s =>
-          normalizeText(s?.name).includes(q) ||
-          normalizeText(s?.description).includes(q)
-        );
-        return inName || inCat || inAddr || inDesc || inServices;
-      });
-    }
-    if (selectedCategory !== 'Todos') {
-      const normCat = normalizeText(selectedCategory);
-      result = result.filter(b => normalizeText(b?.category) === normCat);
-    }
-    setFiltered(result);
+    const result = filterAndSortBusinesses(businesses, {
+      searchQuery,
+      selectedCategory,
+      userCoords,
+      sortByProximity,
+      maxDistanceKm,
+    });
+    setFiltered(result as Business[]);
     setPage(1);
-  }, [searchQuery, selectedCategory, businesses]);
+  }, [searchQuery, selectedCategory, businesses, userCoords, sortByProximity, maxDistanceKm]);
 
   const getCategoryCount = (cat: string) => {
     let list = Array.isArray(businesses) ? businesses : [];
@@ -134,16 +150,115 @@ const Home: React.FC = () => {
             </div>
           </div>
 
+          {/* Tu Ubicación y Cercanía */}
           <div style={{ marginBottom: '1.25rem' }}>
             <div className="filter-section-title" style={{ fontSize: '0.78rem' }}>
-              <MapPin size={13} color="var(--primary-color)" /> Tu Ubicación
+              <Navigation size={13} color="var(--primary-color)" /> Cercanía y Ubicación
             </div>
-            <p className="text-muted text-xs" style={{ marginBottom: '0.75rem' }}>
-              No se ha detectado tu ubicación actual.
-            </p>
-            <button className="btn btn-outline-primary btn-full" style={{ fontSize: '0.85rem', padding: '7px 12px', marginBottom: '6px' }}>
-              Mi Ubicación
-            </button>
+
+            {!sortByProximity ? (
+              <div>
+                <p className="text-muted text-xs" style={{ marginBottom: '0.75rem' }}>
+                  Activá la cercanía para ordenar comercios desde el más próximo a vos.
+                </p>
+                <button
+                  onClick={handleGetLocation}
+                  disabled={locatingUser}
+                  className="btn btn-outline-primary btn-full"
+                  style={{
+                    fontSize: '0.85rem',
+                    padding: '8px 12px',
+                    marginBottom: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Navigation size={14} />
+                  {locatingUser ? 'Localizando...' : 'Usar mi ubicación'}
+                </button>
+                <button
+                  onClick={handleUseDemoLocation}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    width: '100%',
+                    textDecoration: 'underline',
+                    padding: '4px',
+                  }}
+                >
+                  O probar con Centro CABA
+                </button>
+              </div>
+            ) : (
+              <div style={{
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '8px',
+                padding: '10px 12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#0369a1' }}>
+                    <Navigation size={13} color="#0284c7" />
+                    <span>{locationLabel}</span>
+                  </div>
+                  <button
+                    onClick={handleClearLocation}
+                    title="Desactivar cercanía"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369a1', marginBottom: '6px', marginTop: '8px' }}>
+                  Radio de distancia:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {[
+                    { label: 'Todos', value: null },
+                    { label: '< 3 km', value: 3 },
+                    { label: '< 5 km', value: 5 },
+                    { label: '< 10 km', value: 10 },
+                  ].map(rad => {
+                    const isSelected = maxDistanceKm === rad.value;
+                    return (
+                      <button
+                        key={rad.label}
+                        onClick={() => setMaxDistanceKm(rad.value)}
+                        style={{
+                          fontSize: '0.74rem',
+                          fontWeight: isSelected ? 700 : 500,
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          border: '1px solid',
+                          borderColor: isSelected ? 'var(--primary-color)' : '#cbd5e1',
+                          background: isSelected ? 'var(--primary-color)' : '#ffffff',
+                          color: isSelected ? '#ffffff' : '#475569',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {rad.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="divider" />
@@ -201,6 +316,41 @@ const Home: React.FC = () => {
 
         {/* Columna de negocios */}
         <div>
+          {sortByProximity && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.65rem 1rem',
+              background: '#e0f2fe',
+              border: '1px solid #bae6fd',
+              borderRadius: '10px',
+              marginBottom: '1rem',
+              fontSize: '0.85rem',
+              color: '#0369a1',
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                <Navigation size={14} color="#0284c7" />
+                Ordenando comercios por cercanía ({locationLabel})
+                {maxDistanceKm !== null && ` · Radio: < ${maxDistanceKm} km`}
+              </span>
+              <button
+                onClick={handleClearLocation}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#0284c7',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.80rem',
+                  textDecoration: 'underline',
+                }}
+              >
+                Quitar cercanía
+              </button>
+            </div>
+          )}
+
           {searchQuery && (
             <div style={{
               display: 'flex',
@@ -272,11 +422,31 @@ const Home: React.FC = () => {
                         <h3 style={{ color: 'var(--text-title)', fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>
                           {business.name}
                         </h3>
-                        {business.category && (
-                          <span className="badge badge-confirmed" style={{ marginBottom: '6px', fontSize: '0.75rem', alignSelf: 'flex-start' }}>
-                            {business.category}
-                          </span>
-                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                          {business.category && (
+                            <span className="badge badge-confirmed" style={{ fontSize: '0.75rem' }}>
+                              {business.category}
+                            </span>
+                          )}
+                          {business.distanceKm !== undefined && (
+                            <span style={{
+                              fontSize: '0.73rem',
+                              fontWeight: 700,
+                              color: '#0284c7',
+                              background: '#e0f2fe',
+                              border: '1px solid #bae6fd',
+                              borderRadius: '4px',
+                              padding: '1px 6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                            }}>
+                              <Navigation size={10} />
+                              {formatDistance(business.distanceKm)}
+                            </span>
+                          )}
+                        </div>
                         {business.description && (
                           <p className="text-muted text-sm" style={{
                             marginBottom: '8px',

@@ -23,29 +23,13 @@ import { formatTimeToHHMM } from '../utils/timeHelper';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Pagination from '../components/common/Pagination';
 import { SkeletonTicket } from '../components/common/SkeletonLoaders';
-
-interface Business { id: number; name: string; description: string; address: string; phone: string; category: string; }
-interface Service { id: number; name: string; description: string; durationMinutes: number; price: number; }
-interface Schedule { id: number; dayOfWeek: number; startTime: string; endTime: string; }
-interface Appointment {
-  id: number;
-  date: string;
-  time: string;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
-  cancelledReason?: string;
-  user?: { name: string; email: string };
-  service?: { name: string; price: number };
-}
-interface Review {
-  id: number;
-  rating: number;
-  comment?: string | null;
-  createdAt: string;
-  appointment?: {
-    user?: { id: number; name: string };
-    service?: { id: number; name: string };
-  };
-}
+import {
+  type Business,
+  type BusinessService as Service,
+  type Schedule,
+  type Appointment,
+  type Review,
+} from '../types';
 
 const DAY_NAMES = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const STATUS_MAP: Record<string, string> = {
@@ -104,8 +88,8 @@ const Dashboard: React.FC = () => {
     setServiceForm({
       name: svc.name,
       description: svc.description || '',
-      durationMinutes: svc.durationMinutes,
-      price: Number(svc.price)
+      durationMinutes: svc.durationMinutes ?? 30,
+      price: Number(svc.price ?? 0)
     });
   };
 

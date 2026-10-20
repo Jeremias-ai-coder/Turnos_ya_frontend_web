@@ -8,15 +8,7 @@ import { es } from 'date-fns/locale';
 import { formatTimeToHHMM } from '../utils/timeHelper';
 import { SkeletonTable } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
-
-interface User { id: number; name: string; email: string; role: string; phone: string; createdAt: string; }
-interface Business { id: number; name: string; address: string; owner?: { name: string }; }
-interface Appointment {
-  id: number; status: string; date: string; time: string;
-  user?: { name: string; email: string };
-  business?: { name: string };
-  service?: { name: string };
-}
+import { type User, type Business, type Appointment } from '../types';
 
 const ROLE_LABELS: Record<string, { label: string; badge: string }> = {
   client: { label: 'Cliente', badge: 'badge-completed' },

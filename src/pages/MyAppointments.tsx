@@ -7,24 +7,7 @@ import { formatTimeToHHMM, getHoursUntilAppointment } from '../utils/timeHelper'
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { SkeletonTicket } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
-
-interface Review {
-  id: number;
-  rating: number;
-  comment?: string | null;
-  createdAt: string;
-}
-
-interface Appointment {
-  id: number;
-  date: string;
-  time: string;
-  status: string;
-  cancelledReason: string | null;
-  service?: { name: string; durationMinutes: number; price: number; minCancellationNoticeHours?: number };
-  business?: { name: string; address: string; };
-  review?: Review | null;
-}
+import { type Appointment } from '../types';
 
 type StatusFilter = 'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 

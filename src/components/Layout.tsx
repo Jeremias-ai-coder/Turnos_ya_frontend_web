@@ -71,9 +71,12 @@ export const Layout: React.FC = () => {
       <nav className="navbar-custom">
         <div className="container">
           <div className="navbar-inner">
-            <Link to="/" className="navbar-brand">
-              <div className="logo-nav">TY</div>
-              Turnos Ya
+            <Link to="/" className="navbar-brand" title="Turnos Ya - Inicio">
+              <img
+                src="/assets/brand/logo-white.png"
+                alt="Turnos Ya"
+                className="brand-logo-nav"
+              />
             </Link>
 
             <form className="search-group" onSubmit={handleSearchSubmit} role="search">

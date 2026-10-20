@@ -36,7 +36,13 @@ const Login: React.FC = () => {
     <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
         <div className="ml-card" style={{ padding: '2.5rem' }}>
-          <div className="login-logo">TY</div>
+          <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+            <img
+              src="/assets/brand/logo-color.png"
+              alt="Turnos Ya"
+              style={{ height: '48px', objectFit: 'contain' }}
+            />
+          </div>
           <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.25rem' }}>Iniciar sesión</h2>
           <p className="text-muted text-sm" style={{ marginBottom: '1.75rem' }}>
             Ingresa tus credenciales para administrar tus citas y negocios.
