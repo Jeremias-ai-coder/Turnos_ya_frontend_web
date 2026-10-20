@@ -42,6 +42,13 @@ const Register: React.FC = () => {
   return (
     <div style={{ maxWidth: '400px', margin: '4rem auto' }}>
       <div className="ml-card" style={{ padding: '2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+          <img
+            src="/assets/brand/logo-color.png"
+            alt="Turnos Ya"
+            style={{ height: '44px', objectFit: 'contain' }}
+          />
+        </div>
         <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--text-title)' }}>
           Crear Cuenta
         </h2>

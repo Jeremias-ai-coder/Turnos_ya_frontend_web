@@ -52,6 +52,18 @@ body {
   flex-shrink: 0;
 }
 
+.brand-logo-nav {
+  height: 38px;
+  max-width: 155px;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.brand-logo-nav:hover {
+  transform: scale(1.02);
+}
+
 .logo-nav {
   width: 34px;
   height: 34px;
