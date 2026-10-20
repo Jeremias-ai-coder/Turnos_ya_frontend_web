@@ -1,9 +1,20 @@
 import axios from 'axios';
 
-// Si se define VITE_API_URL en el archivo .env se usa esa URL;
-// de lo contrario, se usa '/api/v1' que aprovecha el proxy de Vite en desarrollo.
+// Normalizar baseURL: si VITE_API_URL no incluye '/api/v1', se lo añade automáticamente.
+export const normalizeApiBaseUrl = (rawUrl?: string): string => {
+  const url = (rawUrl || '').trim();
+  if (!url) {
+    return '/api/v1';
+  }
+  const cleanUrl = url.replace(/\/+$/, '');
+  if (!cleanUrl.endsWith('/api/v1') && !cleanUrl.endsWith('/api')) {
+    return `${cleanUrl}/api/v1`;
+  }
+  return cleanUrl;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_API_URL),
   headers: {
     'Content-Type': 'application/json',
   },
