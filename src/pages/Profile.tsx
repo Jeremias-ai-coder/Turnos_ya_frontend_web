@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle, Mail, KeyRound, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 type ActiveTab = 'profile' | 'security' | 'notifications' | 'privacy';
@@ -59,6 +59,12 @@ const Profile: React.FC = () => {
     newPassword: '',
     confirmPassword: '',
   });
+
+  const [pendingPasswordConfirmation, setPendingPasswordConfirmation] = useState(false);
+  const [confirmationToken, setConfirmationToken] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [qaPasswordCode, setQaPasswordCode] = useState<string | null>(null);
+  const [securityLoading, setSecurityLoading] = useState(false);
 
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
 
@@ -149,8 +155,8 @@ const Profile: React.FC = () => {
       return;
     }
 
-    if (securityForm.newPassword.length < 8) {
-      setSecurityMessage({ type: 'error', text: 'La nueva contraseña debe tener al menos 8 caracteres.' });
+    if (securityForm.newPassword.length < 6) {
+      setSecurityMessage({ type: 'error', text: 'La nueva contraseña debe tener al menos 6 caracteres.' });
       return;
     }
 
@@ -159,16 +165,51 @@ const Profile: React.FC = () => {
       return;
     }
 
+    setSecurityLoading(true);
     try {
-      await api.patch('/auth/change-password', {
+      const res = await api.post('/auth/request-password-change', {
         currentPassword: securityForm.currentPassword,
         newPassword: securityForm.newPassword,
-        confirmPassword: securityForm.confirmPassword,
+      });
+
+      if (res.data?.requiresConfirmation) {
+        setPendingPasswordConfirmation(true);
+        setConfirmationToken(res.data.confirmationToken);
+        setQaPasswordCode(res.data.qaCode || null);
+        setSecurityMessage({
+          type: 'success',
+          text: res.data.message || 'Código de confirmación enviado a tu correo.',
+        });
+      }
+    } catch (err: any) {
+      setSecurityMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo procesar la solicitud.',
+      });
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleConfirmPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityMessage(null);
+
+    if (!verificationCode.trim()) {
+      setSecurityMessage({ type: 'error', text: 'Ingresa el código de 6 dígitos recibido por correo.' });
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const res = await api.post('/auth/confirm-password-change', {
+        confirmationToken,
+        code: verificationCode.trim(),
       });
 
       setSecurityMessage({
         type: 'success',
-        text: 'La contraseña se actualizó correctamente.',
+        text: res.data?.message || '¡La contraseña se actualizó correctamente!',
       });
 
       setSecurityForm({
@@ -176,12 +217,26 @@ const Profile: React.FC = () => {
         newPassword: '',
         confirmPassword: '',
       });
+      setPendingPasswordConfirmation(false);
+      setConfirmationToken(null);
+      setVerificationCode('');
+      setQaPasswordCode(null);
     } catch (err: any) {
       setSecurityMessage({
         type: 'error',
-        text: err.response?.data?.message || 'No se pudo actualizar la contraseña.',
+        text: err.response?.data?.message || 'Código incorrecto o expirado.',
       });
+    } finally {
+      setSecurityLoading(false);
     }
+  };
+
+  const handleCancelPasswordChange = () => {
+    setPendingPasswordConfirmation(false);
+    setConfirmationToken(null);
+    setVerificationCode('');
+    setQaPasswordCode(null);
+    setSecurityMessage(null);
   };
 
   const handleNotificationSubmit = async (e: React.FormEvent) => {
@@ -351,51 +406,145 @@ const Profile: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSecuritySubmit}>
-                <div className="form-group">
-                  <label className="form-label">Contraseña actual</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={securityForm.currentPassword}
-                    onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                  />
-                </div>
+              {pendingPasswordConfirmation ? (
+                <form onSubmit={handleConfirmPasswordChange}>
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '1.5rem',
+                      marginBottom: '1.25rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Mail size={18} color="#0284c7" />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-title)' }}>
+                          Confirmación por correo electrónico requerida
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                          Ingresa el código de 6 dígitos enviado a tu correo para autorizar el cambio
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="form-group">
-                  <label className="form-label">Nueva contraseña</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={securityForm.newPassword}
-                    onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                  />
-                </div>
+                    {qaPasswordCode && (
+                      <div
+                        style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          marginBottom: '1rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#166534', fontWeight: 600 }}>
+                          <Sparkles size={15} color="#16a34a" /> Modo pruebas (QA): <code>{qaPasswordCode}</code>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setVerificationCode(qaPasswordCode)}
+                          className="btn btn-primary"
+                          style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                        >
+                          Usar código
+                        </button>
+                      </div>
+                    )}
 
-                <div className="form-group">
-                  <label className="form-label">Confirmar nueva contraseña</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={securityForm.confirmPassword}
-                    onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                  />
-                </div>
+                    <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                      <label className="form-label" style={{ fontWeight: 700 }}>
+                        Código de verificación (6 dígitos)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        className="form-control"
+                        placeholder="123456"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                        style={{
+                          fontSize: '1.4rem',
+                          letterSpacing: '6px',
+                          textAlign: 'center',
+                          fontWeight: 700,
+                          maxWidth: '200px',
+                        }}
+                        required
+                        autoFocus
+                      />
+                      <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
+                        El código expira en 10 minutos.
+                      </small>
+                    </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary">
-                    <Lock size={16} /> Cambiar contraseña
-                  </button>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <button type="submit" className="btn btn-primary" disabled={securityLoading}>
+                        <KeyRound size={16} /> {securityLoading ? 'Verificando...' : 'Confirmar y cambiar contraseña'}
+                      </button>
+                      <button type="button" className="btn btn-light" onClick={handleCancelPasswordChange}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleSecuritySubmit}>
+                  <div className="form-group">
+                    <label className="form-label">Contraseña actual</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={securityForm.currentPassword}
+                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                      required
+                    />
+                  </div>
 
-                  <button type="button" className="btn btn-light" onClick={handleLogout}>
-                    <LogOut size={16} /> Cerrar sesión
-                  </button>
+                  <div className="form-group">
+                    <label className="form-label">Nueva contraseña</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={securityForm.newPassword}
+                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                      required
+                    />
+                  </div>
 
-                  <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
-                    Cerrar todas las sesiones
-                  </button>
-                </div>
-              </form>
+                  <div className="form-group">
+                    <label className="form-label">Confirmar nueva contraseña</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={securityForm.confirmPassword}
+                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                    <button type="submit" className="btn btn-primary" disabled={securityLoading}>
+                      <Lock size={16} /> {securityLoading ? 'Enviando código...' : 'Cambiar contraseña'}
+                    </button>
+
+                    <button type="button" className="btn btn-light" onClick={handleLogout}>
+                      <LogOut size={16} /> Cerrar sesión
+                    </button>
+
+                    <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
+                      Cerrar todas las sesiones
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           )}
 
