@@ -836,6 +836,194 @@ body {
   align-items: start;
 }
 
+/* ====== DASHBOARD MODERN UI ====== */
+.dashboard-hero-card {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.dashboard-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.dashboard-hero-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 4px 10px rgba(0, 158, 227, 0.08);
+}
+
+.dashboard-hero-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-title);
+  line-height: 1.25;
+}
+
+.dashboard-hero-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.dashboard-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.metric-card-compact {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.metric-card-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+}
+
+.metric-icon-compact {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background-color: #e6f5fc;
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dashboard-tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 4px 2px 12px 2px;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-tab-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-default);
+  background: #ffffff;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: var(--font-family-base);
+}
+
+.dashboard-tab-pill:hover {
+  background: #f8fafc;
+  color: var(--text-title);
+  border-color: #cbd5e1;
+}
+
+.dashboard-tab-pill.active {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+  box-shadow: 0 3px 10px rgba(0, 158, 227, 0.3);
+}
+
+.dashboard-tab-pill.active svg {
+  color: #ffffff !important;
+}
+
+/* Service Card Mobile & Desktop */
+.service-item-card {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  transition: all 0.2s ease;
+}
+
+.service-item-card.editing {
+  border-color: var(--primary-color);
+  background-color: #f0f9ff;
+  box-shadow: 0 0 0 2px rgba(0, 158, 227, 0.15);
+}
+
+/* Schedule Card Mobile & Desktop */
+.schedule-mobile-list {
+  display: none;
+}
+
+.schedule-desktop-table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedule-item-mobile {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  transition: all 0.15s ease;
+}
+
+.schedule-item-mobile.editing {
+  border-color: var(--primary-color);
+  background-color: #f0f9ff;
+  box-shadow: 0 0 0 2px rgba(0, 158, 227, 0.15);
+}
+
+.dashboard-form-panel {
+  display: block;
+}
+
 .bottom-nav-mobile {
   display: none;
 }
@@ -1087,7 +1275,91 @@ body {
   }
 
   .dashboard-panel-grid {
-    grid-template-columns: 1fr;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+
+  .dashboard-hero-card {
+    padding: 0.9rem 1rem !important;
+    border-radius: 12px !important;
+    gap: 0.75rem !important;
+  }
+
+  .dashboard-hero-title {
+    font-size: 1.15rem !important;
+  }
+
+  .dashboard-hero-avatar {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.15rem !important;
+    border-radius: 10px !important;
+  }
+
+  .dashboard-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .metric-card-compact {
+    padding: 0.7rem 0.8rem !important;
+    gap: 0.6rem !important;
+    border-radius: 10px !important;
+  }
+
+  .metric-icon-compact {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .metric-icon-compact svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .metric-card-compact .metric-value {
+    font-size: 1.15rem !important;
+  }
+
+  .metric-card-compact .metric-title {
+    font-size: 0.7rem !important;
+  }
+
+  .dashboard-tabs-container {
+    padding: 2px 2px 8px 2px !important;
+    margin-bottom: 0.85rem !important;
+    gap: 6px !important;
+  }
+
+  .dashboard-tab-pill {
+    padding: 6px 13px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .schedule-desktop-table {
+    display: none !important;
+  }
+
+  .schedule-mobile-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+  }
+
+  .dashboard-card-responsive {
+    padding: 1.15rem 1rem !important;
+  }
+
+  .dashboard-form-panel:not(.open) {
+    display: none !important;
+  }
+
+  .dashboard-form-panel.open {
+    display: block !important;
+    order: -1 !important;
   }
 
   .wizard-card { grid-template-columns: 1fr; }
