@@ -263,9 +263,9 @@ const Home: React.FC = () => {
 
           <div className="divider" />
 
-          <div>
-            <div className="filter-section-title" style={{ fontSize: '0.78rem', marginBottom: '0.6rem' }}>Categoría</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="categories-filter-wrapper">
+            <div className="filter-section-title categories-section-title" style={{ fontSize: '0.78rem', marginBottom: '0.6rem' }}>Categoría</div>
+            <div className="category-filter-list">
               {categories.map(cat => {
                 const count = getCategoryCount(cat);
                 const isSelected = selectedCategory === cat;
@@ -273,6 +273,7 @@ const Home: React.FC = () => {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
+                    className={`category-filter-btn ${isSelected ? 'selected' : ''}`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -293,6 +294,7 @@ const Home: React.FC = () => {
                   >
                     <span>{cat}</span>
                     <span
+                      className="category-count-badge"
                       style={{
                         fontSize: '0.75rem',
                         fontWeight: 700,
@@ -303,6 +305,7 @@ const Home: React.FC = () => {
                         minWidth: '22px',
                         textAlign: 'center',
                         transition: 'all 0.15s ease',
+                        marginLeft: '8px',
                       }}
                     >
                       {count}

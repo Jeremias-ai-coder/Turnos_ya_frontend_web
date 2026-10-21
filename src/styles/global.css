@@ -834,11 +834,21 @@ body {
   align-items: start;
 }
 
-.navbar-mobile-links {
+.bottom-nav-mobile {
   display: none;
 }
 
+.category-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 @media (max-width: 768px) {
+  body {
+    padding-bottom: 74px;
+  }
+
   .container {
     padding: 0 1rem;
   }
@@ -868,29 +878,108 @@ body {
     margin-top: 4px;
   }
 
-  .navbar-mobile-links {
+  /* ====== NAVEGACIÓN INFERIOR MÓVIL ESTILO APP NATIVA ====== */
+  .bottom-nav-mobile {
     display: flex;
-    order: 4;
-    width: 100%;
-    gap: 0.5rem;
-    padding-top: 4px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.05);
+    z-index: 1100;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 6px;
   }
 
-  .navbar-mobile-pill {
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
     flex: 1;
-    text-align: center;
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
+    height: 100%;
+    color: #64748b;
     text-decoration: none;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    padding: 7px 10px;
-    border-radius: 20px;
-    transition: background 0.15s;
+    transition: all 0.2s ease;
+    border-radius: 8px;
   }
 
-  .navbar-mobile-pill:active {
-    background: rgba(255, 255, 255, 0.35);
+  .bottom-nav-item.active {
+    color: var(--primary-color);
+    font-weight: 700;
+  }
+
+  .bottom-nav-item:active {
+    transform: scale(0.92);
+  }
+
+  /* ====== CARRUSEL HORIZONTAL DE CATEGORÍAS MÓVIL ====== */
+  .categories-section-title {
+    display: none;
+  }
+
+  .categories-filter-wrapper {
+    margin-bottom: 0.75rem;
+  }
+
+  .category-filter-list {
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    padding: 2px 2px 8px 2px;
+    scrollbar-width: none;
+  }
+
+  .category-filter-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .category-filter-btn {
+    flex-shrink: 0;
+    width: auto !important;
+    border-radius: 20px !important;
+    padding: 6px 14px !important;
+    font-size: 0.82rem !important;
+    white-space: nowrap;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .category-filter-btn.selected {
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(0, 158, 227, 0.25);
+  }
+
+  .category-filter-btn.selected .category-count-badge {
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+  }
+
+  /* ====== COMERCIOS EN 1 COLUMNA TÁCTIL ====== */
+  .business-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .two-col-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .sidebar-filters {
+    position: static;
+    margin-bottom: 0.5rem;
   }
 
   /* Profile page responsive */
@@ -935,8 +1024,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .two-col-layout { grid-template-columns: 1fr; }
-  .sidebar-filters { position: static; }
   .wizard-card { grid-template-columns: 1fr; }
   .wizard-sidebar { min-height: auto; padding: 1.5rem; }
 }

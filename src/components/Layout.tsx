@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Search, X } from 'lucide-react';
+import { LogOut, Search, X, Home, Calendar, Building2, User } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 
@@ -140,23 +140,6 @@ export const Layout: React.FC = () => {
                 </>
               )}
             </div>
-
-            {user ? (
-              <div className="navbar-mobile-links">
-                <Link to="/my-appointments" className="navbar-mobile-pill">Mis Turnos</Link>
-                <Link to="/dashboard" className="navbar-mobile-pill">
-                  {user.role === 'client' ? 'Registrar Negocio' : 'Mi Panel'}
-                </Link>
-                {user.role === 'administrator' && (
-                  <Link to="/system" className="navbar-mobile-pill">⚙ Sistema</Link>
-                )}
-              </div>
-            ) : (
-              <div className="navbar-mobile-links">
-                <Link to="/login" className="navbar-mobile-pill">Iniciar Sesión</Link>
-                <Link to="/register" className="navbar-mobile-pill" style={{ background: '#ffffff', color: 'var(--primary-color)' }}>Crear cuenta</Link>
-              </div>
-            )}
           </div>
         </div>
       </nav>
@@ -164,6 +147,41 @@ export const Layout: React.FC = () => {
       <main className="container page-main">
         <Outlet />
       </main>
+
+      {/* Barra de Navegación Inferior Fija para Móviles (Estilo App Nativa) */}
+      <nav className="bottom-nav-mobile" aria-label="Navegación móvil inferior">
+        <Link
+          to="/"
+          className={`bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`}
+        >
+          <Home size={21} />
+          <span>Explorar</span>
+        </Link>
+
+        <Link
+          to={user ? '/my-appointments' : '/login'}
+          className={`bottom-nav-item ${location.pathname === '/my-appointments' ? 'active' : ''}`}
+        >
+          <Calendar size={21} />
+          <span>Mis Turnos</span>
+        </Link>
+
+        <Link
+          to={user ? '/dashboard' : '/login'}
+          className={`bottom-nav-item ${location.pathname.startsWith('/dashboard') ? 'active' : ''}`}
+        >
+          <Building2 size={21} />
+          <span>{user?.role === 'owner' ? 'Mi Negocio' : 'Registrar'}</span>
+        </Link>
+
+        <Link
+          to={user ? '/profile' : '/login'}
+          className={`bottom-nav-item ${location.pathname === '/profile' || location.pathname === '/login' ? 'active' : ''}`}
+        >
+          <User size={21} />
+          <span>{user ? 'Perfil' : 'Ingresar'}</span>
+        </Link>
+      </nav>
     </div>
   );
 };
