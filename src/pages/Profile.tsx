@@ -251,6 +251,31 @@ const Profile: React.FC = () => {
     setSecurityMessage(null);
   };
 
+  const handleResendPasswordCode = async () => {
+    if (!securityForm.currentPassword || !securityForm.newPassword) return;
+    setSecurityLoading(true);
+    setSecurityMessage(null);
+    try {
+      const res = await api.post('/auth/request-password-change', {
+        currentPassword: securityForm.currentPassword,
+        newPassword: securityForm.newPassword,
+      });
+      setConfirmationToken(res.data.confirmationToken);
+      setQaPasswordCode(res.data.qaCode || null);
+      setSecurityMessage({
+        type: 'success',
+        text: 'Hemos reenviado un nuevo código de 6 dígitos a tu correo.',
+      });
+    } catch (err: any) {
+      setSecurityMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Error al reenviar el código.',
+      });
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
   const handleNotificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileMessage(null);
@@ -767,27 +792,33 @@ const Profile: React.FC = () => {
                   </div>
                 </div>
               ) : pendingPasswordConfirmation ? (
-                /* Formulario de confirmación por email para autorizar el cambio de clave */
+                /* Paso 2: Formulario de confirmación por email para autorizar el cambio de clave */
                 <form onSubmit={handleConfirmPasswordChange}>
                   <div
                     style={{
                       background: '#f8fafc',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      padding: '1.5rem',
+                      borderRadius: '14px',
+                      padding: '1.75rem',
                       marginBottom: '1.25rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Mail size={18} color="#0284c7" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Mail size={20} />
                       </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-title)' }}>
-                          Confirmación por correo electrónico requerida
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                          Ingresa el código de 6 dígitos enviado a tu correo para autorizar el cambio
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                            Autorización por correo electrónico
+                          </h4>
+                          <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                            Paso 2 de 2
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                          Ingresa el código de 6 dígitos enviado a <strong>{profileForm.email}</strong> para autorizar el cambio
                         </p>
                       </div>
                     </div>
@@ -798,8 +829,8 @@ const Profile: React.FC = () => {
                           background: '#f0fdf4',
                           border: '1px solid #bbf7d0',
                           borderRadius: '8px',
-                          padding: '10px 12px',
-                          marginBottom: '1rem',
+                          padding: '10px 14px',
+                          marginBottom: '1.25rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -822,7 +853,7 @@ const Profile: React.FC = () => {
 
                     <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                       <label className="form-label" style={{ fontWeight: 700 }}>
-                        Código de verificación (6 dígitos)
+                        Código de autorización (6 dígitos)
                       </label>
                       <input
                         type="text"
@@ -836,19 +867,22 @@ const Profile: React.FC = () => {
                           letterSpacing: '6px',
                           textAlign: 'center',
                           fontWeight: 700,
-                          maxWidth: '200px',
+                          maxWidth: '220px',
                         }}
                         required
                         autoFocus
                       />
                       <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
-                        El código expira en 10 minutos.
+                        El código expira en 10 minutos. Revisa tu bandeja de entrada o spam.
                       </small>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                       <button type="submit" className="btn btn-primary" disabled={securityLoading}>
                         <KeyRound size={16} /> {securityLoading ? 'Verificando...' : 'Confirmar y cambiar contraseña'}
+                      </button>
+                      <button type="button" className="btn btn-outline-primary" onClick={handleResendPasswordCode} disabled={securityLoading}>
+                        <Mail size={15} /> Reenviar código
                       </button>
                       <button type="button" className="btn btn-light" onClick={handleCancelPasswordChange}>
                         Cancelar
@@ -857,55 +891,105 @@ const Profile: React.FC = () => {
                   </div>
                 </form>
               ) : (
-                /* Formulario normal de cambio de contraseña (habilitado porque ya está verificado) */
-                <form onSubmit={handleSecuritySubmit}>
-                  <div className="form-group">
-                    <label className="form-label">Contraseña actual</label>
-                    <input
-                      type="password"
-                      className="form-control"
-                      value={securityForm.currentPassword}
-                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                      required
-                    />
+                /* Paso 1: Formulario de cambio de contraseña con aviso de autorización obligatoria */
+                <div>
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '1.1rem 1.25rem',
+                      marginBottom: '1.5rem',
+                      display: 'flex',
+                      gap: '0.85rem',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: '#16a34a',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: '2px',
+                      }}
+                    >
+                      <ShieldCheck size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                        <strong style={{ color: '#166534', fontSize: '0.94rem' }}>
+                          Autorización por correo electrónico requerida
+                        </strong>
+                        <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                          Paso 1 de 2
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: '#166534', lineHeight: 1.45 }}>
+                        Para proteger tu cuenta contra cualquier cambio no autorizado, al presionar <strong>"Solicitar código y continuar"</strong> te enviaremos un código de seguridad único de 6 dígitos a tu correo (<strong>{profileForm.email}</strong>) que deberás ingresar para autorizar la nueva contraseña.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Nueva contraseña</label>
-                    <input
-                      type="password"
-                      className="form-control"
-                      value={securityForm.newPassword}
-                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                      required
-                    />
-                  </div>
+                  <form onSubmit={handleSecuritySubmit}>
+                    <div className="form-group">
+                      <label className="form-label">Contraseña actual</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        value={securityForm.currentPassword}
+                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                        required
+                      />
+                    </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Confirmar nueva contraseña</label>
-                    <input
-                      type="password"
-                      className="form-control"
-                      value={securityForm.confirmPassword}
-                      onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                      required
-                    />
-                  </div>
+                    <div className="form-group">
+                      <label className="form-label">Nueva contraseña</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        value={securityForm.newPassword}
+                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                        required
+                      />
+                    </div>
 
-                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-                    <button type="submit" className="btn btn-primary" disabled={securityLoading}>
-                      <Lock size={16} /> {securityLoading ? 'Enviando código...' : 'Cambiar contraseña'}
-                    </button>
+                    <div className="form-group">
+                      <label className="form-label">Confirmar nueva contraseña</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        value={securityForm.confirmPassword}
+                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                        required
+                      />
+                    </div>
 
-                    <button type="button" className="btn btn-light" onClick={handleLogout}>
-                      <LogOut size={16} /> Cerrar sesión
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.25rem' }}>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={securityLoading}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', fontWeight: 700 }}
+                      >
+                        <Mail size={16} /> {securityLoading ? 'Enviando código de autorización...' : 'Solicitar código por email y continuar'}
+                      </button>
 
-                    <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
-                      Cerrar todas las sesiones
-                    </button>
-                  </div>
-                </form>
+                      <button type="button" className="btn btn-light" onClick={handleLogout}>
+                        <LogOut size={16} /> Cerrar sesión
+                      </button>
+
+                      <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
+                        Cerrar todas las sesiones
+                      </button>
+                    </div>
+                  </form>
+                </div>
               )}
             </div>
           )}
