@@ -1254,15 +1254,21 @@ const Profile: React.FC = () => {
                                 >
                                   {forgotPasswordMode === 'reset_directly' ? '✓ Estableciendo sin contraseña actual' : 'Restablecer sin contraseña actual'}
                                 </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-light"
-                                  style={{ padding: '5px 10px', fontSize: '0.78rem' }}
-                                  onClick={handleSendRecoveryEmailFromModal}
-                                  disabled={forgotPasswordSending}
-                                >
-                                  <Mail size={12} /> {forgotPasswordSending ? 'Enviando...' : 'Enviar enlace a mi correo'}
-                                </button>
+                                {forgotPasswordSent ? (
+                                  <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <CheckCircle2 size={13} /> Enlace enviado
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn btn-light"
+                                    style={{ padding: '5px 10px', fontSize: '0.78rem' }}
+                                    onClick={handleSendRecoveryEmailFromModal}
+                                    disabled={forgotPasswordSending}
+                                  >
+                                    <Mail size={12} /> {forgotPasswordSending ? 'Enviando...' : 'Enviar enlace a mi correo'}
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )}
