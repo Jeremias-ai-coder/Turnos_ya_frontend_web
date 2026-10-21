@@ -144,14 +144,14 @@ const Home: React.FC = () => {
       <div className="two-col-layout">
         {/* Sidebar de filtros */}
         <aside className="sidebar-filters">
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div className="filter-main-title-wrapper" style={{ marginBottom: '1.5rem' }}>
             <div className="filter-section-title">
               <SlidersHorizontal size={15} /> Filtros
             </div>
           </div>
 
           {/* Tu Ubicación y Cercanía */}
-          <div style={{ marginBottom: '1.25rem' }}>
+          <div className="location-filter-box" style={{ marginBottom: '1.25rem' }}>
             <div className="filter-section-title" style={{ fontSize: '0.78rem' }}>
               <Navigation size={13} color="var(--primary-color)" /> Cercanía y Ubicación
             </div>
@@ -261,7 +261,7 @@ const Home: React.FC = () => {
             )}
           </div>
 
-          <div className="divider" />
+          <div className="divider filters-divider" />
 
           <div className="categories-filter-wrapper">
             <div className="filter-section-title categories-section-title" style={{ fontSize: '0.78rem', marginBottom: '0.6rem' }}>Categoría</div>
