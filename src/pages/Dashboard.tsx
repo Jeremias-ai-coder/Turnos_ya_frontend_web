@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import {
   CalendarDays,
@@ -15,7 +16,10 @@ import {
   User,
   Check,
   Pencil,
-  X
+  X,
+  ExternalLink,
+  MapPin,
+  Phone
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -62,8 +66,11 @@ const Dashboard: React.FC = () => {
   const [initialLoading, setInitialLoading] = useState(true);
 
   // Forms
+  const [showServiceForm, setShowServiceForm] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
   const [serviceForm, setServiceForm] = useState({ name: '', description: '', durationMinutes: 30, price: 0 });
+
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
   const [settingsForm, setSettingsForm] = useState({ name: '', description: '', address: '', phone: '', category: '' });
@@ -91,11 +98,13 @@ const Dashboard: React.FC = () => {
       durationMinutes: svc.durationMinutes ?? 30,
       price: Number(svc.price ?? 0)
     });
+    setShowServiceForm(true);
   };
 
   const handleCancelEditService = () => {
     setEditingServiceId(null);
     setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
+    setShowServiceForm(false);
   };
 
   const handleStartEditSchedule = (sch: Schedule) => {
@@ -105,11 +114,13 @@ const Dashboard: React.FC = () => {
       startTime: getFormattedTimeForInput(sch.startTime),
       endTime: getFormattedTimeForInput(sch.endTime)
     });
+    setShowScheduleForm(true);
   };
 
   const handleCancelEditSchedule = () => {
     setEditingScheduleId(null);
     setScheduleForm({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
+    setShowScheduleForm(false);
   };
 
   // Load my businesses and categories
@@ -213,6 +224,7 @@ const Dashboard: React.FC = () => {
         const res = await api.post(`/businesses/${selectedBiz.id}/services`, serviceForm);
         setServices(s => [...s, res.data]);
         setServiceForm({ name: '', description: '', durationMinutes: 30, price: 0 });
+        setShowServiceForm(false);
         showToast('Servicio agregado.');
       }
     } catch (err: any) {
@@ -247,9 +259,10 @@ const Dashboard: React.FC = () => {
       } else {
         const res = await api.post(`/businesses/${selectedBiz.id}/schedules`, scheduleForm);
         setSchedules(s =>
-          [...s, res.data].sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(b.startTime)))
+          [...s, res.data].sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(a.startTime)))
         );
         setScheduleForm({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
+        setShowScheduleForm(false);
         showToast('Horario agregado.');
       }
     } catch (err: any) {
@@ -292,9 +305,9 @@ const Dashboard: React.FC = () => {
 
   const TABS = [
     { id: 'agenda' as const, label: 'Agenda de Turnos', icon: <CalendarDays size={16} /> },
-    { id: 'services' as const, label: 'Servicios', icon: <Briefcase size={16} /> },
-    { id: 'schedules' as const, label: 'Horarios de Atención', icon: <Clock size={16} /> },
-    { id: 'reviews' as const, label: `Opiniones y Reseñas (${reviewsStats.count})`, icon: <Star size={16} /> },
+    { id: 'services' as const, label: `Servicios (${services.length})`, icon: <Briefcase size={16} /> },
+    { id: 'schedules' as const, label: `Horarios (${schedules.length})`, icon: <Clock size={16} /> },
+    { id: 'reviews' as const, label: `Opiniones (${reviewsStats.count})`, icon: <Star size={16} /> },
     { id: 'settings' as const, label: 'Configuración', icon: <Settings size={16} /> },
   ];
 
@@ -306,45 +319,17 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Header del Dashboard */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
-            Panel de Control
-          </h1>
-          <p className="text-muted text-sm" style={{ margin: '2px 0 0 0' }}>
-            Gestiona la agenda, servicios, opiniones y configuración de tu local.
-          </p>
-        </div>
-
-        {businesses.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="text-muted text-sm fw-semibold">Local:</span>
-            <select
-              className="form-control"
-              style={{ width: 'auto', padding: '6px 12px', fontSize: '0.88rem' }}
-              value={selectedBiz?.id}
-              onChange={e => setSelectedBiz(businesses.find(b => b.id === Number(e.target.value)) || null)}
-            >
-              {businesses.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
       {initialLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
             {[1, 2, 3, 4].map(n => (
-              <div key={n} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />
+              <div key={n} className="skeleton-box" style={{ height: '70px', borderRadius: '12px' }} />
             ))}
           </div>
           <div className="skeleton-box" style={{ height: '360px', borderRadius: '12px' }} />
         </div>
       ) : businesses.length === 0 ? (
-        <div className="ml-card" style={{ padding: '3rem', textAlign: 'center' }}>
+        <div className="ml-card dashboard-card-responsive" style={{ padding: '3rem', textAlign: 'center' }}>
           <Building2 size={56} color="var(--primary-color)" style={{ marginBottom: '1rem' }} />
           <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.5rem' }}>¡Bienvenido a Turnos Ya!</h2>
           <p className="text-muted" style={{ marginBottom: '2rem', maxWidth: '460px', margin: '0 auto 2rem' }}>
@@ -376,38 +361,94 @@ const Dashboard: React.FC = () => {
 
       {selectedBiz && (
         <>
-          {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          {/* Hero Card del Negocio */}
+          <div className="dashboard-hero-card">
+            <div className="dashboard-hero-left">
+              <div className="dashboard-hero-avatar">
+                {selectedBiz.name?.charAt(0).toUpperCase() || 'N'}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h1 className="dashboard-hero-title">
+                    {selectedBiz.name}
+                  </h1>
+                  {selectedBiz.category && (
+                    <span className="badge badge-confirmed" style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
+                      {selectedBiz.category}
+                    </span>
+                  )}
+                </div>
+                <div className="dashboard-hero-badges">
+                  {selectedBiz.address && (
+                    <span className="text-muted text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={12} color="var(--primary-color)" /> {selectedBiz.address}
+                    </span>
+                  )}
+                  {selectedBiz.phone && (
+                    <span className="text-muted text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                      <Phone size={12} color="var(--primary-color)" /> {selectedBiz.phone}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <Link
+                to={`/businesses/${selectedBiz.id}`}
+                className="btn btn-light"
+                style={{ padding: '7px 12px', fontSize: '0.82rem', gap: '6px', borderRadius: '8px' }}
+                title="Ver cómo lo ven los clientes"
+              >
+                <ExternalLink size={14} color="var(--primary-color)" />
+                <span>Ver perfil público</span>
+              </Link>
+
+              {businesses.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="text-muted text-xs fw-semibold">Local:</span>
+                  <select
+                    className="form-control"
+                    style={{ width: 'auto', padding: '6px 10px', fontSize: '0.82rem', borderRadius: '8px' }}
+                    value={selectedBiz.id}
+                    onChange={e => setSelectedBiz(businesses.find(b => b.id === Number(e.target.value)) || null)}
+                  >
+                    {businesses.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* KPIs / Métricas Modernas */}
+          <div className="dashboard-metrics-grid">
             {[
-              { icon: <CalendarDays size={22} />, label: 'Turnos de Hoy', value: agendaAppointments.length },
-              { icon: <Briefcase size={22} />, label: 'Servicios Activos', value: services.length },
-              { icon: <Clock size={22} />, label: 'Horarios Configurados', value: schedules.length },
-              { icon: <Star size={22} />, label: 'Calificación de Clientes', value: reviewsStats.average > 0 ? `${reviewsStats.average.toFixed(1)} ★ (${reviewsStats.count})` : 'Nuevo' },
+              { icon: <CalendarDays size={20} />, label: 'Turnos Hoy', value: agendaAppointments.length },
+              { icon: <Briefcase size={20} />, label: 'Servicios', value: services.length },
+              { icon: <Clock size={20} />, label: 'Horarios', value: schedules.length },
+              { icon: <Star size={20} />, label: 'Calificación', value: reviewsStats.average > 0 ? `${reviewsStats.average.toFixed(1)} ★ (${reviewsStats.count})` : 'Nuevo' },
             ].map((m, i) => (
-              <div key={i} className="metric-card">
-                <div className="metric-icon">{m.icon}</div>
-                <div>
-                  <div className="metric-title">{m.label}</div>
+              <div key={i} className="metric-card-compact">
+                <div className="metric-icon-compact">{m.icon}</div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <div className="metric-title" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {m.label}
+                  </div>
                   <div className="metric-value">{m.value}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Nav de pestañas */}
-          <div className="ml-card" style={{ padding: '0.5rem', marginBottom: '1.5rem', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {/* Carrusel Horizontal de Pestañas */}
+          <div className="dashboard-tabs-container">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '8px 16px', border: '1px solid', borderRadius: '10px', cursor: 'pointer', fontWeight: 600,
-                  fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'var(--font-family-base)',
-                  borderColor: activeTab === tab.id ? 'var(--primary-color)' : 'transparent',
-                  background: activeTab === tab.id ? 'var(--status-pending-bg)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--primary-color)' : 'var(--text-secondary)',
-                  transition: 'all 0.15s',
-                }}
+                className={`dashboard-tab-pill ${activeTab === tab.id ? 'active' : ''}`}
               >
                 {tab.icon} {tab.label}
               </button>
@@ -416,24 +457,26 @@ const Dashboard: React.FC = () => {
 
           {/* ======= AGENDA ======= */}
           {activeTab === 'agenda' && (
-            <div className="ml-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button className="btn btn-light" style={{ padding: '6px 10px' }} onClick={() => setAgendaDate(d => subDays(d, 1))}>
-                    <ChevronLeft size={16} />
-                  </button>
-                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-title)' }}>
-                    {format(agendaDate, "EEEE d 'de' MMMM, yyyy", { locale: es })}
-                  </h3>
-                  <button className="btn btn-light" style={{ padding: '6px 10px' }} onClick={() => setAgendaDate(d => addDays(d, 1))}>
-                    <ChevronRight size={16} />
-                  </button>
-                  <button className="btn btn-light" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setAgendaDate(new Date())}>
+            <div className="ml-card dashboard-card-responsive">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <button className="btn btn-light" style={{ padding: '6px 8px' }} onClick={() => setAgendaDate(d => subDays(d, 1))} aria-label="Día anterior">
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-title)', padding: '0 6px', textTransform: 'capitalize' }}>
+                      {format(agendaDate, "EEEE d 'de' MMMM", { locale: es })}
+                    </span>
+                    <button className="btn btn-light" style={{ padding: '6px 8px' }} onClick={() => setAgendaDate(d => addDays(d, 1))} aria-label="Día siguiente">
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <button className="btn btn-light" style={{ fontSize: '0.8rem', padding: '5px 11px', borderRadius: '20px' }} onClick={() => setAgendaDate(new Date())}>
                     Hoy
                   </button>
                 </div>
-                <span className="badge badge-pending" style={{ fontSize: '0.82rem' }}>
-                  {agendaAppointments.length} turnos agendados
+                <span className="badge badge-pending" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                  {agendaAppointments.length} {agendaAppointments.length === 1 ? 'turno agendado' : 'turnos agendados'}
                 </span>
               </div>
 
@@ -444,10 +487,10 @@ const Dashboard: React.FC = () => {
                   ))}
                 </div>
               ) : agendaAppointments.length === 0 ? (
-                <div className="empty-state">
-                  <CalendarDays size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
-                  <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px' }}>Sin turnos para esta fecha</p>
-                  <p className="text-muted text-sm">No hay clientes agendados para este día.</p>
+                <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
+                  <CalendarDays size={42} color="var(--text-disabled)" style={{ marginBottom: '0.75rem' }} />
+                  <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px', fontSize: '1rem' }}>Sin turnos para esta fecha</p>
+                  <p className="text-muted text-sm" style={{ margin: 0 }}>No hay clientes agendados para este día.</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -455,41 +498,69 @@ const Dashboard: React.FC = () => {
                     <div
                       key={apt.id}
                       style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '1rem 1.25rem', border: '1px solid var(--border-default)',
-                        borderRadius: '10px', flexWrap: 'wrap', gap: '1rem',
-                        background: apt.status === 'COMPLETED' ? '#f8fafc' : 'white'
+                        padding: '1rem',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: '12px',
+                        background: apt.status === 'COMPLETED' ? '#f8fafc' : '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ width: '60px', fontWeight: 800, color: 'var(--primary-color)', fontSize: '1.1rem' }}>
-                          {formatTime(apt.time)}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            background: '#e0f2fe',
+                            color: 'var(--primary-color)',
+                            fontWeight: 800,
+                            fontSize: '0.95rem',
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <Clock size={13} /> {formatTime(apt.time)} hs
+                          </span>
+                          <span className={`badge badge-${apt.status.toLowerCase()}`} style={{ fontSize: '0.75rem' }}>
+                            {STATUS_MAP[apt.status] || apt.status}
+                          </span>
                         </div>
-                        <div>
-                          <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '2px' }}>
-                            {apt.user?.name || 'Cliente'}
-                          </p>
-                          <p className="text-muted text-xs">
-                            {apt.service?.name} · ${apt.service?.price}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <span className={`badge badge-${apt.status.toLowerCase()}`}>
-                          {STATUS_MAP[apt.status] || apt.status}
-                        </span>
-
-                        {apt.status === 'CONFIRMED' && (
-                          <button
-                            className="btn btn-success-fill"
-                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            onClick={() => handleCompleteAppointment(apt.id)}
-                          >
-                            <Check size={14} /> Marcar como Completado
-                          </button>
+                        {apt.service?.price && (
+                          <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1rem' }}>
+                            ${apt.service.price}
+                          </span>
                         )}
                       </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '50%',
+                          background: '#f1f5f9', color: '#475569',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 700, fontSize: '0.9rem', flexShrink: 0
+                        }}>
+                          {apt.user?.name ? apt.user.name.charAt(0).toUpperCase() : <User size={16} />}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: '0 0 2px 0', fontSize: '0.92rem' }}>
+                            {apt.user?.name || 'Cliente'}
+                          </p>
+                          <p className="text-muted text-xs" style={{ margin: 0 }}>
+                            {apt.service?.name || 'Servicio'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {apt.status === 'CONFIRMED' && (
+                        <button
+                          className="btn btn-success-fill"
+                          style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '8px', marginTop: '2px' }}
+                          onClick={() => handleCompleteAppointment(apt.id)}
+                        >
+                          <Check size={15} /> Marcar como Completado
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -500,72 +571,111 @@ const Dashboard: React.FC = () => {
           {/* ======= SERVICIOS ======= */}
           {activeTab === 'services' && (
             <div className="dashboard-panel-grid">
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Servicios Publicados ({services.length})</h3>
+              {/* Lista de Servicios */}
+              <div className="ml-card dashboard-card-responsive">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <h3 style={{ fontWeight: 800, margin: 0, color: 'var(--text-title)', fontSize: '1.15rem' }}>
+                      Servicios Publicados ({services.length})
+                    </h3>
+                    <p className="text-muted text-xs" style={{ margin: '2px 0 0 0' }}>
+                      Servicios que tus clientes pueden reservar en tu negocio
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ padding: '7px 14px', fontSize: '0.85rem', borderRadius: '8px' }}
+                    onClick={() => {
+                      if (showServiceForm && !editingServiceId) {
+                        setShowServiceForm(false);
+                      } else {
+                        handleCancelEditService();
+                        setShowServiceForm(true);
+                      }
+                    }}
+                  >
+                    {showServiceForm && !editingServiceId ? <><X size={14} /> Cerrar</> : <><Plus size={15} /> Nuevo Servicio</>}
+                  </button>
+                </div>
+
                 {services.length === 0 ? (
-                  <div className="empty-state">No hay servicios creados aún.</div>
+                  <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
+                    <Briefcase size={40} color="var(--text-disabled)" style={{ marginBottom: '0.75rem' }} />
+                    <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px' }}>No hay servicios creados aún</p>
+                    <p className="text-muted text-sm">Comienza agregando los servicios que ofreces a tus clientes.</p>
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {services.map(svc => {
                       const isEditing = editingServiceId === svc.id;
                       return (
-                        <div
-                          key={svc.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '1rem',
-                            border: `1px solid ${isEditing ? 'var(--primary-color)' : 'var(--border-default)'}`,
-                            backgroundColor: isEditing ? '#f0f9ff' : 'var(--bg-card)',
-                            borderRadius: '10px',
-                            transition: 'all 0.2s ease',
-                            boxShadow: isEditing ? '0 0 0 2px rgba(0, 158, 227, 0.15)' : 'none'
-                          }}
-                        >
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                              <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: 0 }}>{svc.name}</p>
-                              {isEditing && (
-                                <span style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: 600,
-                                  backgroundColor: 'var(--primary-color)',
-                                  color: '#fff',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px'
-                                }}>
-                                  Editando
+                        <div key={svc.id} className={`service-item-card ${isEditing ? 'editing' : ''}`}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, color: 'var(--text-title)', fontSize: '0.98rem' }}>
+                                  {svc.name}
                                 </span>
+                                {isEditing && (
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: 'var(--primary-color)', color: '#fff', padding: '1px 6px', borderRadius: '4px' }}>
+                                    Editando
+                                  </span>
+                                )}
+                              </div>
+                              {svc.description && (
+                                <p className="text-muted text-xs" style={{ margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                                  {svc.description}
+                                </p>
                               )}
                             </div>
-                            <p className="text-muted text-xs" style={{ marginBottom: '4px' }}>{svc.description || 'Sin descripción'}</p>
-                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>⏱ {svc.durationMinutes} min</span>
+
+                            <span style={{
+                              fontWeight: 800,
+                              color: 'var(--status-success-text)',
+                              fontSize: '1.1rem',
+                              background: '#ecfdf5',
+                              padding: '3px 10px',
+                              borderRadius: '8px',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
+                            }}>
+                              ${Number(svc.price).toLocaleString('es-AR')}
+                            </span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1.1rem', marginRight: '0.5rem' }}>${svc.price}</span>
-                            <button
-                              type="button"
-                              className="btn btn-light"
-                              style={{
-                                padding: '6px 10px',
-                                borderColor: isEditing ? 'var(--primary-color)' : undefined,
-                                color: isEditing ? 'var(--primary-color)' : undefined
-                              }}
-                              title="Editar servicio"
-                              onClick={() => handleStartEditService(svc)}
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-light-danger"
-                              style={{ padding: '6px 10px' }}
-                              title="Eliminar servicio"
-                              onClick={() => handleDeleteService(svc.id)}
-                            >
-                              <Trash2 size={14} />
-                            </button>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                              <Clock size={13} color="var(--primary-color)" /> {svc.durationMinutes} min
+                            </span>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-light"
+                                style={{
+                                  padding: '5px 10px',
+                                  fontSize: '0.8rem',
+                                  gap: '4px',
+                                  borderColor: isEditing ? 'var(--primary-color)' : undefined,
+                                  color: isEditing ? 'var(--primary-color)' : undefined
+                                }}
+                                title="Editar servicio"
+                                onClick={() => handleStartEditService(svc)}
+                              >
+                                <Pencil size={13} /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-light-danger"
+                                style={{ padding: '5px 10px', fontSize: '0.8rem', gap: '4px' }}
+                                title="Eliminar servicio"
+                                onClick={() => handleDeleteService(svc.id)}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -575,12 +685,12 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Formulario nuevo / editar servicio */}
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
+              <div className={`ml-card dashboard-card-responsive dashboard-form-panel ${showServiceForm || editingServiceId !== null ? 'open' : ''}`}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ fontWeight: 700, margin: 0, color: 'var(--text-title)' }}>
+                  <h4 style={{ fontWeight: 800, margin: 0, color: 'var(--text-title)', fontSize: '1.05rem' }}>
                     {editingServiceId ? 'Editar Servicio' : 'Agregar Servicio'}
                   </h4>
-                  {editingServiceId && (
+                  {(editingServiceId || showServiceForm) && (
                     <button
                       type="button"
                       className="btn btn-light"
@@ -597,12 +707,12 @@ const Dashboard: React.FC = () => {
                     backgroundColor: '#e0f2fe',
                     color: '#0369a1',
                     padding: '8px 12px',
-                    borderRadius: '6px',
+                    borderRadius: '8px',
                     fontSize: '0.82rem',
                     marginBottom: '1rem',
                     fontWeight: 500
                   }}>
-                    Modifica los datos del servicio y haz clic en "Guardar Cambios".
+                    Modificá los datos del servicio y hacé clic en "Guardar Cambios".
                   </div>
                 )}
 
@@ -618,7 +728,7 @@ const Dashboard: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div className="form-group">
                       <label className="form-label">Duración (min) *</label>
-                      <input type="number" min={10} step={5} className="form-control" value={serviceForm.durationMinutes} onChange={e => setServiceForm(f => ({ ...f, durationMinutes: Number(e.target.value) }))} required />
+                      <input type="number" min={5} step={5} className="form-control" value={serviceForm.durationMinutes} onChange={e => setServiceForm(f => ({ ...f, durationMinutes: Number(e.target.value) }))} required />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Precio ($) *</label>
@@ -654,91 +764,181 @@ const Dashboard: React.FC = () => {
           {/* ======= HORARIOS ======= */}
           {activeTab === 'schedules' && (
             <div className="dashboard-panel-grid">
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Horarios de Atención Configurados</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--border-default)' }}>
-                      {['Día', 'Apertura', 'Cierre', 'Acciones'].map(h => (
-                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {schedules.length === 0 ? (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No hay horarios configurados.</td></tr>
-                    ) : [...schedules]
-                        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(b.startTime)))
+              <div className="ml-card dashboard-card-responsive">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <h3 style={{ fontWeight: 800, margin: 0, color: 'var(--text-title)', fontSize: '1.15rem' }}>
+                      Horarios de Atención ({schedules.length})
+                    </h3>
+                    <p className="text-muted text-xs" style={{ margin: '2px 0 0 0' }}>
+                      Franjas horarias en las que tu comercio recibe turnos
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ padding: '7px 14px', fontSize: '0.85rem', borderRadius: '8px' }}
+                    onClick={() => {
+                      if (showScheduleForm && !editingScheduleId) {
+                        setShowScheduleForm(false);
+                      } else {
+                        handleCancelEditSchedule();
+                        setShowScheduleForm(true);
+                      }
+                    }}
+                  >
+                    {showScheduleForm && !editingScheduleId ? <><X size={14} /> Cerrar</> : <><Plus size={15} /> Agregar Horario</>}
+                  </button>
+                </div>
+
+                {schedules.length === 0 ? (
+                  <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
+                    <Clock size={40} color="var(--text-disabled)" style={{ marginBottom: '0.75rem' }} />
+                    <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px' }}>No hay horarios configurados</p>
+                    <p className="text-muted text-sm">Configura los días y horarios en los que atiendes a tus clientes.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Versión Móvil: Tarjetas elegantes por horario */}
+                    <div className="schedule-mobile-list">
+                      {[...schedules]
+                        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(a.startTime)))
                         .map(sch => {
                           const isEditing = editingScheduleId === sch.id;
                           return (
-                            <tr
-                              key={sch.id}
-                              style={{
-                                borderBottom: '1px solid var(--border-default)',
-                                backgroundColor: isEditing ? '#f0f9ff' : 'transparent',
-                                transition: 'background-color 0.2s'
-                              }}
-                            >
-                              <td style={{ padding: '12px 14px', fontWeight: 600 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div key={sch.id} className={`schedule-item-mobile ${isEditing ? 'editing' : ''}`}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{
+                                  background: '#e0f2fe',
+                                  color: 'var(--primary-color)',
+                                  fontWeight: 700,
+                                  fontSize: '0.82rem',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  minWidth: '78px',
+                                  textAlign: 'center'
+                                }}>
                                   {DAY_NAMES[sch.dayOfWeek]}
-                                  {isEditing && (
-                                    <span style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: 600,
-                                      backgroundColor: 'var(--primary-color)',
-                                      color: '#fff',
-                                      padding: '1px 5px',
-                                      borderRadius: '3px'
-                                    }}>
-                                      Editando
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td style={{ padding: '12px 14px' }}>{formatTime(sch.startTime)}</td>
-                              <td style={{ padding: '12px 14px' }}>{formatTime(sch.endTime)}</td>
-                              <td style={{ padding: '12px 14px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <button
-                                    type="button"
-                                    className="btn btn-light"
-                                    style={{
-                                      padding: '6px 10px',
-                                      borderColor: isEditing ? 'var(--primary-color)' : undefined,
-                                      color: isEditing ? 'var(--primary-color)' : undefined
-                                    }}
-                                    title="Editar horario"
-                                    onClick={() => handleStartEditSchedule(sch)}
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-light-danger"
-                                    style={{ padding: '6px 10px' }}
-                                    title="Eliminar horario"
-                                    onClick={() => handleDeleteSchedule(sch.id)}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
+                                </span>
+                                <span style={{ fontWeight: 800, color: 'var(--text-title)', fontSize: '0.92rem' }}>
+                                  {formatTime(sch.startTime)} — {formatTime(sch.endTime)}
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-light"
+                                  style={{
+                                    padding: '5px 8px',
+                                    borderColor: isEditing ? 'var(--primary-color)' : undefined,
+                                    color: isEditing ? 'var(--primary-color)' : undefined
+                                  }}
+                                  title="Editar horario"
+                                  onClick={() => handleStartEditSchedule(sch)}
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-light-danger"
+                                  style={{ padding: '5px 8px' }}
+                                  title="Eliminar horario"
+                                  onClick={() => handleDeleteSchedule(sch.id)}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
                           );
                         })}
-                  </tbody>
-                </table>
+                    </div>
+
+                    {/* Versión Escritorio: Tabla tradicional con buen espacio */}
+                    <table className="schedule-desktop-table">
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid var(--border-default)' }}>
+                          {['Día', 'Apertura', 'Cierre', 'Acciones'].map(h => (
+                            <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...schedules]
+                          .sort((a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime).localeCompare(String(a.startTime)))
+                          .map(sch => {
+                            const isEditing = editingScheduleId === sch.id;
+                            return (
+                              <tr
+                                key={sch.id}
+                                style={{
+                                  borderBottom: '1px solid var(--border-default)',
+                                  backgroundColor: isEditing ? '#f0f9ff' : 'transparent',
+                                  transition: 'background-color 0.2s'
+                                }}
+                              >
+                                <td style={{ padding: '12px 14px', fontWeight: 600 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {DAY_NAMES[sch.dayOfWeek]}
+                                    {isEditing && (
+                                      <span style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        backgroundColor: 'var(--primary-color)',
+                                        color: '#fff',
+                                        padding: '1px 5px',
+                                        borderRadius: '3px'
+                                      }}>
+                                        Editando
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px 14px' }}>{formatTime(sch.startTime)}</td>
+                                <td style={{ padding: '12px 14px' }}>{formatTime(sch.endTime)}</td>
+                                <td style={{ padding: '12px 14px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-light"
+                                      style={{
+                                        padding: '6px 10px',
+                                        borderColor: isEditing ? 'var(--primary-color)' : undefined,
+                                        color: isEditing ? 'var(--primary-color)' : undefined
+                                      }}
+                                      title="Editar horario"
+                                      onClick={() => handleStartEditSchedule(sch)}
+                                    >
+                                      <Pencil size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-light-danger"
+                                      style={{ padding: '6px 10px' }}
+                                      title="Eliminar horario"
+                                      onClick={() => handleDeleteSchedule(sch.id)}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </>
+                )}
               </div>
 
               {/* Formulario nuevo / editar horario */}
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
+              <div className={`ml-card dashboard-card-responsive dashboard-form-panel ${showScheduleForm || editingScheduleId !== null ? 'open' : ''}`}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ fontWeight: 700, margin: 0, color: 'var(--text-title)' }}>
+                  <h4 style={{ fontWeight: 800, margin: 0, color: 'var(--text-title)', fontSize: '1.05rem' }}>
                     {editingScheduleId ? 'Editar Horario' : 'Agregar Día y Horario'}
                   </h4>
-                  {editingScheduleId && (
+                  {(editingScheduleId || showScheduleForm) && (
                     <button
                       type="button"
                       className="btn btn-light"
@@ -755,12 +955,12 @@ const Dashboard: React.FC = () => {
                     backgroundColor: '#e0f2fe',
                     color: '#0369a1',
                     padding: '8px 12px',
-                    borderRadius: '6px',
+                    borderRadius: '8px',
                     fontSize: '0.82rem',
                     marginBottom: '1rem',
                     fontWeight: 500
                   }}>
-                    Modifica el día u horario y haz clic en "Guardar Cambios".
+                    Modificá el día u horario y hacé clic en "Guardar Cambios".
                   </div>
                 )}
 
@@ -816,25 +1016,25 @@ const Dashboard: React.FC = () => {
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
                 border: '1px solid #a7f3d0',
-                borderRadius: '12px',
-                padding: '1.5rem',
+                borderRadius: '14px',
+                padding: '1.25rem 1.5rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '1.5rem',
+                marginBottom: '1.25rem',
                 flexWrap: 'wrap',
                 gap: '1rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '2.8rem', fontWeight: 800, color: '#065f46', lineHeight: 1 }}>
+                    <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#065f46', lineHeight: 1 }}>
                       {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : '5.0'}
                     </div>
                     <div style={{ display: 'flex', gap: '2px', marginTop: '6px', justifyContent: 'center' }}>
                       {[1, 2, 3, 4, 5].map(star => (
                         <Star
                           key={star}
-                          size={18}
+                          size={16}
                           fill={star <= Math.round(reviewsStats.average || 5) ? '#f59e0b' : 'none'}
                           color={star <= Math.round(reviewsStats.average || 5) ? '#f59e0b' : '#cbd5e1'}
                         />
@@ -843,10 +1043,10 @@ const Dashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 style={{ fontWeight: 800, color: '#065f46', margin: 0, fontSize: '1.25rem' }}>
+                    <h3 style={{ fontWeight: 800, color: '#065f46', margin: 0, fontSize: '1.15rem' }}>
                       Calificación General del Comercio
                     </h3>
-                    <p style={{ color: '#047857', margin: '4px 0 0 0', fontSize: '0.88rem' }}>
+                    <p style={{ color: '#047857', margin: '3px 0 0 0', fontSize: '0.85rem' }}>
                       Basado en <strong>{reviewsStats.count}</strong> {reviewsStats.count === 1 ? 'opinión de cliente verificado' : 'opiniones de clientes verificados'}
                     </p>
                   </div>
@@ -854,20 +1054,20 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Lista de Reseñas */}
-              <div className="ml-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontWeight: 800, marginBottom: '1.25rem', color: 'var(--text-title)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MessageSquare size={20} color="var(--primary-color)" /> Comentarios y Feedback Recibido
+              <div className="ml-card dashboard-card-responsive">
+                <h3 style={{ fontWeight: 800, marginBottom: '1.25rem', color: 'var(--text-title)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
+                  <MessageSquare size={18} color="var(--primary-color)" /> Comentarios y Feedback Recibido
                 </h3>
 
                 {reviews.length === 0 ? (
-                  <div className="empty-state" style={{ padding: '3rem 1rem' }}>
-                    <MessageSquare size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
+                  <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
+                    <MessageSquare size={42} color="var(--text-disabled)" style={{ marginBottom: '0.75rem' }} />
                     <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px' }}>Aún no has recibido opiniones</p>
                     <p className="text-muted text-sm">Cuando tus clientes completen sus turnos, podrán dejarte calificaciones y comentarios aquí.</p>
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.5rem' }}>
                       {reviews
                         .slice((reviewsPage - 1) * REVIEWS_PER_PAGE, reviewsPage * REVIEWS_PER_PAGE)
                         .map(rev => (
@@ -875,16 +1075,16 @@ const Dashboard: React.FC = () => {
                             key={rev.id}
                             style={{
                               border: '1px solid var(--border-default)',
-                              borderRadius: '10px',
-                              padding: '1.25rem',
+                              borderRadius: '12px',
+                              padding: '1rem',
                               background: 'white'
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
-                                  width: '40px',
-                                  height: '40px',
+                                  width: '38px',
+                                  height: '38px',
                                   borderRadius: '50%',
                                   background: '#e0f2fe',
                                   color: 'var(--primary-color)',
@@ -892,28 +1092,28 @@ const Dashboard: React.FC = () => {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   fontWeight: 700,
-                                  fontSize: '1rem'
+                                  fontSize: '0.95rem'
                                 }}>
-                                  {rev.appointment?.user?.name ? rev.appointment.user.name[0].toUpperCase() : <User size={18} />}
+                                  {rev.appointment?.user?.name ? rev.appointment.user.name[0].toUpperCase() : <User size={16} />}
                                 </div>
                                 <div>
-                                  <p style={{ fontWeight: 700, fontSize: '0.98rem', margin: 0, color: 'var(--text-title)' }}>
+                                  <p style={{ fontWeight: 700, fontSize: '0.92rem', margin: 0, color: 'var(--text-title)' }}>
                                     {rev.appointment?.user?.name || 'Cliente'}
                                   </p>
                                   {rev.appointment?.service?.name && (
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                      Servicio realizado: <strong>{rev.appointment.service.name}</strong>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                      Servicio: <strong>{rev.appointment.service.name}</strong>
                                     </span>
                                   )}
                                 </div>
                               </div>
 
                               <div style={{ textAlign: 'right' }}>
-                                <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                                <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '2px' }}>
                                   {[1, 2, 3, 4, 5].map(s => (
                                     <Star
                                       key={s}
-                                      size={16}
+                                      size={15}
                                       fill={s <= rev.rating ? '#f59e0b' : 'none'}
                                       color={s <= rev.rating ? '#f59e0b' : '#cbd5e1'}
                                     />
@@ -924,8 +1124,8 @@ const Dashboard: React.FC = () => {
                             </div>
 
                             {rev.comment ? (
-                              <div style={{ margin: '10px 0 0 0', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--primary-color)' }}>
-                                <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                              <div style={{ margin: '8px 0 0 0', background: '#f8fafc', padding: '9px 12px', borderRadius: '8px', borderLeft: '3px solid var(--primary-color)' }}>
+                                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.5 }}>
                                   "{rev.comment}"
                                 </p>
                               </div>
@@ -953,35 +1153,38 @@ const Dashboard: React.FC = () => {
 
           {/* ======= CONFIGURACIÓN ======= */}
           {activeTab === 'settings' && (
-            <div className="ml-card" style={{ padding: '2rem', maxWidth: '640px' }}>
-              <h3 style={{ fontWeight: 700, marginBottom: '1.5rem', color: 'var(--text-title)' }}>Configuración del Negocio</h3>
+            <div className="ml-card dashboard-card-responsive" style={{ maxWidth: '640px' }}>
+              <h3 style={{ fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-title)', fontSize: '1.15rem' }}>Configuración del Negocio</h3>
+              <p className="text-muted text-xs" style={{ margin: '0 0 1.25rem 0' }}>
+                Actualiza los datos de tu comercio visibles para los clientes
+              </p>
               <form onSubmit={handleSaveSettings}>
                 <div className="form-group">
-                  <label className="form-label">Nombre del Negocio</label>
+                  <label className="form-label">Nombre del Negocio *</label>
                   <input className="form-control" value={settingsForm.name} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Descripción</label>
-                  <textarea className="form-control" rows={3} value={settingsForm.description} onChange={e => setSettingsForm(f => ({ ...f, description: e.target.value }))} />
+                  <textarea className="form-control" rows={3} placeholder="Describe los servicios y especialidad de tu local..." value={settingsForm.description} onChange={e => setSettingsForm(f => ({ ...f, description: e.target.value }))} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Dirección</label>
-                    <input className="form-control" value={settingsForm.address} onChange={e => setSettingsForm(f => ({ ...f, address: e.target.value }))} />
+                    <input className="form-control" placeholder="Ej. Calle 123, CABA" value={settingsForm.address} onChange={e => setSettingsForm(f => ({ ...f, address: e.target.value }))} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Teléfono</label>
-                    <input className="form-control" value={settingsForm.phone} onChange={e => setSettingsForm(f => ({ ...f, phone: e.target.value }))} />
+                    <input className="form-control" placeholder="Ej. 11 2345-6789" value={settingsForm.phone} onChange={e => setSettingsForm(f => ({ ...f, phone: e.target.value }))} />
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Categoría</label>
-                  <select className="form-control" value={settingsForm.category} onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))}>
+                  <label className="form-label">Categoría *</label>
+                  <select className="form-control" value={settingsForm.category} onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))} required>
                     <option value="">Seleccionar categoría...</option>
                     {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <button type="submit" className="btn btn-primary" disabled={submitting} style={{ padding: '0.75rem 2rem' }}>
+                <button type="submit" className="btn btn-primary" disabled={submitting} style={{ width: '100%', padding: '0.75rem 1.5rem', marginTop: '0.5rem' }}>
                   {submitting ? (
                     <LoadingSpinner size="sm" inline text="Guardando..." color="white" />
                   ) : (
