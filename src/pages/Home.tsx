@@ -325,7 +325,7 @@ const Home: React.FC = () => {
         </aside>
 
         {/* Columna de negocios */}
-        <div>
+        <div className="two-col-content" style={{ width: '100%', minWidth: 0 }}>
           {sortByProximity && (
             <div style={{
               display: 'flex',
@@ -412,8 +412,8 @@ const Home: React.FC = () => {
             <>
               <div className="business-grid">
                 {paginated.map(business => (
-                  <Link to={`/businesses/${business.id}`} key={business.id} style={{ textDecoration: 'none' }}>
-                    <div className="ml-card ml-card-hoverable" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <Link to={`/businesses/${business.id}`} key={business.id} style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
+                    <div className="ml-card ml-card-hoverable" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
                       {/* Imagen / Avatar */}
                       <div style={{ height: '120px', background: 'linear-gradient(180deg, #f8fbfd, #ffffff)', borderBottom: '1px solid #f1f5f9', borderTopLeftRadius: '13px', borderTopRightRadius: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <div style={{
