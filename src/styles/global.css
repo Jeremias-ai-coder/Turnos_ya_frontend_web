@@ -980,10 +980,19 @@ body {
   .two-col-layout {
     display: flex !important;
     flex-direction: column !important;
+    align-items: stretch !important;
     gap: 0.75rem !important;
     min-width: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+  }
+
+  .two-col-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
   }
 
   .sidebar-filters {
@@ -1020,10 +1029,23 @@ body {
   }
 
   .business-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    min-width: 0;
-    width: 100%;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .business-grid > a {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    text-decoration: none !important;
+  }
+
+  .business-grid .ml-card {
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   /* Profile page responsive */
