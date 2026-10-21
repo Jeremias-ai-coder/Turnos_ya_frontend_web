@@ -164,19 +164,26 @@ const Home: React.FC = () => {
                 <button
                   onClick={handleGetLocation}
                   disabled={locatingUser}
-                  className="btn btn-outline-primary btn-full"
+                  className="btn btn-full"
                   style={{
-                    fontSize: '0.85rem',
-                    padding: '8px 12px',
+                    fontSize: '0.86rem',
+                    fontWeight: 700,
+                    padding: '9px 12px',
                     marginBottom: '6px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '7px',
+                    backgroundColor: 'var(--status-pending-bg)',
+                    color: 'var(--primary-color)',
+                    border: '1.5px solid var(--status-pending-border)',
+                    cursor: locatingUser ? 'not-allowed' : 'pointer',
+                    borderRadius: '8px',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <Navigation size={14} />
-                  {locatingUser ? 'Localizando...' : 'Usar mi ubicación'}
+                  <Navigation size={15} />
+                  <span>{locatingUser ? 'Localizando...' : 'Usar mi ubicación'}</span>
                 </button>
                 <button
                   onClick={handleUseDemoLocation}
