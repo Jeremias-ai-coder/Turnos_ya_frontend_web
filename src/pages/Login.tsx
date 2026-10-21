@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -97,7 +98,7 @@ const Login: React.FC = () => {
               </label>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-full" style={{ padding: '0.75rem', fontSize: '1rem' }} disabled={loading}>
+            <button type="submit" className="btn btn-primary btn-full" style={{ padding: '0.75rem', fontSize: '1rem', fontWeight: 700 }} disabled={loading}>
               {loading ? (
                 <LoadingSpinner size="sm" inline text="Ingresando..." color="white" />
               ) : (
@@ -108,7 +109,18 @@ const Login: React.FC = () => {
             </button>
           </form>
 
-          <div className="divider" />
+          <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', color: '#94a3b8' }}>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            <span style={{ padding: '0 10px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>O bien</span>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+          </div>
+
+          <GoogleSignInButton
+            buttonText="Continuar con Google"
+            onError={err => setError(err)}
+          />
+
+          <div className="divider" style={{ margin: '1.25rem 0' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', alignItems: 'center' }}>
             <Link to="/register" style={{ color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', textDecoration: 'none' }}>
               Crear una cuenta nueva

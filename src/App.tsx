@@ -6,6 +6,8 @@ import { Layout } from './components/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import RecoverPassword from './pages/RecoverPassword';
+import ResetPassword from './pages/ResetPassword';
 import BusinessDetail from './pages/BusinessDetail';
 import Booking from './pages/Booking';
 import MyAppointments from './pages/MyAppointments';
@@ -30,6 +32,9 @@ function App() {
             <Route index element={<Home />} />
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
+            <Route path="recover" element={<RecoverPassword />} />
+            <Route path="forgot-password" element={<Navigate to="/recover" replace />} />
+            <Route path="reset-password" element={<ResetPassword />} />
             <Route path="businesses/:id" element={<BusinessDetail />} />
 
             <Route path="businesses/:id/book" element={
