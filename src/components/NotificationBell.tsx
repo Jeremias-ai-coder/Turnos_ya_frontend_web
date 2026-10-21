@@ -57,17 +57,32 @@ export const NotificationBell: React.FC = () => {
     }
   };
 
-  // Carga inicial y polling periódico cada 20 segundos
+  // Carga inicial y polling periódico inteligente (solo cuando la pestaña está activa)
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     fetchNotifications();
 
     const interval = setInterval(() => {
-      fetchNotifications();
-    }, 20000);
+      // Solo consultar al servidor si la pestaña está visible
+      if (document.visibilityState === 'visible') {
+        fetchNotifications();
+      }
+    }, 30000);
 
-    return () => clearInterval(interval);
-  }, [user]);
+    // Al volver a la pestaña de Turnos Ya, actualizar de inmediato
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.id]);
 
   // Cerrar al hacer clic afuera
   useEffect(() => {
