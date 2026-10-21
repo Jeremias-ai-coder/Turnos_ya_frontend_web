@@ -28,7 +28,8 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   const navigate = useNavigate();
   const googleBtnContainerRef = useRef<HTMLDivElement>(null);
 
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const googleClientId = typeof rawClientId === 'string' ? rawClientId.replace(/['"\r\n\t\s]+/g, '').trim() : '';
 
   // Carga del script oficial de Google Identity Services si hay un CLIENT_ID configurado
   useEffect(() => {
