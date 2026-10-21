@@ -243,9 +243,9 @@ const Profile: React.FC = () => {
         </button>
       </div>
 
-      <div className="ml-card" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '620px', overflow: 'hidden' }}>
-        <aside style={{ background: 'var(--background-app)', borderRight: '1px solid var(--border-default)', padding: '1.2rem 0.8rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div className="ml-card profile-card-responsive">
+        <aside className="profile-aside-responsive">
+          <div className="profile-tabs-responsive">
             {tabs.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -255,7 +255,6 @@ const Profile: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.65rem',
-                  width: '100%',
                   border: 'none',
                   cursor: 'pointer',
                   textAlign: 'left',
@@ -273,7 +272,7 @@ const Profile: React.FC = () => {
           </div>
         </aside>
 
-        <main style={{ padding: '1.8rem' }}>
+        <main className="profile-main-responsive">
           {activeTab === 'profile' && (
             <div>
               <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -299,7 +298,7 @@ const Profile: React.FC = () => {
               )}
 
               <form onSubmit={handleProfileSubmit}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Nombre</label>
                     <input

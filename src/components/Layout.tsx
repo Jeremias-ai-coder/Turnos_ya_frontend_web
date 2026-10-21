@@ -116,30 +116,47 @@ export const Layout: React.FC = () => {
             <div className="navbar-actions">
               {user ? (
                 <>
-                  <Link to="/my-appointments" className="navbar-link">Mis Turnos</Link>
-                  <Link to="/dashboard" className="navbar-link">
+                  <Link to="/my-appointments" className="navbar-link navbar-link-desktop">Mis Turnos</Link>
+                  <Link to="/dashboard" className="navbar-link navbar-link-desktop">
                     {user.role === 'client' ? 'Registrar Negocio' : 'Mi Panel'}
                   </Link>
                   {user.role === 'administrator' && (
-                    <Link to="/system" className="navbar-link" style={{ opacity: 0.8 }}>⚙ Sistema</Link>
+                    <Link to="/system" className="navbar-link navbar-link-desktop" style={{ opacity: 0.8 }}>⚙ Sistema</Link>
                   )}
                   <NotificationBell />
                   <div className="navbar-separator" />
                   <Link to="/profile" className="user-avatar-nav" title={user.name}>{initials}</Link>
-                  <span style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{user.name.split(' ')[0]}</span>
-                  <button className="btn-logout" onClick={handleLogout}>
-                    <LogOut size={14} /> Salir
+                  <span className="navbar-username-desktop" style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{user.name.split(' ')[0]}</span>
+                  <button className="btn-logout" onClick={handleLogout} title="Cerrar sesión" aria-label="Cerrar sesión">
+                    <LogOut size={14} /><span className="logout-text-desktop"> Salir</span>
                   </button>
                 </>
               ) : (
                 <>
-                  <Link to="/login" className="navbar-link">Iniciar Sesión</Link>
-                  <Link to="/register" className="btn btn-light" style={{ fontSize: '0.85rem', padding: '8px 16px' }}>
+                  <Link to="/login" className="navbar-link navbar-link-desktop">Iniciar Sesión</Link>
+                  <Link to="/register" className="btn btn-light navbar-link-desktop" style={{ fontSize: '0.85rem', padding: '8px 16px' }}>
                     Crear cuenta
                   </Link>
                 </>
               )}
             </div>
+
+            {user ? (
+              <div className="navbar-mobile-links">
+                <Link to="/my-appointments" className="navbar-mobile-pill">Mis Turnos</Link>
+                <Link to="/dashboard" className="navbar-mobile-pill">
+                  {user.role === 'client' ? 'Registrar Negocio' : 'Mi Panel'}
+                </Link>
+                {user.role === 'administrator' && (
+                  <Link to="/system" className="navbar-mobile-pill">⚙ Sistema</Link>
+                )}
+              </div>
+            ) : (
+              <div className="navbar-mobile-links">
+                <Link to="/login" className="navbar-mobile-pill">Iniciar Sesión</Link>
+                <Link to="/register" className="navbar-mobile-pill" style={{ background: '#ffffff', color: 'var(--primary-color)' }}>Crear cuenta</Link>
+              </div>
+            )}
           </div>
         </div>
       </nav>

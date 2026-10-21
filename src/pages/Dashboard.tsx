@@ -499,7 +499,7 @@ const Dashboard: React.FC = () => {
 
           {/* ======= SERVICIOS ======= */}
           {activeTab === 'services' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
+            <div className="dashboard-panel-grid">
               <div className="ml-card" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Servicios Publicados ({services.length})</h3>
                 {services.length === 0 ? (
@@ -653,7 +653,7 @@ const Dashboard: React.FC = () => {
 
           {/* ======= HORARIOS ======= */}
           {activeTab === 'schedules' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
+            <div className="dashboard-panel-grid">
               <div className="ml-card" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-title)' }}>Horarios de Atención Configurados</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
