@@ -319,6 +319,10 @@ const Profile: React.FC = () => {
         type: 'success',
         text: res.data.message || '¡Tu correo electrónico ha sido verificado con éxito!',
       });
+      setSecurityMessage({
+        type: 'success',
+        text: '¡Tu usuario ha sido verificado a través de Gmail! El panel de seguridad se ha desbloqueado.',
+      });
     } catch (err: any) {
       setProfileMessage({
         type: 'error',
@@ -383,7 +387,26 @@ const Profile: React.FC = () => {
                 }}
               >
                 <Icon size={17} />
-                {label}
+                <span>{label}</span>
+                {id === 'security' && !profileForm.emailVerified && (
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: '0.68rem',
+                      background: '#fffbeb',
+                      color: '#d97706',
+                      border: '1px solid #fde68a',
+                      padding: '2px 6px',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                    }}
+                  >
+                    <Lock size={10} /> Bloqueado
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -566,16 +589,185 @@ const Profile: React.FC = () => {
 
           {activeTab === 'security' && (
             <div>
-              <h2 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text-title)', fontWeight: 800 }}>Seguridad</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <h2 style={{ margin: 0, color: 'var(--text-title)', fontWeight: 800 }}>Seguridad</h2>
+                {profileForm.emailVerified ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '4px 12px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <CheckCircle2 size={13} /> Usuario verificado
+                  </span>
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', padding: '4px 12px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <Lock size={13} /> Panel bloqueado
+                  </span>
+                )}
+              </div>
               <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Cambia tu contraseña y controla el acceso a tu cuenta.</p>
 
               {securityMessage && (
-                <div className={securityMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1rem' }}>
+                <div className={securityMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1.25rem' }}>
                   {securityMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {securityMessage.text}
                 </div>
               )}
 
-              {pendingPasswordConfirmation ? (
+              {!profileForm.emailVerified ? (
+                /* Panel Bloqueado: Requiere verificación previa por Gmail */
+                <div
+                  style={{
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: '16px',
+                    padding: '2.25rem 1.75rem',
+                    marginBottom: '1.5rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '68px',
+                      height: '68px',
+                      borderRadius: '50%',
+                      background: '#fef3c7',
+                      color: '#d97706',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 1.25rem',
+                      boxShadow: '0 4px 12px rgba(217, 119, 6, 0.15)',
+                    }}
+                  >
+                    <Lock size={34} />
+                  </div>
+
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+                    <Lock size={13} /> Panel Bloqueado por Seguridad
+                  </div>
+
+                  <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Verificación de usuario requerida
+                  </h3>
+
+                  <p style={{ color: '#78350f', fontSize: '0.92rem', maxWidth: '520px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+                    Para proteger la seguridad de tu cuenta y evitar cambios de contraseña no autorizados, este panel se encuentra bloqueado hasta que verifiques tu usuario a través de tu correo electrónico (Gmail).
+                  </p>
+
+                  <div
+                    style={{
+                      background: 'white',
+                      border: '1px solid #fef08a',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      maxWidth: '480px',
+                      margin: '0 auto 1.75rem',
+                      textAlign: 'left',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem' }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Mail size={17} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>Correo electrónico a verificar:</div>
+                        <strong style={{ fontSize: '0.95rem', color: '#1f2937' }}>{profileForm.email}</strong>
+                      </div>
+                    </div>
+
+                    {!emailVerificationSent ? (
+                      <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.92rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                          onClick={handleSendVerificationEmail}
+                          disabled={emailVerificationSending}
+                        >
+                          <Mail size={16} />
+                          {emailVerificationSending ? 'Enviando código...' : 'Verificar mi usuario a través de Gmail'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: '#4b5563' }}>
+                          Ingresa el código de 6 dígitos enviado a tu correo para verificar tu cuenta y desbloquear el panel:
+                        </p>
+
+                        {qaEmailCode && (
+                          <div
+                            style={{
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              marginBottom: '0.85rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '8px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#166534', fontWeight: 600 }}>
+                              <Sparkles size={14} color="#16a34a" /> Modo pruebas (QA): <code>{qaEmailCode}</code>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEmailVerificationCode(qaEmailCode)}
+                              className="btn btn-primary"
+                              style={{ padding: '3px 8px', fontSize: '0.75rem' }}
+                            >
+                              Autocompletar
+                            </button>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            placeholder="123456"
+                            className="form-control"
+                            style={{
+                              width: '140px',
+                              textAlign: 'center',
+                              fontSize: '1.2rem',
+                              letterSpacing: '4px',
+                              fontWeight: 700,
+                            }}
+                            value={emailVerificationCode}
+                            onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ padding: '8px 16px', fontSize: '0.88rem' }}
+                            onClick={handleConfirmEmailVerification}
+                            disabled={emailVerificationLoading || emailVerificationCode.length < 6}
+                          >
+                            <CheckCircle2 size={15} /> {emailVerificationLoading ? 'Verificando...' : 'Desbloquear panel'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-light"
+                            style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                            onClick={() => setEmailVerificationSent(false)}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-light" onClick={handleLogout}>
+                      <LogOut size={15} /> Cerrar sesión
+                    </button>
+                    <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
+                      Cerrar todas las sesiones
+                    </button>
+                  </div>
+                </div>
+              ) : pendingPasswordConfirmation ? (
+                /* Formulario de confirmación por email para autorizar el cambio de clave */
                 <form onSubmit={handleConfirmPasswordChange}>
                   <div
                     style={{
@@ -665,6 +857,7 @@ const Profile: React.FC = () => {
                   </div>
                 </form>
               ) : (
+                /* Formulario normal de cambio de contraseña (habilitado porque ya está verificado) */
                 <form onSubmit={handleSecuritySubmit}>
                   <div className="form-group">
                     <label className="form-label">Contraseña actual</label>
