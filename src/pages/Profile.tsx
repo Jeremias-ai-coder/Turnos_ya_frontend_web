@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle, AlertTriangle, Mail, KeyRound, Sparkles } from 'lucide-react';
+import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle, AlertTriangle, Mail, KeyRound, Sparkles, X, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 type ActiveTab = 'profile' | 'security' | 'notifications' | 'privacy';
@@ -62,11 +62,26 @@ const Profile: React.FC = () => {
     confirmPassword: '',
   });
 
-  const [pendingPasswordConfirmation, setPendingPasswordConfirmation] = useState(false);
-  const [confirmationToken, setConfirmationToken] = useState<string | null>(null);
+  // Modal y flujo de cambio de contraseña
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordModalStep, setPasswordModalStep] = useState<'verify_code' | 'set_passwords'>('verify_code');
+  const [changeToken, setChangeToken] = useState<string | null>(null);
+  const [changeAuthToken, setChangeAuthToken] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [qaPasswordCode, setQaPasswordCode] = useState<string | null>(null);
   const [securityLoading, setSecurityLoading] = useState(false);
+  const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Visibilidad de contraseñas
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Estados para "¿Olvidaste tu contraseña?"
+  const [forgotPasswordActive, setForgotPasswordActive] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState<'reset_directly' | 'email_link'>('email_link');
+  const [forgotPasswordSending, setForgotPasswordSending] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
 
   // Estados para verificación de correo progresiva
   const [emailVerificationSending, setEmailVerificationSending] = useState(false);
@@ -158,83 +173,56 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleSecuritySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSecurityMessage(null);
-
-    if (!securityForm.currentPassword || !securityForm.newPassword || !securityForm.confirmPassword) {
-      setSecurityMessage({ type: 'error', text: 'Completá los tres campos para cambiar la contraseña.' });
-      return;
-    }
-
-    if (securityForm.newPassword.length < 6) {
-      setSecurityMessage({ type: 'error', text: 'La nueva contraseña debe tener al menos 6 caracteres.' });
-      return;
-    }
-
-    if (securityForm.newPassword !== securityForm.confirmPassword) {
-      setSecurityMessage({ type: 'error', text: 'La confirmación de la contraseña no coincide.' });
-      return;
-    }
-
+  const handleStartPasswordChange = async () => {
     setSecurityLoading(true);
-    try {
-      const res = await api.post('/auth/request-password-change', {
-        currentPassword: securityForm.currentPassword,
-        newPassword: securityForm.newPassword,
-      });
+    setSecurityMessage(null);
+    setModalMessage(null);
+    setVerificationCode('');
+    setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setForgotPasswordActive(false);
+    setForgotPasswordSent(false);
+    setForgotPasswordMode('email_link');
 
-      if (res.data?.requiresConfirmation) {
-        setPendingPasswordConfirmation(true);
-        setConfirmationToken(res.data.confirmationToken);
-        setQaPasswordCode(res.data.qaCode || null);
-        setSecurityMessage({
-          type: 'success',
-          text: res.data.message || 'Código de confirmación enviado a tu correo.',
-        });
-      }
+    try {
+      const res = await api.post('/auth/request-password-change-code');
+      setChangeToken(res.data.confirmationToken);
+      setQaPasswordCode(res.data.qaCode || null);
+      setPasswordModalStep('verify_code');
+      setIsPasswordModalOpen(true);
     } catch (err: any) {
       setSecurityMessage({
         type: 'error',
-        text: err.response?.data?.message || 'No se pudo procesar la solicitud.',
+        text: err.response?.data?.message || 'No se pudo enviar el código de seguridad a tu correo.',
       });
     } finally {
       setSecurityLoading(false);
     }
   };
 
-  const handleConfirmPasswordChange = async (e: React.FormEvent) => {
+  const handleVerifyPasswordCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSecurityMessage(null);
+    setModalMessage(null);
 
-    if (!verificationCode.trim()) {
-      setSecurityMessage({ type: 'error', text: 'Ingresa el código de 6 dígitos recibido por correo.' });
+    if (verificationCode.trim().length !== 6) {
+      setModalMessage({ type: 'error', text: 'Ingresa el código de 6 dígitos recibido por correo.' });
       return;
     }
 
     setSecurityLoading(true);
     try {
-      const res = await api.post('/auth/confirm-password-change', {
-        confirmationToken,
+      const res = await api.post('/auth/verify-password-change-code', {
+        confirmationToken: changeToken,
         code: verificationCode.trim(),
       });
 
-      setSecurityMessage({
+      setChangeAuthToken(res.data.changeAuthToken);
+      setPasswordModalStep('set_passwords');
+      setModalMessage({
         type: 'success',
-        text: res.data?.message || '¡La contraseña se actualizó correctamente!',
+        text: 'Código verificado con éxito. Ya puedes ingresar tu nueva contraseña.',
       });
-
-      setSecurityForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
-      setPendingPasswordConfirmation(false);
-      setConfirmationToken(null);
-      setVerificationCode('');
-      setQaPasswordCode(null);
     } catch (err: any) {
-      setSecurityMessage({
+      setModalMessage({
         type: 'error',
         text: err.response?.data?.message || 'Código incorrecto o expirado.',
       });
@@ -243,37 +231,114 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleCancelPasswordChange = () => {
-    setPendingPasswordConfirmation(false);
-    setConfirmationToken(null);
-    setVerificationCode('');
-    setQaPasswordCode(null);
-    setSecurityMessage(null);
-  };
-
   const handleResendPasswordCode = async () => {
-    if (!securityForm.currentPassword || !securityForm.newPassword) return;
     setSecurityLoading(true);
-    setSecurityMessage(null);
+    setModalMessage(null);
     try {
-      const res = await api.post('/auth/request-password-change', {
-        currentPassword: securityForm.currentPassword,
-        newPassword: securityForm.newPassword,
-      });
-      setConfirmationToken(res.data.confirmationToken);
+      const res = await api.post('/auth/request-password-change-code');
+      setChangeToken(res.data.confirmationToken);
       setQaPasswordCode(res.data.qaCode || null);
-      setSecurityMessage({
+      setModalMessage({
         type: 'success',
         text: 'Hemos reenviado un nuevo código de 6 dígitos a tu correo.',
       });
     } catch (err: any) {
-      setSecurityMessage({
+      setModalMessage({
         type: 'error',
         text: err.response?.data?.message || 'Error al reenviar el código.',
       });
     } finally {
       setSecurityLoading(false);
     }
+  };
+
+  const handleFinalizePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalMessage(null);
+
+    const isDirectReset = forgotPasswordActive && forgotPasswordMode === 'reset_directly';
+
+    if (!isDirectReset && !securityForm.currentPassword) {
+      setModalMessage({ type: 'error', text: 'Debes ingresar tu contraseña actual.' });
+      return;
+    }
+
+    if (!securityForm.newPassword) {
+      setModalMessage({ type: 'error', text: 'Debes ingresar la nueva contraseña.' });
+      return;
+    }
+
+    if (securityForm.newPassword.length < 6) {
+      setModalMessage({ type: 'error', text: 'La nueva contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
+
+    if (securityForm.newPassword !== securityForm.confirmPassword) {
+      setModalMessage({ type: 'error', text: 'La confirmación de la contraseña no coincide.' });
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const res = await api.post('/auth/submit-password-change', {
+        changeAuthToken,
+        currentPassword: isDirectReset ? undefined : securityForm.currentPassword,
+        newPassword: securityForm.newPassword,
+        skipCurrentPassword: isDirectReset,
+      });
+
+      setIsPasswordModalOpen(false);
+      setSecurityMessage({
+        type: 'success',
+        text: res.data?.message || '¡La contraseña se actualizó correctamente! Te enviamos un correo informativo.',
+      });
+
+      setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setVerificationCode('');
+      setChangeToken(null);
+      setChangeAuthToken(null);
+      setQaPasswordCode(null);
+      setForgotPasswordActive(false);
+    } catch (err: any) {
+      setModalMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo actualizar la contraseña.',
+      });
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleSendRecoveryEmailFromModal = async () => {
+    setForgotPasswordSending(true);
+    setModalMessage(null);
+    try {
+      await api.post('/auth/forgot-password', { email: profileForm.email });
+      setForgotPasswordSent(true);
+      setModalMessage({
+        type: 'success',
+        text: `Te enviamos un enlace de recuperación a ${profileForm.email}.`,
+      });
+    } catch (err: any) {
+      setModalMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo enviar el enlace de recuperación.',
+      });
+    } finally {
+      setForgotPasswordSending(false);
+    }
+  };
+
+  const handleClosePasswordModal = () => {
+    setIsPasswordModalOpen(false);
+    setModalMessage(null);
+    setVerificationCode('');
+    setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setChangeToken(null);
+    setChangeAuthToken(null);
+    setQaPasswordCode(null);
+    setForgotPasswordActive(false);
+    setForgotPasswordSent(false);
   };
 
   const handleNotificationSubmit = async (e: React.FormEvent) => {
@@ -791,204 +856,433 @@ const Profile: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : pendingPasswordConfirmation ? (
-                /* Paso 2: Formulario de confirmación por email para autorizar el cambio de clave */
-                <form onSubmit={handleConfirmPasswordChange}>
+              ) : (
+                /* Contenedor cuando el usuario está verificado */
+                <div>
                   <div
                     style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '14px',
+                      background: 'white',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: '16px',
                       padding: '1.75rem',
                       marginBottom: '1.25rem',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Mail size={20} />
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
-                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                            Autorización por correo electrónico
-                          </h4>
-                          <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
-                            Paso 2 de 2
-                          </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div
+                          style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '12px',
+                            background: 'rgba(0, 158, 227, 0.08)',
+                            color: 'var(--primary-color)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid rgba(0, 158, 227, 0.18)',
+                          }}
+                        >
+                          <KeyRound size={22} />
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
-                          Ingresa el código de 6 dígitos enviado a <strong>{profileForm.email}</strong> para autorizar el cambio
-                        </p>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                            Contraseña de acceso
+                          </h3>
+                          <p style={{ margin: '0.2rem 0 0', fontSize: '0.86rem', color: '#64748b' }}>
+                            Para mayor protección de tu cuenta, te enviaremos un código de seguridad de 6 dígitos a tu correo ({profileForm.email}).
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {qaPasswordCode && (
-                      <div
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleStartPasswordChange}
+                        disabled={securityLoading}
                         style={{
-                          background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
-                          borderRadius: '8px',
-                          padding: '10px 14px',
-                          marginBottom: '1.25rem',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
                           gap: '8px',
+                          padding: '0.75rem 1.4rem',
+                          fontWeight: 700,
+                          fontSize: '0.92rem',
+                          borderRadius: '10px',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#166534', fontWeight: 600 }}>
-                          <Sparkles size={15} color="#16a34a" /> Modo pruebas (QA): <code>{qaPasswordCode}</code>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setVerificationCode(qaPasswordCode)}
-                          className="btn btn-primary"
-                          style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                        >
-                          Usar código
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                      <label className="form-label" style={{ fontWeight: 700 }}>
-                        Código de autorización (6 dígitos)
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        className="form-control"
-                        placeholder="123456"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                        style={{
-                          fontSize: '1.4rem',
-                          letterSpacing: '6px',
-                          textAlign: 'center',
-                          fontWeight: 700,
-                          maxWidth: '220px',
-                        }}
-                        required
-                        autoFocus
-                      />
-                      <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
-                        El código expira en 10 minutos. Revisa tu bandeja de entrada o spam.
-                      </small>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button type="submit" className="btn btn-primary" disabled={securityLoading}>
-                        <KeyRound size={16} /> {securityLoading ? 'Verificando...' : 'Confirmar y cambiar contraseña'}
-                      </button>
-                      <button type="button" className="btn btn-outline-primary" onClick={handleResendPasswordCode} disabled={securityLoading}>
-                        <Mail size={15} /> Reenviar código
-                      </button>
-                      <button type="button" className="btn btn-light" onClick={handleCancelPasswordChange}>
-                        Cancelar
+                        <KeyRound size={16} />
+                        {securityLoading ? 'Iniciando verificación...' : 'Cambiar contraseña'}
                       </button>
                     </div>
                   </div>
-                </form>
-              ) : (
-                /* Paso 1: Formulario de cambio de contraseña con aviso de autorización obligatoria */
-                <div>
+
                   <div
                     style={{
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                      border: '1px solid #bbf7d0',
-                      borderRadius: '12px',
-                      padding: '1.1rem 1.25rem',
-                      marginBottom: '1.5rem',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '16px',
+                      padding: '1.5rem 1.75rem',
                       display: 'flex',
-                      gap: '0.85rem',
-                      alignItems: 'flex-start',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '1rem',
                     }}
                   >
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: '#16a34a',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        marginTop: '2px',
-                      }}
-                    >
-                      <ShieldCheck size={20} />
-                    </div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                        <strong style={{ color: '#166534', fontSize: '0.94rem' }}>
-                          Autorización por correo electrónico requerida
-                        </strong>
-                        <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
-                          Paso 1 de 2
-                        </span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.84rem', color: '#166534', lineHeight: 1.45 }}>
-                        Para proteger tu cuenta contra cualquier cambio no autorizado, al presionar <strong>"Solicitar código y continuar"</strong> te enviaremos un código de seguridad único de 6 dígitos a tu correo (<strong>{profileForm.email}</strong>) que deberás ingresar para autorizar la nueva contraseña.
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-title)' }}>
+                        Sesiones activas
+                      </h4>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                        Controla el acceso a tu cuenta en todos tus dispositivos.
                       </p>
                     </div>
-                  </div>
-
-                  <form onSubmit={handleSecuritySubmit}>
-                    <div className="form-group">
-                      <label className="form-label">Contraseña actual</label>
-                      <input
-                        type="password"
-                        className="form-control"
-                        value={securityForm.currentPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Nueva contraseña</label>
-                      <input
-                        type="password"
-                        className="form-control"
-                        value={securityForm.newPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Confirmar nueva contraseña</label>
-                      <input
-                        type="password"
-                        className="form-control"
-                        value={securityForm.confirmPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.25rem' }}>
-                      <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={securityLoading}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', fontWeight: 700 }}
-                      >
-                        <Mail size={16} /> {securityLoading ? 'Enviando código de autorización...' : 'Solicitar código por email y continuar'}
-                      </button>
-
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                       <button type="button" className="btn btn-light" onClick={handleLogout}>
-                        <LogOut size={16} /> Cerrar sesión
+                        <LogOut size={15} /> Cerrar sesión
                       </button>
-
                       <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
                         Cerrar todas las sesiones
                       </button>
                     </div>
-                  </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal / Ventana de Cambio de Contraseña */}
+              {isPasswordModalOpen && (
+                <div className="modal-overlay" onClick={handleClosePasswordModal}>
+                  <div
+                    className="modal-box"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ maxWidth: '500px', width: '100%', padding: '2rem' }}
+                  >
+                    {/* Header del modal */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <KeyRound size={20} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                            Cambiar contraseña
+                          </h3>
+                          <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700 }}>
+                            {passwordModalStep === 'verify_code' ? 'Paso 1 de 2: Verificación de código por mail' : 'Paso 2 de 2: Establecer nueva contraseña'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleClosePasswordModal}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px', borderRadius: '6px' }}
+                        title="Cerrar ventana"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    {/* Mensajes del modal */}
+                    {modalMessage && (
+                      <div
+                        className={modalMessage.type === 'success' ? 'alert-success' : 'alert-danger'}
+                        style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}
+                      >
+                        {modalMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {modalMessage.text}
+                      </div>
+                    )}
+
+                    {passwordModalStep === 'verify_code' ? (
+                      /* PASO 1: Ventana que pide el código de 6 dígitos enviado al mail */
+                      <form onSubmit={handleVerifyPasswordCode}>
+                        <div
+                          style={{
+                            background: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '12px',
+                            padding: '1rem',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            gap: '10px',
+                            alignItems: 'flex-start',
+                          }}
+                        >
+                          <Mail size={18} color="#16a34a" style={{ marginTop: '2px', flexShrink: 0 }} />
+                          <p style={{ margin: 0, fontSize: '0.84rem', color: '#166534', lineHeight: 1.45 }}>
+                            Te enviamos un código de seguridad de 6 dígitos a <strong>{profileForm.email}</strong>. Ingrésalo para verificar tu cuenta y continuar.
+                          </p>
+                        </div>
+
+                        {qaPasswordCode && (
+                          <div
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              marginBottom: '1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '8px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#334155', fontWeight: 600 }}>
+                              <Sparkles size={14} color="#009ee3" /> Modo pruebas (QA): <code>{qaPasswordCode}</code>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setVerificationCode(qaPasswordCode)}
+                              className="btn btn-primary"
+                              style={{ padding: '3px 8px', fontSize: '0.74rem' }}
+                            >
+                              Autocompletar
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="form-group" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
+                          <label className="form-label" style={{ fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>
+                            Código de verificación (6 dígitos)
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            className="form-control"
+                            placeholder="123456"
+                            value={verificationCode}
+                            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                            style={{
+                              fontSize: '1.4rem',
+                              letterSpacing: '6px',
+                              textAlign: 'center',
+                              fontWeight: 700,
+                              maxWidth: '220px',
+                              margin: '0 auto',
+                            }}
+                            autoFocus
+                            required
+                          />
+                          <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
+                            El código expira en 15 minutos. Revisa tu bandeja de entrada o spam.
+                          </small>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+                          <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline-primary"
+                            onClick={handleResendPasswordCode}
+                            disabled={securityLoading}
+                          >
+                            <Mail size={14} /> Reenviar código
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={securityLoading || verificationCode.length !== 6}
+                          >
+                            <CheckCircle2 size={16} /> {securityLoading ? 'Verificando...' : 'Verificar código'}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      /* PASO 2: Una vez comprobado el mail, aparecen los cuadros de texto para contraseñas */
+                      <form onSubmit={handleFinalizePasswordChange}>
+                        <div
+                          style={{
+                            background: '#ecfdf5',
+                            border: '1px solid #a7f3d0',
+                            borderRadius: '10px',
+                            padding: '8px 12px',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '0.82rem',
+                            color: '#065f46',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <CheckCircle2 size={16} color="#059669" /> Correo verificado con éxito. Ya puedes ingresar tu nueva contraseña.
+                        </div>
+
+                        {(!forgotPasswordActive || forgotPasswordMode !== 'reset_directly') && (
+                          <div className="form-group" style={{ marginBottom: '1rem' }}>
+                            <label className="form-label" style={{ fontWeight: 600 }}>Contraseña actual</label>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type={showCurrentPassword ? 'text' : 'password'}
+                                className="form-control"
+                                placeholder="Ingresa tu contraseña actual"
+                                value={securityForm.currentPassword}
+                                onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                                required={!forgotPasswordActive || forgotPasswordMode !== 'reset_directly'}
+                                style={{ paddingRight: '2.5rem' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                style={{
+                                  position: 'absolute',
+                                  right: '10px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: '#94a3b8',
+                                  padding: 0,
+                                  display: 'flex',
+                                }}
+                              >
+                                {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                          <label className="form-label" style={{ fontWeight: 600 }}>Nueva contraseña</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type={showNewPassword ? 'text' : 'password'}
+                              className="form-control"
+                              placeholder="Mínimo 6 caracteres"
+                              value={securityForm.newPassword}
+                              onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                              required
+                              style={{ paddingRight: '2.5rem' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                              style={{
+                                position: 'absolute',
+                                right: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#94a3b8',
+                                padding: 0,
+                                display: 'flex',
+                              }}
+                            >
+                              {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                          <label className="form-label" style={{ fontWeight: 600 }}>Confirmar nueva contraseña</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              className="form-control"
+                              placeholder="Repite tu nueva contraseña"
+                              value={securityForm.confirmPassword}
+                              onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                              required
+                              style={{ paddingRight: '2.5rem' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              style={{
+                                position: 'absolute',
+                                right: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#94a3b8',
+                                padding: 0,
+                                display: 'flex',
+                              }}
+                            >
+                              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Botón "¿Olvidaste tu contraseña?" */}
+                        <div style={{ marginTop: '0.6rem', marginBottom: '1.25rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setForgotPasswordActive(!forgotPasswordActive)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--primary-color)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            ¿Olvidaste tu contraseña?
+                          </button>
+
+                          {forgotPasswordActive && (
+                            <div
+                              style={{
+                                marginTop: '0.75rem',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '10px',
+                                padding: '12px 14px',
+                              }}
+                            >
+                              <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#475569', lineHeight: 1.45 }}>
+                                ¿No recuerdas tu contraseña actual? Como ya verificaste tu identidad con el código de 6 dígitos enviado a tu correo, puedes crear tu nueva clave directamente o recibir un enlace por email.
+                              </p>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <button
+                                  type="button"
+                                  className={forgotPasswordMode === 'reset_directly' ? 'btn btn-primary' : 'btn btn-outline-primary'}
+                                  style={{ padding: '5px 10px', fontSize: '0.78rem' }}
+                                  onClick={() => setForgotPasswordMode(forgotPasswordMode === 'reset_directly' ? 'email_link' : 'reset_directly')}
+                                >
+                                  {forgotPasswordMode === 'reset_directly' ? '✓ Estableciendo sin contraseña actual' : 'Restablecer sin contraseña actual'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-light"
+                                  style={{ padding: '5px 10px', fontSize: '0.78rem' }}
+                                  onClick={handleSendRecoveryEmailFromModal}
+                                  disabled={forgotPasswordSending}
+                                >
+                                  <Mail size={12} /> {forgotPasswordSending ? 'Enviando...' : 'Enviar enlace a mi correo'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+                          <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={securityLoading}
+                          >
+                            <Save size={16} /> {securityLoading ? 'Actualizando...' : 'Guardar nueva contraseña'}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
