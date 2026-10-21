@@ -81,17 +81,66 @@ export const ResetPassword: React.FC = () => {
               {error && <div className="alert-danger" style={{ marginBottom: '1.25rem' }}>{error}</div>}
 
               <form onSubmit={handleSubmit}>
+                {tokenFromUrl && (
+                  <div
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      marginBottom: '1.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.82rem',
+                      color: '#166534',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <CheckCircle2 size={16} color="#16a34a" />
+                    Enlace seguro verificado. Ingresa tu nueva contraseña a continuación.
+                  </div>
+                )}
+
                 {!tokenFromUrl && (
-                  <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                    <label className="form-label">Código o Token de Recuperación</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Pega aquí tu token recibido"
-                      value={token}
-                      onChange={e => setToken(e.target.value)}
-                      required
-                    />
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <div
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        marginBottom: '1rem',
+                        fontSize: '0.82rem',
+                        color: '#1e40af',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      💡 <strong>Tip:</strong> Al hacer clic en el botón <strong>"Restablecer mi contraseña"</strong> del correo que te enviamos, este código se completa automáticamente.
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Código o Token de Recuperación</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Pega aquí tu token o enlace recibido"
+                        value={token}
+                        onChange={e => {
+                          const val = e.target.value.trim();
+                          if (val.includes('token=')) {
+                            try {
+                              const parsed = new URL(val, window.location.origin).searchParams.get('token');
+                              setToken(parsed || val);
+                            } catch {
+                              setToken(val);
+                            }
+                          } else {
+                            setToken(val);
+                          }
+                        }}
+                        required
+                      />
+                    </div>
                   </div>
                 )}
 
