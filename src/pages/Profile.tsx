@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle, Mail, KeyRound, Sparkles } from 'lucide-react';
+import { User, Bell, ShieldCheck, Lock, Save, LogOut, Settings2, CheckCircle2, AlertCircle, AlertTriangle, Mail, KeyRound, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 type ActiveTab = 'profile' | 'security' | 'notifications' | 'privacy';
@@ -11,6 +11,7 @@ interface ProfileData {
   email: string;
   phone: string;
   role: string;
+  emailVerified: boolean;
   emailNotifications: boolean;
   whatsappNotifications: boolean;
 }
@@ -41,7 +42,7 @@ const tabs: { id: ActiveTab; label: string; icon: any }[] = [
 ];
 
 const Profile: React.FC = () => {
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('profile');
@@ -50,6 +51,7 @@ const Profile: React.FC = () => {
     email: user?.email || '',
     phone: user?.phone || '',
     role: user?.role || '',
+    emailVerified: user?.emailVerified ?? false,
     emailNotifications: user?.emailNotifications ?? true,
     whatsappNotifications: user?.whatsappNotifications ?? false,
   });
@@ -66,6 +68,14 @@ const Profile: React.FC = () => {
   const [qaPasswordCode, setQaPasswordCode] = useState<string | null>(null);
   const [securityLoading, setSecurityLoading] = useState(false);
 
+  // Estados para verificación de correo progresiva
+  const [emailVerificationSending, setEmailVerificationSending] = useState(false);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [emailVerificationCode, setEmailVerificationCode] = useState('');
+  const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
+  const [qaEmailCode, setQaEmailCode] = useState<string | null>(null);
+  const [emailVerificationLoading, setEmailVerificationLoading] = useState(false);
+
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
 
   const [loading, setLoading] = useState(false);
@@ -81,6 +91,7 @@ const Profile: React.FC = () => {
       email: freshUser.email || '',
       phone: freshUser.phone || '',
       role: freshUser.role || '',
+      emailVerified: freshUser.emailVerified ?? false,
       emailNotifications: freshUser.emailNotifications ?? true,
       whatsappNotifications: freshUser.whatsappNotifications ?? false,
     });
@@ -121,6 +132,7 @@ const Profile: React.FC = () => {
         email: res.data.email || profileForm.email,
         phone: res.data.phone || '',
         role: res.data.role || profileForm.role,
+        emailVerified: res.data.emailVerified ?? profileForm.emailVerified,
         emailNotifications: res.data.emailNotifications ?? profileForm.emailNotifications,
         whatsappNotifications: res.data.whatsappNotifications ?? profileForm.whatsappNotifications,
       });
@@ -267,6 +279,56 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleSendVerificationEmail = async () => {
+    setEmailVerificationSending(true);
+    setProfileMessage(null);
+    try {
+      const res = await api.post('/auth/send-verification-email');
+      setEmailVerificationSent(true);
+      setEmailVerificationToken(res.data.verificationToken || null);
+      setQaEmailCode(res.data.qaCode || null);
+      setProfileMessage({
+        type: 'success',
+        text: res.data.message || 'Código de verificación enviado a tu correo.',
+      });
+    } catch (err: any) {
+      setProfileMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Error al enviar código de verificación.',
+      });
+    } finally {
+      setEmailVerificationSending(false);
+    }
+  };
+
+  const handleConfirmEmailVerification = async () => {
+    if (!emailVerificationCode.trim()) return;
+    setEmailVerificationLoading(true);
+    setProfileMessage(null);
+    try {
+      const res = await api.post('/auth/verify-email', {
+        code: emailVerificationCode.trim(),
+        verificationToken: emailVerificationToken,
+      });
+      setProfileForm((prev) => ({ ...prev, emailVerified: true }));
+      updateUser({ emailVerified: true });
+      setEmailVerificationSent(false);
+      setEmailVerificationCode('');
+      setQaEmailCode(null);
+      setProfileMessage({
+        type: 'success',
+        text: res.data.message || '¡Tu correo electrónico ha sido verificado con éxito!',
+      });
+    } catch (err: any) {
+      setProfileMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Código de verificación incorrecto o expirado.',
+      });
+    } finally {
+      setEmailVerificationLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -340,10 +402,19 @@ const Profile: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="badge badge-confirmed" style={{ fontSize: '0.78rem' }}>
                   {ROLE_LABELS[profileForm.role] || 'Cliente'}
                 </span>
+                {profileForm.emailVerified ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <CheckCircle2 size={13} /> Correo verificado
+                  </span>
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', padding: '3px 10px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <AlertTriangle size={13} /> Pendiente de verificación
+                  </span>
+                )}
               </div>
 
               {profileMessage && (
@@ -377,15 +448,113 @@ const Profile: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Email</label>
+                    {profileForm.emailVerified ? (
+                      <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={13} /> Verificado
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={13} /> No verificado
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="email"
                     className="form-control"
                     value={profileForm.email}
                     disabled
-                    style={{ background: '#f8fafc', opacity: 0.75 }}
+                    style={{ background: '#f8fafc', opacity: 0.85 }}
                   />
-                  <small className="text-muted">El email se actualiza desde la validación de cuenta o un flujo separado.</small>
+
+                  {!profileForm.emailVerified && (
+                    <div style={{ marginTop: '0.85rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '1.25rem' }}>
+                      {!emailVerificationSent ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1 1 240px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#92400e', fontWeight: 700, fontSize: '0.9rem', marginBottom: '4px' }}>
+                              <Mail size={16} /> ¿Tu correo aún no está verificado?
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.82rem', color: '#b45309', lineHeight: 1.4 }}>
+                              Verifícalo para asegurar la recepción de avisos de turnos y proteger tu cuenta.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ fontSize: '0.85rem', padding: '8px 16px', whiteSpace: 'nowrap' }}
+                            onClick={handleSendVerificationEmail}
+                            disabled={emailVerificationSending}
+                          >
+                            <Mail size={14} /> {emailVerificationSending ? 'Enviando...' : 'Verificar mi correo'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
+                            <Mail size={17} color="#d97706" />
+                            <strong style={{ fontSize: '0.92rem', color: '#92400e' }}>
+                              Ingresa el código de 6 dígitos enviado a tu correo
+                            </strong>
+                          </div>
+                          <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: '#b45309' }}>
+                            Hemos enviado un código a <strong>{profileForm.email}</strong>. Revisa tu bandeja de entrada o spam.
+                          </p>
+
+                          {qaEmailCode && (
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#166534', fontWeight: 600 }}>
+                                <Sparkles size={14} color="#16a34a" /> Modo QA / Pruebas: Código <code>{qaEmailCode}</code>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setEmailVerificationCode(qaEmailCode)}
+                                style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                Autocompletar
+                              </button>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input
+                              type="text"
+                              maxLength={6}
+                              placeholder="123456"
+                              className="form-control"
+                              style={{ width: '150px', textAlign: 'center', fontSize: '1.15rem', letterSpacing: '4px', fontWeight: 700 }}
+                              value={emailVerificationCode}
+                              onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              style={{ fontSize: '0.85rem', padding: '8px 16px' }}
+                              onClick={handleConfirmEmailVerification}
+                              disabled={emailVerificationLoading || emailVerificationCode.length < 6}
+                            >
+                              <CheckCircle2 size={14} /> {emailVerificationLoading ? 'Verificando...' : 'Confirmar código'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-light"
+                              style={{ fontSize: '0.85rem', padding: '8px 12px' }}
+                              onClick={() => setEmailVerificationSent(false)}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {profileForm.emailVerified && (
+                    <small className="text-muted" style={{ display: 'block', marginTop: '0.35rem' }}>
+                      Tu correo está verificado y protegido contra accesos no autorizados.
+                    </small>
+                  )}
                 </div>
 
                 <button type="submit" className="btn btn-primary" disabled={loading}>

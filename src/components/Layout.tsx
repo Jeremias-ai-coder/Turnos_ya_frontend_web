@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Search, X, Home, Calendar, Building2, User } from 'lucide-react';
+import { LogOut, Search, X, Home, Calendar, Building2, User, AlertTriangle } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 
@@ -11,6 +11,7 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   // Keep input in sync if URL query parameter changes
   useEffect(() => {
@@ -143,6 +144,62 @@ export const Layout: React.FC = () => {
           </div>
         </div>
       </nav>
+ 
+      {user && user.emailVerified === false && !bannerDismissed && (
+        <div
+          role="region"
+          aria-label="Aviso de verificación de correo"
+          style={{
+            background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
+            borderBottom: '1px solid #fde68a',
+            padding: '0.65rem 1rem',
+            color: '#92400e',
+            fontSize: '0.88rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
+            position: 'relative',
+            zIndex: 40,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+            <span>
+              Tu correo <strong>{user.email}</strong> aún no está verificado.
+            </span>
+            <Link
+              to="/profile"
+              style={{
+                color: '#b45309',
+                fontWeight: 700,
+                textDecoration: 'underline',
+                marginLeft: '4px',
+              }}
+            >
+              Verificar ahora →
+            </Link>
+          </div>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#b45309',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: '0.5rem',
+            }}
+            title="Cerrar aviso"
+            aria-label="Cerrar aviso de verificación"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       <main className="container page-main">
         <Outlet />

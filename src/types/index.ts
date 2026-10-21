@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   phone?: string | null;
+  emailVerified?: boolean;
   emailNotifications?: boolean;
   whatsappNotifications?: boolean;
   createdAt?: string | null;
