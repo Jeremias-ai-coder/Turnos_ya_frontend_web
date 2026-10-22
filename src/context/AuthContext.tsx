@@ -56,6 +56,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+    try {
+      (window as any).google?.accounts?.id?.disableAutoSelect?.();
+    } catch (e) {
+      // Ignorar si no está cargado el SDK de Google
+    }
   };
 
   const updateUser = (updatedUser: Partial<User>) => {
