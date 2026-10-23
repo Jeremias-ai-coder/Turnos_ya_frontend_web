@@ -16,6 +16,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SkeletonDetail } from '../components/common/SkeletonLoaders';
+import { DefaultBusinessCover } from '../components/common/DefaultBusinessCover';
 import { type Business, type BusinessService as Service } from '../types';
 
 interface Review {
@@ -85,28 +86,31 @@ const BusinessDetail: React.FC = () => {
         <ArrowLeft size={16} /> Volver al catálogo
       </button>
 
-      {/* Header del negocio */}
+      {/* Header del negocio con fondo de negocio por defecto */}
       <div className="ml-card" style={{ marginBottom: '2rem', overflow: 'hidden' }}>
-        <div style={{ background: 'linear-gradient(135deg, #009ee3, #0081bb)', height: '100px' }} />
-        <div style={{ padding: '0 2rem 2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1.25rem', marginTop: '-2.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <DefaultBusinessCover size="banner" style={{ height: '130px' }} />
+        <div style={{ padding: '0 2rem 2rem', position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             <div style={{
-              width: '80px', height: '80px', borderRadius: '16px',
-              background: 'white', border: '3px solid white',
+              width: '84px', height: '84px', borderRadius: '18px',
+              background: 'white', border: '3.5px solid white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: '1.5rem', color: 'var(--primary-color)',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+              fontWeight: 800, fontSize: '1.6rem', color: 'var(--primary-color)',
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
               flexShrink: 0,
+              marginTop: '-42px',
+              position: 'relative',
+              zIndex: 3,
             }}>
               {initials}
             </div>
-            <div style={{ paddingBottom: '4px' }}>
-              <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '2px' }}>{business.name}</h1>
+            <div style={{ paddingTop: '0.6rem' }}>
+              <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>{business.name}</h1>
               {business.category && <span className="badge badge-confirmed">{business.category}</span>}
             </div>
 
             {/* Valoración única en header */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '4px' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontWeight: 700, fontSize: '1.15rem' }}>
                 <Star size={20} fill="currentColor" /> {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : 'Nuevo'}
               </div>
