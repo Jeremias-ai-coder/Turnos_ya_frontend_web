@@ -6,6 +6,8 @@ import { NotificationBell } from './NotificationBell';
 import { Footer } from './Footer';
 import { CookieBanner } from './CookieBanner';
 import { LegalModals } from './LegalModals';
+import { BugReportModal } from './BugReportModal';
+import { FloatingReportButton } from './FloatingReportButton';
 
 
 export const Layout: React.FC = () => {
@@ -216,6 +218,12 @@ export const Layout: React.FC = () => {
 
       {/* Modales legales (Términos, Privacidad, Cookies) */}
       <LegalModals />
+
+      {/* Modal para reportar errores */}
+      <BugReportModal />
+
+      {/* Botón flotante discreto de reporte */}
+      <FloatingReportButton />
 
       {/* Barra de Navegación Inferior Fija para Móviles (Estilo App Nativa) */}
       <nav className="bottom-nav-mobile" aria-label="Navegación móvil inferior">
