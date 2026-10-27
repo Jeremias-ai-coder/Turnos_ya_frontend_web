@@ -30,6 +30,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { openLegalModal } from '../services/legalModalService';
 
 // Íconos SVG ultra fieles a la interfaz de Mercado Libre / Fotos adjuntas
 const CredentialCardIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
@@ -1464,6 +1465,47 @@ const Profile: React.FC = () => {
                   <Save size={16} /> Guardar preferencias
                 </button>
               </div>
+
+              <div className="divider" style={{ margin: '2rem 0 1.5rem' }} />
+
+              <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-title)' }}>
+                Políticas Legales y Consentimiento
+              </h3>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Consultá nuestras directivas de protección de datos o administrá las cookies que guardamos en tu navegador.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.15rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                  <div>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-title)' }}>Términos y Condiciones Generales</strong>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>Condiciones de uso, reservas, asistencias y cancelaciones.</p>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-light" onClick={() => openLegalModal('terms')}>
+                    Consultar
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.15rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                  <div>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-title)' }}>Cómo cuidamos tu privacidad (Ley 25.326)</strong>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>Tratamiento seguro de datos personales y derechos ARCO.</p>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-light" onClick={() => openLegalModal('privacy')}>
+                    Consultar
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.15rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                  <div>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-title)' }}>Preferencias de Cookies</strong>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>Controlá cookies de análisis y personalización en este dispositivo.</p>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => openLegalModal('cookies')}>
+                    Configurar
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1718,6 +1760,24 @@ const Profile: React.FC = () => {
         >
           <LogOut size={14} /> Cerrar sesión
         </button>
+      </div>
+
+      {/* Barra de enlaces legales y cookies en el perfil (estilo institucional) */}
+      <div className="profile-legal-footer">
+        <div className="profile-legal-links">
+          <button type="button" onClick={() => openLegalModal('terms')}>Términos y condiciones</button>
+          <span className="profile-legal-sep">·</span>
+          <button type="button" onClick={() => openLegalModal('privacy')}>Cómo cuidamos tu privacidad</button>
+          <span className="profile-legal-sep">·</span>
+          <button type="button" onClick={() => openLegalModal('cookies')}>Configurar cookies</button>
+          <span className="profile-legal-sep">·</span>
+          <button type="button" onClick={() => openLegalModal('consumer')}>Defensa del Consumidor</button>
+          <span className="profile-legal-sep">·</span>
+          <button type="button" onClick={() => openLegalModal('accessibility')}>Accesibilidad</button>
+        </div>
+        <p className="profile-legal-copy">
+          Turnos Ya v2.1 · Plataforma segura y transparente conforme a la Ley 25.326 de Protección de Datos Personales.
+        </p>
       </div>
     </div>
     );

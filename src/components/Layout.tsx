@@ -3,6 +3,9 @@ import { Outlet, Link, useNavigate, useLocation, useSearchParams } from 'react-r
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Search, X, Home, Calendar, Building2, User, AlertTriangle } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { Footer } from './Footer';
+import { CookieBanner } from './CookieBanner';
+import { LegalModals } from './LegalModals';
 
 
 export const Layout: React.FC = () => {
@@ -204,6 +207,15 @@ export const Layout: React.FC = () => {
       <main className="container page-main">
         <Outlet />
       </main>
+
+      {/* Pie de página institucional estilo Mercado Libre */}
+      <Footer />
+
+      {/* Cartel flotante de cookies */}
+      <CookieBanner />
+
+      {/* Modales legales (Términos, Privacidad, Cookies) */}
+      <LegalModals />
 
       {/* Barra de Navegación Inferior Fija para Móviles (Estilo App Nativa) */}
       <nav className="bottom-nav-mobile" aria-label="Navegación móvil inferior">
