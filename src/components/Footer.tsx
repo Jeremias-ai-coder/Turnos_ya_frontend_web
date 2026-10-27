@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Shield, Sparkles, HelpCircle, Store } from 'lucide-react';
 import { openLegalModal } from '../services/legalModalService';
+import { openBugReportModal } from '../services/bugReportService';
 
 export const Footer: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -69,6 +70,7 @@ export const Footer: React.FC = () => {
                 <li><a href="#/" onClick={(e) => { e.preventDefault(); openLegalModal('consumer'); }}>Defensa del Consumidor</a></li>
                 <li><a href="mailto:soporte@turnosya.com">Atención al cliente: soporte@turnosya.com</a></li>
                 <li><a href="#/" onClick={(e) => { e.preventDefault(); openLegalModal('terms'); }}>Política de cancelaciones</a></li>
+                <li><a href="#/" onClick={(e) => { e.preventDefault(); openBugReportModal(); }}>Reportar un error técnico</a></li>
                 <li><a href="#/" onClick={(e) => { e.preventDefault(); openLegalModal('consumer'); }}>Libro de quejas online</a></li>
               </ul>
             </div>
@@ -88,6 +90,7 @@ export const Footer: React.FC = () => {
           <button type="button" onClick={() => openLegalModal('consumer')}>Ayuda</button>
           <button type="button" onClick={() => openLegalModal('consumer')}>Defensa del Consumidor</button>
           <button type="button" onClick={() => openLegalModal('cookies')}>Configuración de cookies</button>
+          <button type="button" onClick={openBugReportModal} style={{ color: '#dc2626', fontWeight: 600 }}>Reportar un error</button>
           <button type="button" onClick={() => openLegalModal('consumer')}>Libro de quejas online</button>
         </nav>
 

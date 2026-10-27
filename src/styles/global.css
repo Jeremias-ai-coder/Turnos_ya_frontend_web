@@ -2246,6 +2246,55 @@ body {
   line-height: 1.5;
 }
 
+/* ====== BOTON FLOTANTE DE REPORTAR ERROR ====== */
+.floating-report-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1020;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+}
+
+.floating-report-btn:hover {
+  background: #1e293b;
+  color: #fca5a5;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28), 0 3px 8px rgba(220, 38, 38, 0.18);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.floating-report-btn:active {
+  transform: translateY(0);
+}
+
+.floating-report-btn svg {
+  color: #ef4444;
+  transition: transform 0.2s ease;
+}
+
+.floating-report-btn:hover svg {
+  transform: scale(1.12) rotate(-8deg);
+}
+
+.floating-report-text {
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
 /* ====== RESPONSIVE COOKIE BANNER & FOOTER ====== */
 @media (max-width: 920px) {
   .ml-footer-expanded-grid {
@@ -2255,6 +2304,20 @@ body {
 }
 
 @media (max-width: 768px) {
+  .floating-report-btn {
+    bottom: 74px !important;
+    right: 14px !important;
+    padding: 10px !important;
+    border-radius: 50% !important;
+    width: 44px !important;
+    height: 44px !important;
+    justify-content: center !important;
+  }
+
+  .floating-report-text {
+    display: none !important;
+  }
+
   .cookie-banner-bar {
     bottom: 60px !important;
     padding: 0.85rem 0.75rem calc(0.85rem + env(safe-area-inset-bottom, 0px)) !important;
@@ -2300,3 +2363,4 @@ body {
     font-size: 0.78rem;
   }
 }
+

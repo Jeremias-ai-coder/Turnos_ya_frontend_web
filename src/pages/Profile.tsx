@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { openLegalModal } from '../services/legalModalService';
+import { openBugReportModal } from '../services/bugReportService';
 
 // Íconos SVG ultra fieles a la interfaz de Mercado Libre / Fotos adjuntas
 const CredentialCardIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
@@ -1774,6 +1775,8 @@ const Profile: React.FC = () => {
           <button type="button" onClick={() => openLegalModal('consumer')}>Defensa del Consumidor</button>
           <span className="profile-legal-sep">·</span>
           <button type="button" onClick={() => openLegalModal('accessibility')}>Accesibilidad</button>
+          <span className="profile-legal-sep">·</span>
+          <button type="button" onClick={openBugReportModal} style={{ color: '#dc2626', fontWeight: 600 }}>Reportar un error</button>
         </div>
         <p className="profile-legal-copy">
           Turnos Ya v2.1 · Plataforma segura y transparente conforme a la Ley 25.326 de Protección de Datos Personales.
