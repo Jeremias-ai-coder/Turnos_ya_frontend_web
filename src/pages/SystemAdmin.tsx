@@ -948,22 +948,27 @@ export const SystemAdmin: React.FC = () => {
                               )}
                             </td>
                             <td style={{ padding: '12px 14px' }}>
-                              <select
-                                className="form-control"
-                                value={u.role}
-                                onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: '0.82rem',
-                                  borderRadius: '8px',
-                                  borderColor: '#cbd5e1',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <option value="client">Cliente</option>
-                                <option value="owner">Dueño</option>
-                                <option value="administrator">Administrador</option>
-                              </select>
+                              {u.role === 'administrator' ? (
+                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <ShieldCheck size={14} color="#0284c7" /> Protegido
+                                </span>
+                              ) : (
+                                <select
+                                  className="form-control"
+                                  value={u.role}
+                                  onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '0.82rem',
+                                    borderRadius: '8px',
+                                    borderColor: '#cbd5e1',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <option value="client">Cliente</option>
+                                  <option value="owner">Dueño</option>
+                                </select>
+                              )}
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -1751,25 +1756,46 @@ export const SystemAdmin: React.FC = () => {
               </div>
             )}
 
-            {/* Asignación rápida de rol */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ fontSize: '0.84rem', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
-                Modificar rol del usuario:
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {['client', 'owner', 'administrator'].map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => handleRoleChange(inspectedUser.id, r)}
-                    className={`btn btn-sm ${inspectedUser.role === r ? 'btn-primary' : 'btn-light'}`}
-                    style={{ flex: 1, fontSize: '0.82rem' }}
+            {/* Asignación de rol: Sólo disponible en la pestaña 'Usuarios' y sólo entre Cliente y Dueño */}
+            {activeTab === 'users' && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
+                  Modificar rol del usuario:
+                </label>
+                {inspectedUser.role === 'administrator' ? (
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: '#475569',
+                      fontSize: '0.82rem',
+                    }}
                   >
-                    {inspectedUser.role === r && <Check size={13} />} {ROLE_LABELS[r]?.label}
-                  </button>
-                ))}
+                    <ShieldCheck size={16} color="#0284c7" />
+                    <span>Rol de Administrador protegido por seguridad del sistema (no modificable).</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {(['client', 'owner'] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => handleRoleChange(inspectedUser.id, r)}
+                        className={`btn btn-sm ${inspectedUser.role === r ? 'btn-primary' : 'btn-light'}`}
+                        style={{ flex: 1, fontSize: '0.82rem' }}
+                      >
+                        {inspectedUser.role === r && <Check size={13} />} {ROLE_LABELS[r]?.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             <div className="modal-footer-responsive" style={{ margin: 0 }}>
               <button type="button" className="btn btn-light" onClick={() => setInspectedUser(null)}>
