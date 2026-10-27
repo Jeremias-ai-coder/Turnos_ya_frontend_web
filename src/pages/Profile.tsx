@@ -26,7 +26,8 @@ import {
   ScanFace,
   QrCode,
   Info,
-  MonitorSmartphone
+  MonitorSmartphone,
+  ArrowLeft
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -690,12 +691,23 @@ const Profile: React.FC = () => {
     // FOTO 1: MENÚ PRINCIPAL DE SEGURIDAD
     if (securitySub === 'menu') {
       pageContent = (
-        <div style={{ maxWidth: '820px', margin: '0 auto', padding: '1rem 0.5rem 3rem' }}>
-          {/* Breadcrumb idéntico a Mercado Libre */}
-          <div className="profile-breadcrumb">
-            <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
-            <span className="profile-breadcrumb-separator">&gt;</span>
-            <span className="profile-breadcrumb-current">Seguridad</span>
+        <div className="profile-subview-container">
+          {/* Barra de navegación ergonómica y retroceso táctil */}
+          <div className="profile-nav-header-wrap">
+            <button
+              type="button"
+              className="profile-back-btn"
+              onClick={() => setSearchParams({})}
+              aria-label="Volver a Mi perfil"
+            >
+              <ArrowLeft size={18} />
+              <span>Volver a Mi perfil</span>
+            </button>
+            <div className="profile-breadcrumb">
+              <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+              <span className="profile-breadcrumb-separator">&gt;</span>
+              <span className="profile-breadcrumb-current">Seguridad</span>
+            </div>
           </div>
 
           <h1 style={{ margin: '0 0 1.5rem', color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800 }}>
@@ -759,14 +771,25 @@ const Profile: React.FC = () => {
       );
     } else if (securitySub === 'methods') {
       pageContent = (
-        <div style={{ maxWidth: '820px', margin: '0 auto', padding: '1rem 0.5rem 3rem' }}>
-          {/* Breadcrumb idéntico a Mercado Libre (Foto 2) */}
-          <div className="profile-breadcrumb">
-            <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
-            <span className="profile-breadcrumb-separator">&gt;</span>
-            <button type="button" onClick={() => setSearchParams({ tab: 'security' })}>Seguridad</button>
-            <span className="profile-breadcrumb-separator">&gt;</span>
-            <span className="profile-breadcrumb-current">Métodos de verificación</span>
+        <div className="profile-subview-container">
+          {/* Barra de navegación ergonómica y retroceso táctil */}
+          <div className="profile-nav-header-wrap">
+            <button
+              type="button"
+              className="profile-back-btn"
+              onClick={() => setSearchParams({ tab: 'security' })}
+              aria-label="Volver a Seguridad"
+            >
+              <ArrowLeft size={18} />
+              <span>Volver a Seguridad</span>
+            </button>
+            <div className="profile-breadcrumb">
+              <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+              <span className="profile-breadcrumb-separator">&gt;</span>
+              <button type="button" onClick={() => setSearchParams({ tab: 'security' })}>Seguridad</button>
+              <span className="profile-breadcrumb-separator">&gt;</span>
+              <span className="profile-breadcrumb-current">Métodos de verificación</span>
+            </div>
           </div>
 
           <h1 style={{ margin: '0 0 1rem', color: 'var(--text-title)', fontSize: '1.45rem', fontWeight: 800 }}>
@@ -1018,14 +1041,25 @@ const Profile: React.FC = () => {
       );
     } else if (securitySub === 'devices') {
       pageContent = (
-        <div style={{ maxWidth: '820px', margin: '0 auto', padding: '1rem 0.5rem 3rem' }}>
-          {/* Breadcrumb idéntico a Mercado Libre */}
-          <div className="profile-breadcrumb">
-            <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
-            <span className="profile-breadcrumb-separator">&gt;</span>
-            <button type="button" onClick={() => setSearchParams({ tab: 'security' })}>Seguridad</button>
-            <span className="profile-breadcrumb-separator">&gt;</span>
-            <span className="profile-breadcrumb-current">Dispositivos vinculados</span>
+        <div className="profile-subview-container">
+          {/* Barra de navegación ergonómica y retroceso táctil */}
+          <div className="profile-nav-header-wrap">
+            <button
+              type="button"
+              className="profile-back-btn"
+              onClick={() => setSearchParams({ tab: 'security' })}
+              aria-label="Volver a Seguridad"
+            >
+              <ArrowLeft size={18} />
+              <span>Volver a Seguridad</span>
+            </button>
+            <div className="profile-breadcrumb">
+              <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+              <span className="profile-breadcrumb-separator">&gt;</span>
+              <button type="button" onClick={() => setSearchParams({ tab: 'security' })}>Seguridad</button>
+              <span className="profile-breadcrumb-separator">&gt;</span>
+              <span className="profile-breadcrumb-current">Dispositivos vinculados</span>
+            </div>
           </div>
 
           <h1 style={{ margin: '0 0 0.4rem', color: 'var(--text-title)', fontSize: '1.45rem', fontWeight: 800 }}>
@@ -1128,7 +1162,7 @@ const Profile: React.FC = () => {
             )}
           </div>
 
-          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="devices-actions-row">
             <button type="button" className="btn btn-light" onClick={handleLogout}>
               <LogOut size={15} /> Cerrar sesión en este equipo
             </button>
@@ -1161,12 +1195,23 @@ const Profile: React.FC = () => {
     };
 
     pageContent = (
-      <div style={{ maxWidth: '820px', margin: '0 auto', padding: '1rem 0.5rem 3rem' }}>
-        {/* Breadcrumb superior estilo Mercado Libre */}
-        <div className="profile-breadcrumb">
-          <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
-          <span className="profile-breadcrumb-separator">&gt;</span>
-          <span className="profile-breadcrumb-current">{titles[currentTab]?.title}</span>
+      <div className="profile-subview-container">
+        {/* Barra de navegación ergonómica y retroceso táctil */}
+        <div className="profile-nav-header-wrap">
+          <button
+            type="button"
+            className="profile-back-btn"
+            onClick={() => setSearchParams({})}
+            aria-label="Volver a Mi perfil"
+          >
+            <ArrowLeft size={18} />
+            <span>Volver a Mi perfil</span>
+          </button>
+          <div className="profile-breadcrumb">
+            <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+            <span className="profile-breadcrumb-separator">&gt;</span>
+            <span className="profile-breadcrumb-current">{titles[currentTab]?.title}</span>
+          </div>
         </div>
 
         {/* Tarjeta del formulario */}
@@ -1688,8 +1733,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '500px', width: '100%', padding: '2rem' }}
+            style={{ maxWidth: '500px', width: '100%' }}
           >
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1799,7 +1845,7 @@ const Profile: React.FC = () => {
                   </small>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+                <div className="modal-footer-responsive">
                   <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
                     Cancelar
                   </button>
@@ -1986,7 +2032,7 @@ const Profile: React.FC = () => {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+                <div className="modal-footer-responsive">
                   <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
                     Cancelar
                   </button>
@@ -2010,8 +2056,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px', width: '100%', padding: '1.75rem' }}
+            style={{ maxWidth: '440px', width: '100%' }}
           >
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2034,7 +2081,7 @@ const Profile: React.FC = () => {
               {infoModal.description}
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'space-between' }}>
               {infoModal.badge && (
                 <span className="badge badge-confirmed" style={{ fontSize: '0.75rem' }}>
                   {infoModal.badge}
@@ -2059,8 +2106,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px', width: '100%', padding: '1.75rem' }}
+            style={{ maxWidth: '440px', width: '100%' }}
           >
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2099,7 +2147,7 @@ const Profile: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <div className="modal-footer-responsive">
               <button
                 type="button"
                 className="btn btn-light"
@@ -2126,8 +2174,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '460px', width: '100%', padding: '1.75rem' }}
+            style={{ maxWidth: '460px', width: '100%' }}
           >
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2161,7 +2210,7 @@ const Profile: React.FC = () => {
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <div className="modal-footer-responsive">
               <button
                 type="button"
                 className="btn btn-primary"
@@ -2181,8 +2230,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px', width: '100%', padding: '2rem', textAlign: 'center' }}
+            style={{ maxWidth: '440px', width: '100%', textAlign: 'center' }}
           >
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
               <button
                 type="button"
@@ -2208,14 +2258,16 @@ const Profile: React.FC = () => {
               Esta función generará un código QR dinámico firmado para que el recepcionista del local comercial pueda escanear tu llegada y registrar tu asistencia en tiempo real.
             </p>
 
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '0.75rem' }}
-              onClick={() => setIsQrModalOpen(false)}
-            >
-              Entendido
-            </button>
+            <div className="modal-footer-responsive">
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '0.75rem' }}
+                onClick={() => setIsQrModalOpen(false)}
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2226,8 +2278,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '480px', width: '100%', padding: '1.85rem' }}
+            style={{ maxWidth: '480px', width: '100%' }}
           >
+            <div className="modal-drag-handle" />
             {/* Cabecera */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2311,7 +2364,7 @@ const Profile: React.FC = () => {
                       />
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <div className="modal-footer-responsive">
                       <button
                         type="button"
                         className="btn btn-light"
@@ -2358,7 +2411,7 @@ const Profile: React.FC = () => {
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="modal-footer-responsive" style={{ justifyContent: 'space-between' }}>
                   <button
                     type="button"
                     className="btn btn-light"
@@ -2396,7 +2449,7 @@ const Profile: React.FC = () => {
                   />
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <div className="modal-footer-responsive">
                   <button
                     type="button"
                     className="btn btn-light"
@@ -2425,8 +2478,9 @@ const Profile: React.FC = () => {
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '480px', width: '100%', padding: '2rem' }}
+            style={{ maxWidth: '480px', width: '100%' }}
           >
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <AlertCircle size={22} />
@@ -2449,7 +2503,7 @@ const Profile: React.FC = () => {
               Si tenés dudas o necesitás asistencia previa, contactanos en <strong>soporte@turnosya.com</strong>.
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="modal-footer-responsive">
               <button
                 type="button"
                 className="btn btn-light"
