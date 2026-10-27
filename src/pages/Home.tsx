@@ -4,6 +4,7 @@ import api from '../services/api';
 import { Building2, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
+import { DefaultBusinessCover } from '../components/common/DefaultBusinessCover';
 import {
   type Coordinates,
   formatDistance,
@@ -414,19 +415,8 @@ const Home: React.FC = () => {
                 {paginated.map(business => (
                   <Link to={`/businesses/${business.id}`} key={business.id} style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
                     <div className="ml-card ml-card-hoverable" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-                      {/* Imagen / Avatar */}
-                      <div style={{ height: '120px', background: 'linear-gradient(180deg, #f8fbfd, #ffffff)', borderBottom: '1px solid #f1f5f9', borderTopLeftRadius: '13px', borderTopRightRadius: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{
-                          width: '64px', height: '64px', borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #e6f5fc, #ffffff)',
-                          color: 'var(--primary-color)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 800, fontSize: '1.25rem',
-                          border: '1px solid #cce9f8', boxShadow: '0 4px 10px rgba(0, 158, 227, 0.05)'
-                        }}>
-                          {business.name?.charAt(0).toUpperCase() || '?'}
-                        </div>
-                      </div>
+                      {/* Fondo por defecto de negocio con patrón de turnos y avatar */}
+                      <DefaultBusinessCover name={business.name} size="card" />
 
                       <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <h3 style={{ color: 'var(--text-title)', fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>
