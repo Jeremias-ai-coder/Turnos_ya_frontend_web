@@ -77,6 +77,7 @@ interface ProfileData {
   emailVerified: boolean;
   emailNotifications: boolean;
   whatsappNotifications: boolean;
+  twoFactorEnabled: boolean;
 }
 
 interface SecurityForm {
@@ -115,6 +116,7 @@ const Profile: React.FC = () => {
     emailVerified: user?.emailVerified ?? false,
     emailNotifications: user?.emailNotifications ?? true,
     whatsappNotifications: user?.whatsappNotifications ?? false,
+    twoFactorEnabled: user?.twoFactorEnabled ?? false,
   });
 
   const [securityForm, setSecurityForm] = useState<SecurityForm>({
@@ -149,10 +151,101 @@ const Profile: React.FC = () => {
   const [phoneSaving, setPhoneSaving] = useState(false);
 
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-
-  const [isAuthenticatorModalOpen, setIsAuthenticatorModalOpen] = useState(false);
-
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+
+  // Estados y lógica para Doble Factor de Autenticación Real (Google Authenticator)
+  const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [twoFactorStep, setTwoFactorStep] = useState<'setup' | 'backup_codes' | 'disable_confirm'>('setup');
+  const [twoFactorQr, setTwoFactorQr] = useState<string>('');
+  const [twoFactorSecret, setTwoFactorSecret] = useState<string>('');
+  const [twoFactorCodeInput, setTwoFactorCodeInput] = useState<string>('');
+  const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState<string[]>([]);
+  const [twoFactorDisablePassword, setTwoFactorDisablePassword] = useState<string>('');
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [twoFactorCopied, setTwoFactorCopied] = useState(false);
+
+  const handleOpenTwoFactorModal = async () => {
+    setTwoFactorError(null);
+    setTwoFactorCodeInput('');
+    setTwoFactorDisablePassword('');
+    setTwoFactorCopied(false);
+
+    if (profileForm.twoFactorEnabled) {
+      setTwoFactorStep('disable_confirm');
+      setIsTwoFactorModalOpen(true);
+    } else {
+      setTwoFactorStep('setup');
+      setIsTwoFactorModalOpen(true);
+      setTwoFactorLoading(true);
+      try {
+        const res = await api.get('/auth/2fa/setup');
+        setTwoFactorQr(res.data.qrCode);
+        setTwoFactorSecret(res.data.secret);
+      } catch (err: any) {
+        setTwoFactorError(err.response?.data?.message || 'Error al iniciar la configuración de 2FA.');
+      } finally {
+        setTwoFactorLoading(false);
+      }
+    }
+  };
+
+  const handleVerifyAndEnableTwoFactor = async () => {
+    if (!twoFactorCodeInput || twoFactorCodeInput.length < 6) return;
+    setTwoFactorLoading(true);
+    setTwoFactorError(null);
+    try {
+      const res = await api.post('/auth/2fa/verify-and-enable', { code: twoFactorCodeInput });
+      setTwoFactorBackupCodes(res.data.backupCodes || []);
+      setTwoFactorStep('backup_codes');
+      setProfileForm((prev) => ({ ...prev, twoFactorEnabled: true }));
+      updateUser({ twoFactorEnabled: true });
+      setSecurityMessage({
+        type: 'success',
+        text: '¡Google Authenticator activado con éxito! Tu cuenta cuenta con doble factor de autenticación.',
+      });
+    } catch (err: any) {
+      setTwoFactorError(err.response?.data?.message || 'Código de verificación incorrecto.');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleDisableTwoFactor = async () => {
+    if (!twoFactorDisablePassword) return;
+    setTwoFactorLoading(true);
+    setTwoFactorError(null);
+    try {
+      await api.post('/auth/2fa/disable', { password: twoFactorDisablePassword });
+      setProfileForm((prev) => ({ ...prev, twoFactorEnabled: false }));
+      updateUser({ twoFactorEnabled: false });
+      setIsTwoFactorModalOpen(false);
+      setSecurityMessage({
+        type: 'success',
+        text: 'El doble factor de autenticación ha sido desactivado.',
+      });
+    } catch (err: any) {
+      setTwoFactorError(err.response?.data?.message || 'Contraseña incorrecta.');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleCopySecret = () => {
+    if (twoFactorSecret) {
+      navigator.clipboard.writeText(twoFactorSecret);
+      setTwoFactorCopied(true);
+      setTimeout(() => setTwoFactorCopied(false), 2000);
+    }
+  };
+
+  const handleCopyBackupCodes = () => {
+    if (twoFactorBackupCodes.length > 0) {
+      navigator.clipboard.writeText(twoFactorBackupCodes.join('\n'));
+      setTwoFactorCopied(true);
+      setTimeout(() => setTwoFactorCopied(false), 2000);
+    }
+  };
 
   const handleSavePhoneFromModal = async () => {
     setPhoneSaving(true);
@@ -212,6 +305,7 @@ const Profile: React.FC = () => {
         emailVerified: freshUser.emailVerified ?? false,
         emailNotifications: freshUser.emailNotifications ?? true,
         whatsappNotifications: freshUser.whatsappNotifications ?? false,
+        twoFactorEnabled: freshUser.twoFactorEnabled ?? false,
       });
 
       const storedToken = localStorage.getItem('token');
@@ -556,15 +650,17 @@ const Profile: React.FC = () => {
                 <div>
                   <h3 className="security-item-title">Métodos de verificación</h3>
                   <p className="security-item-desc">
-                    {profileForm.emailVerified
+                    {profileForm.twoFactorEnabled
+                      ? 'Nivel de seguridad alto: Contraseña y Doble Factor (2FA) configurados.'
+                      : profileForm.emailVerified
                       ? 'Nivel estándar: Contraseña y correo electrónico verificado.'
                       : 'Protección básica activa (Contraseña). Verificá tu e-mail para mayor seguridad.'}
                   </p>
                 </div>
               </div>
               <div className="security-item-right">
-                <span className={`security-badge-pill ${profileForm.emailVerified ? 'active' : 'unconfigured'}`}>
-                  {profileForm.emailVerified ? 'Estándar' : 'Básica'}
+                <span className={`security-badge-pill ${profileForm.twoFactorEnabled ? 'active' : profileForm.emailVerified ? 'active' : 'unconfigured'}`}>
+                  {profileForm.twoFactorEnabled ? '2FA Activo' : profileForm.emailVerified ? 'Estándar' : 'Básica'}
                 </span>
                 <ChevronRight size={18} color="#94a3b8" />
               </div>
@@ -611,13 +707,22 @@ const Profile: React.FC = () => {
           </h1>
 
           {/* Banner de estado dinámico y honesto */}
-          {profileForm.emailVerified ? (
+          {profileForm.twoFactorEnabled ? (
             <div className="security-banner-info">
               <span className="profile-check-badge" style={{ width: '18px', height: '18px', flexShrink: 0 }}>
                 <Check size={11} strokeWidth={3} />
               </span>
               <span>
-                <strong>Protección estándar activa:</strong> Tu cuenta cuenta con contraseña y correo electrónico verificado. Podés revisar los métodos adicionales planificados a continuación.
+                <strong>Nivel de seguridad alto:</strong> Tu cuenta está protegida con contraseña y Doble Factor de Autenticación (Google Authenticator) activo.
+              </span>
+            </div>
+          ) : profileForm.emailVerified ? (
+            <div className="security-banner-info">
+              <span className="profile-check-badge" style={{ width: '18px', height: '18px', flexShrink: 0 }}>
+                <Check size={11} strokeWidth={3} />
+              </span>
+              <span>
+                <strong>Protección estándar activa:</strong> Tu cuenta cuenta con contraseña y correo electrónico verificado. Activá el Doble Factor para mayor protección.
               </span>
             </div>
           ) : (
@@ -733,27 +838,35 @@ const Profile: React.FC = () => {
               </div>
             </button>
 
-            {/* 4. Google Authenticator (TOTP - Roadmap Fase 4) */}
+            {/* 4. Google Authenticator (TOTP 2FA Real) */}
             <button
               type="button"
-              className="security-list-item is-dimmed"
-              onClick={() => setIsAuthenticatorModalOpen(true)}
+              className={`security-list-item ${profileForm.twoFactorEnabled ? '' : 'is-dimmed'}`}
+              onClick={handleOpenTwoFactorModal}
             >
               <div className="security-item-left">
-                <div className="security-item-icon">
+                <div className="security-item-icon" style={{ color: profileForm.twoFactorEnabled ? '#009ee3' : undefined }}>
                   <GoogleAuthIcon size={22} />
                 </div>
                 <div>
                   <h3 className="security-item-title">Google Authenticator (2FA)</h3>
                   <p className="security-item-desc">
-                    Códigos temporales de 6 dígitos con apps como Google Authenticator o Authy
+                    {profileForm.twoFactorEnabled
+                      ? 'Doble factor activo · Requiere código de 6 dígitos en cada inicio de sesión'
+                      : 'Códigos temporales de 6 dígitos con apps como Google Authenticator o Authy'}
                   </p>
                 </div>
               </div>
               <div className="security-item-right">
-                <span className="security-badge-pill unconfigured">
-                  Sin configurar
-                </span>
+                {profileForm.twoFactorEnabled ? (
+                  <span className="security-badge-pill active">
+                    <Check size={11} strokeWidth={3} /> Activo
+                  </span>
+                ) : (
+                  <span className="security-badge-pill action">
+                    + Configurar
+                  </span>
+                )}
                 <ChevronRight size={18} color="#94a3b8" />
               </div>
             </button>
@@ -1965,14 +2078,15 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* Modal para Google Authenticator (Explicación técnica y paso honesto) */}
-      {isAuthenticatorModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsAuthenticatorModalOpen(false)}>
+      {/* Modal Real para Google Authenticator (2FA) */}
+      {isTwoFactorModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsTwoFactorModalOpen(false)}>
           <div
             className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '480px', width: '100%', padding: '1.75rem' }}
+            style={{ maxWidth: '480px', width: '100%', padding: '1.85rem' }}
           >
+            {/* Cabecera */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1982,47 +2096,183 @@ const Profile: React.FC = () => {
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
                     Google Authenticator (2FA)
                   </h3>
-                  <span className="security-badge-pill unconfigured" style={{ marginTop: '3px' }}>
-                    Fase 4 · En hoja de ruta
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {twoFactorStep === 'setup' && 'Paso 1: Vincular tu aplicación'}
+                    {twoFactorStep === 'backup_codes' && 'Paso 2: Códigos de respaldo'}
+                    {twoFactorStep === 'disable_confirm' && 'Desactivar doble factor'}
                   </span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsAuthenticatorModalOpen(false)}
+                onClick={() => setIsTwoFactorModalOpen(false)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5, margin: '0 0 1rem' }}>
-              El Doble Factor de Autenticación (2FA) con TOTP requiere infraestructura criptográfica real en el servidor para garantizar que no sea simulado:
-            </p>
+            {twoFactorError && (
+              <div className="alert-danger" style={{ marginBottom: '1.25rem' }}>
+                <AlertCircle size={16} /> {twoFactorError}
+              </div>
+            )}
 
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '1.25rem' }}>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.82rem', color: '#475569', lineHeight: 1.6 }}>
-                <li>Generar un secreto Base32 cifrado con AES-256 en la base de datos (Prisma).</li>
-                <li>Generar el código QR dinámico <code>otpauth://totp/...</code> para escanear con Google Authenticator o Authy.</li>
-                <li>Verificar matemáticamente el código de 6 dígitos con <code>otplib</code> antes de activar.</li>
-                <li>Modificar el flujo de Login para exigir el token antes de emitir el JWT definitivo.</li>
-              </ul>
-            </div>
+            {/* Paso 1: Configurar / Escanear QR */}
+            {twoFactorStep === 'setup' && (
+              <div>
+                {twoFactorLoading && !twoFactorQr ? (
+                  <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <p className="text-muted" style={{ fontSize: '0.9rem' }}>Generando clave criptográfica en el servidor...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5, margin: '0 0 1rem' }}>
+                      Escaneá este código QR con la app <strong>Google Authenticator</strong> o <strong>Authy</strong> en tu teléfono celular:
+                    </p>
 
-            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 1.25rem' }}>
-              💡 Podés pedirme iniciar la implementación de este módulo en el backend cuando desees.
-            </p>
+                    {twoFactorQr && (
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                        <div style={{ padding: '10px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                          <img src={twoFactorQr} alt="Código QR 2FA" style={{ width: '160px', height: '160px', display: 'block' }} />
+                        </div>
+                      </div>
+                    )}
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setIsAuthenticatorModalOpen(false)}
-                style={{ padding: '7px 18px' }}
-              >
-                Entendido
-              </button>
-            </div>
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div>
+                        <small className="text-muted" style={{ display: 'block', fontSize: '0.72rem' }}>O ingresá la clave manualmente:</small>
+                        <code style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0284c7', letterSpacing: '1px' }}>{twoFactorSecret}</code>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopySecret}
+                        className="btn btn-light"
+                        style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                      >
+                        {twoFactorCopied ? '¡Copiado!' : 'Copiar'}
+                      </button>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.84rem' }}>
+                        Ingresá el código de 6 dígitos que muestra tu app
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="123456"
+                        className="form-control"
+                        value={twoFactorCodeInput}
+                        onChange={(e) => setTwoFactorCodeInput(e.target.value.replace(/\D/g, ''))}
+                        style={{ textAlign: 'center', fontSize: '1.25rem', letterSpacing: '4px', fontWeight: 700 }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="btn btn-light"
+                        onClick={() => setIsTwoFactorModalOpen(false)}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={twoFactorCodeInput.length < 6 || twoFactorLoading}
+                        onClick={handleVerifyAndEnableTwoFactor}
+                      >
+                        {twoFactorLoading ? 'Verificando...' : 'Verificar y Activar'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Paso 2: Códigos de respaldo */}
+            {twoFactorStep === 'backup_codes' && (
+              <div>
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="profile-check-badge" style={{ width: '22px', height: '22px' }}>
+                    <Check size={12} strokeWidth={3} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', color: '#065f46', fontWeight: 700 }}>¡Doble factor activado!</h4>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#047857' }}>Tu cuenta ahora está protegida con verificación en dos pasos.</p>
+                  </div>
+                </div>
+
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.5, margin: '0 0 1rem' }}>
+                  <strong>Guardá estos códigos de respaldo en un lugar seguro.</strong> Si alguna vez perdés el acceso a tu teléfono o app autenticadora, podrás usar cualquiera de estos códigos para ingresar:
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '1.25rem' }}>
+                  {twoFactorBackupCodes.map((c, i) => (
+                    <div key={i} style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.9rem', color: '#1e293b', background: '#ffffff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-light"
+                    onClick={handleCopyBackupCodes}
+                    style={{ fontSize: '0.82rem' }}
+                  >
+                    {twoFactorCopied ? '¡Códigos copiados!' : 'Copiar todos los códigos'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setIsTwoFactorModalOpen(false)}
+                  >
+                    Listo, entendido
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Desactivar 2FA */}
+            {twoFactorStep === 'disable_confirm' && (
+              <div>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5, margin: '0 0 1.25rem' }}>
+                  Google Authenticator está actualmente <strong>activo</strong> en tu cuenta. Para desactivarlo, por favor ingresá tu contraseña actual por motivos de seguridad:
+                </p>
+
+                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.84rem' }}>Contraseña actual</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    placeholder="••••••••"
+                    value={twoFactorDisablePassword}
+                    onChange={(e) => setTwoFactorDisablePassword(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn btn-light"
+                    onClick={() => setIsTwoFactorModalOpen(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    disabled={!twoFactorDisablePassword || twoFactorLoading}
+                    onClick={handleDisableTwoFactor}
+                  >
+                    {twoFactorLoading ? 'Desactivando...' : 'Desactivar 2FA'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

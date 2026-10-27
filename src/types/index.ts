@@ -9,6 +9,7 @@ export interface User {
   emailVerified?: boolean;
   emailNotifications?: boolean;
   whatsappNotifications?: boolean;
+  twoFactorEnabled?: boolean;
   createdAt?: string | null;
   deletedAt?: string | null;
 }
