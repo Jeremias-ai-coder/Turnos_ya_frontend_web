@@ -292,6 +292,37 @@ const Profile: React.FC = () => {
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [securityMessage, setSecurityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Estados para Dispositivos Vinculados y Sesiones Activas
+  interface UserSessionItem {
+    id: string;
+    deviceName: string;
+    ipAddress?: string;
+    lastActiveAt: string;
+    createdAt: string;
+    isCurrent: boolean;
+  }
+  const [sessions, setSessions] = useState<UserSessionItem[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionActionLoading, setSessionActionLoading] = useState<string | null>(null);
+
+  const loadSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await api.get('/auth/sessions');
+      setSessions(res.data || []);
+    } catch (err) {
+      console.warn('Error al cargar sesiones activas:', err);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentTab === 'security' && securitySub === 'devices') {
+      loadSessions();
+    }
+  }, [currentTab, securitySub]);
+
   const refreshProfileFromServer = async () => {
     try {
       const res = await api.get('/users/me');
@@ -595,8 +626,44 @@ const Profile: React.FC = () => {
     navigate('/login');
   };
 
-  const handleLogoutAll = () => {
-    alert('Has cerrado todas las demás sesiones activas.');
+  const handleRevokeSession = async (sessionId: string) => {
+    if (!window.confirm('¿Deseas cerrar la sesión en este dispositivo de forma remota?')) return;
+    setSessionActionLoading(sessionId);
+    try {
+      await api.delete(`/auth/sessions/${sessionId}`);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setSecurityMessage({
+        type: 'success',
+        text: 'Sesión cerrada exitosamente.',
+      });
+    } catch (err: any) {
+      setSecurityMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo cerrar la sesión.',
+      });
+    } finally {
+      setSessionActionLoading(null);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    if (!window.confirm('¿Estás seguro de que deseas cerrar todas las demás sesiones excepto la actual?')) return;
+    setSessionActionLoading('all');
+    try {
+      await api.post('/auth/sessions/revoke-all');
+      setSessions((prev) => prev.filter((s) => s.isCurrent));
+      setSecurityMessage({
+        type: 'success',
+        text: 'Todas las demás sesiones fueron cerradas con éxito.',
+      });
+    } catch (err: any) {
+      setSecurityMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudieron cerrar las demás sesiones.',
+      });
+    } finally {
+      setSessionActionLoading(null);
+    }
   };
 
   const ROLE_LABELS: Record<string, string> = {
@@ -968,35 +1035,110 @@ const Profile: React.FC = () => {
             Gestioná los dispositivos donde iniciaste sesión con tu cuenta de Turnos Ya.
           </p>
 
-          <div className="security-list-card">
-            <div className="security-list-item" style={{ cursor: 'default' }}>
-              <div className="security-item-left">
-                <div className="security-item-icon">
-                  <Laptop size={24} color="#009ee3" strokeWidth={1.8} />
-                </div>
-                <div>
-                  <h3 className="security-item-title">
-                    {navigator.userAgent.includes('Chrome') ? 'Google Chrome en Windows' : 'Navegador Web en Computadora'}
-                  </h3>
-                  <p className="security-item-desc">
-                    Sesión iniciada · Activa en este equipo
-                  </p>
-                </div>
-              </div>
-              <div className="security-item-right">
-                <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '0.74rem', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                  Este dispositivo
-                </span>
-              </div>
+          {securityMessage && (
+            <div className={securityMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1.25rem' }}>
+              {securityMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {securityMessage.text}
             </div>
+          )}
+
+          <div className="security-list-card">
+            {sessionsLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                Cargando dispositivos activos...
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="security-list-item" style={{ cursor: 'default' }}>
+                <div className="security-item-left">
+                  <div className="security-item-icon">
+                    <Laptop size={24} color="#009ee3" strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <h3 className="security-item-title">
+                      {navigator.userAgent.includes('Chrome') ? 'Google Chrome en Windows' : 'Navegador Web en Computadora'}
+                    </h3>
+                    <p className="security-item-desc">
+                      Sesión iniciada · Activa en este equipo
+                    </p>
+                  </div>
+                </div>
+                <div className="security-item-right">
+                  <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '0.74rem', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                    Este dispositivo
+                  </span>
+                </div>
+              </div>
+            ) : (
+              sessions.map((s) => {
+                const isMobile =
+                  s.deviceName.toLowerCase().includes('móvil') ||
+                  s.deviceName.toLowerCase().includes('android') ||
+                  s.deviceName.toLowerCase().includes('ios') ||
+                  s.deviceName.toLowerCase().includes('iphone');
+
+                const dateFormatted = new Date(s.lastActiveAt).toLocaleString('es-AR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+
+                return (
+                  <div key={s.id} className="security-list-item" style={{ cursor: 'default' }}>
+                    <div className="security-item-left">
+                      <div className="security-item-icon">
+                        {isMobile ? (
+                          <Smartphone size={24} color="#009ee3" strokeWidth={1.8} />
+                        ) : (
+                          <Laptop size={24} color="#009ee3" strokeWidth={1.8} />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="security-item-title">{s.deviceName}</h3>
+                        <p className="security-item-desc">
+                          {s.isCurrent ? (
+                            <span style={{ color: '#059669', fontWeight: 600 }}>Sesión activa en este equipo</span>
+                          ) : (
+                            `Última actividad: ${dateFormatted}`
+                          )}
+                          {s.ipAddress ? ` · IP: ${s.ipAddress}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="security-item-right">
+                      {s.isCurrent ? (
+                        <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '0.74rem', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                          Este dispositivo
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger"
+                          style={{ fontSize: '0.8rem', padding: '4px 10px', borderColor: '#fca5a5', color: '#dc2626' }}
+                          onClick={() => handleRevokeSession(s.id)}
+                          disabled={sessionActionLoading === s.id}
+                        >
+                          {sessionActionLoading === s.id ? 'Cerrando...' : 'Cerrar sesión'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button type="button" className="btn btn-light" onClick={handleLogout}>
               <LogOut size={15} /> Cerrar sesión en este equipo
             </button>
-            <button type="button" className="btn btn-outline-primary" onClick={handleLogoutAll}>
-              Cerrar todas las demás sesiones
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={handleLogoutAll}
+              disabled={sessions.filter((s) => !s.isCurrent).length === 0 || sessionActionLoading === 'all'}
+            >
+              {sessionActionLoading === 'all' ? 'Cerrando sesiones...' : 'Cerrar todas las demás sesiones'}
             </button>
           </div>
         </div>
