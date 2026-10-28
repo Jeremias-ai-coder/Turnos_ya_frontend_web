@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import api, { cachedGet } from '../services/api';
+import { cachedGet } from '../services/api';
 import { Building2, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';

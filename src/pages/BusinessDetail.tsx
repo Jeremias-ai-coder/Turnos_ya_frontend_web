@@ -89,7 +89,7 @@ const BusinessDetail: React.FC = () => {
       {/* Header del negocio con fondo de negocio por defecto */}
       <div className="ml-card" style={{ marginBottom: '2rem', overflow: 'hidden' }}>
         <DefaultBusinessCover size="banner" style={{ height: '130px' }} />
-        <div style={{ padding: '0 2rem 2rem', position: 'relative', zIndex: 2 }}>
+        <div style={{ padding: '0 clamp(1rem, 3.5vw, 2rem) 1.75rem', position: 'relative', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             <div style={{
               width: '84px', height: '84px', borderRadius: '18px',
@@ -184,7 +184,7 @@ const BusinessDetail: React.FC = () => {
       </div>
 
       {/* Sección Permanente de Opiniones y Reseñas (Coincide con el ancho de arriba) */}
-      <div className="ml-card" style={{ padding: '2rem', marginBottom: '3rem' }}>
+      <div className="ml-card" style={{ padding: 'clamp(1.2rem, 3.5vw, 2rem)', marginBottom: '3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h2 style={{ color: 'var(--text-title)', fontSize: '1.3rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
