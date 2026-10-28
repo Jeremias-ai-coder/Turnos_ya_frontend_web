@@ -210,8 +210,8 @@ export const Layout: React.FC = () => {
         <Outlet />
       </main>
 
-      {/* Pie de página institucional estilo Mercado Libre */}
-      <Footer />
+      {/* Pie de página institucional estilo Mercado Libre (solamente en inicio) */}
+      {location.pathname === '/' && <Footer />}
 
       {/* Cartel flotante de cookies */}
       <CookieBanner />

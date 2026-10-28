@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { openLegalModal } from '../services/legalModalService';
-import { openBugReportModal } from '../services/bugReportService';
 
 // Íconos SVG ultra fieles a la interfaz de Mercado Libre / Fotos adjuntas
 const CredentialCardIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
@@ -1761,26 +1760,6 @@ const Profile: React.FC = () => {
         >
           <LogOut size={14} /> Cerrar sesión
         </button>
-      </div>
-
-      {/* Barra de enlaces legales y cookies en el perfil (estilo institucional) */}
-      <div className="profile-legal-footer">
-        <div className="profile-legal-links">
-          <button type="button" onClick={() => openLegalModal('terms')}>Términos y condiciones</button>
-          <span className="profile-legal-sep">·</span>
-          <button type="button" onClick={() => openLegalModal('privacy')}>Cómo cuidamos tu privacidad</button>
-          <span className="profile-legal-sep">·</span>
-          <button type="button" onClick={() => openLegalModal('cookies')}>Configurar cookies</button>
-          <span className="profile-legal-sep">·</span>
-          <button type="button" onClick={() => openLegalModal('consumer')}>Defensa del Consumidor</button>
-          <span className="profile-legal-sep">·</span>
-          <button type="button" onClick={() => openLegalModal('accessibility')}>Accesibilidad</button>
-          <span className="profile-legal-sep">·</span>
-          <button type="button" onClick={openBugReportModal} style={{ color: '#dc2626', fontWeight: 600 }}>Reportar un error</button>
-        </div>
-        <p className="profile-legal-copy">
-          Turnos Ya v2.1 · Plataforma segura y transparente conforme a la Ley 25.326 de Protección de Datos Personales.
-        </p>
       </div>
     </div>
     );
