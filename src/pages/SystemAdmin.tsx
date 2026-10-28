@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import api, { clientCache } from '../services/api';
 import {
   Users,
   Building2,
@@ -18,6 +18,8 @@ import {
   AlertTriangle,
   Sparkles,
   Check,
+  Zap,
+  Database,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -119,6 +121,34 @@ export const SystemAdmin: React.FC = () => {
   // Modal de confirmación para eliminar usuario
   const [userToDelete, setUserToDelete] = useState<{ id: number; name: string } | null>(null);
 
+  // Estados de Caché Inteligente
+  const [cacheStats, setCacheStats] = useState<{ hits: number; misses: number; totalKeys: number; hitRatio: string; engine: string } | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [showCacheModal, setShowCacheModal] = useState(false);
+
+  const loadCacheStats = async () => {
+    try {
+      const res = await api.get('/admin/cache/stats');
+      setCacheStats(res.data);
+    } catch {
+      // Endpoint admin only
+    }
+  };
+
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    try {
+      await api.post('/admin/cache/clear');
+      clientCache.clear();
+      showToast('Caché purgada exitosamente en servidor y cliente');
+      await Promise.all([loadStatsAndReports(), loadCacheStats(), fetchTabData()]);
+    } catch {
+      showToast('Error al purgar la caché');
+    } finally {
+      setClearingCache(false);
+    }
+  };
+
   // Seguridad: Verificación de acceso
   useEffect(() => {
     if (user?.role !== 'administrator') {
@@ -137,6 +167,7 @@ export const SystemAdmin: React.FC = () => {
       if (reportsRes.counts) {
         setReportsCounts(reportsRes.counts);
       }
+      loadCacheStats();
     } catch (err) {
       console.error('Error al cargar estadísticas del administrador', err);
     }
@@ -364,6 +395,30 @@ export const SystemAdmin: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            className="btn btn-light"
+            onClick={() => {
+              loadCacheStats();
+              setShowCacheModal(true);
+            }}
+            style={{
+              fontSize: '0.84rem',
+              padding: '8px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              color: '#0284c7',
+              fontWeight: 600,
+            }}
+            title="Monitoreo de Caché Inteligente"
+          >
+            <Zap size={14} color="#0284c7" />
+            <span>Caché: {cacheStats ? cacheStats.hitRatio : 'Activa'}</span>
+          </button>
+
           <button
             type="button"
             className="btn btn-light"
@@ -2213,6 +2268,179 @@ export const SystemAdmin: React.FC = () => {
                 style={{ background: '#dc2626', borderColor: '#dc2626' }}
               >
                 Sí, eliminar usuario
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* MODAL 6: MONITOR Y GESTIÓN DE CACHÉ INTELIGENTE */}
+      {/* ======================================================================= */}
+      {showCacheModal && (
+        <div className="modal-overlay" onClick={() => setShowCacheModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Zap size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Caché Inteligente del Sistema
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                    Arquitectura Multi-Tier: Backend LRU + Cliente Web
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCacheModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px',
+                }}
+                title="Cerrar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem 0' }}>
+              {/* Grid de Métricas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Motor Activo
+                  </span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                    {cacheStats?.engine || 'in-memory (LRU + TTL)'}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Tasa de Acierto (Hit Ratio)
+                  </span>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#059669', marginTop: '4px' }}>
+                    {cacheStats?.hitRatio || '100%'}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Claves Backend
+                  </span>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                    {cacheStats?.totalKeys ?? 0} <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>activas</span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Aciertos / Fallos
+                  </span>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                    <span style={{ color: '#059669' }}>{cacheStats?.hits ?? 0} hits</span> /{' '}
+                    <span style={{ color: '#94a3b8' }}>{cacheStats?.misses ?? 0} misses</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info del Cliente Web */}
+              <div
+                style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  fontSize: '0.82rem',
+                  color: '#166534',
+                  lineHeight: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Sparkles size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Caché en Navegador:</strong> {clientCache.getStats().size} consultas en memoria local (0ms de latencia). Se invalidan automáticamente ante cualquier reserva o modificación.
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-footer-responsive">
+              <button
+                type="button"
+                className="btn btn-light"
+                onClick={() => setShowCacheModal(false)}
+                style={{ fontSize: '0.85rem' }}
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleClearCache}
+                disabled={clearingCache}
+                style={{
+                  background: '#ea580c',
+                  borderColor: '#ea580c',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Trash2 size={14} />
+                <span>{clearingCache ? 'Purgando...' : 'Purgar Toda la Caché'}</span>
               </button>
             </div>
           </div>

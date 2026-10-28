@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import api from '../services/api';
+import api, { cachedGet } from '../services/api';
 import { Building2, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
@@ -40,8 +40,8 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchBusinesses = async () => {
       try {
-        const res = await api.get('/businesses');
-        const raw = res.data?.data ?? res.data;
+        const resData = await cachedGet('/businesses', undefined, 120);
+        const raw = resData?.data ?? resData;
         const data = Array.isArray(raw) ? raw : [];
         setBusinesses(data);
         setFiltered(data);
@@ -55,8 +55,8 @@ const Home: React.FC = () => {
 
     const fetchCategories = async () => {
       try {
-        const res = await api.get('/categories');
-        const raw = res.data?.data ?? res.data;
+        const resData = await cachedGet('/categories', undefined, 600);
+        const raw = resData?.data ?? resData;
         if (Array.isArray(raw) && raw.length > 0) {
           setCategories(['Todos', ...raw.map((c: any) => c.name)]);
         }
