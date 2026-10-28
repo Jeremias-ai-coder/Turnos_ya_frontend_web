@@ -62,5 +62,46 @@ api.interceptors.response.use(
   }
 );
 
+import { clientCache } from './apiCache';
+
+// Segundo interceptor: Invalidación automática de caché ante operaciones de escritura
+api.interceptors.response.use(
+  (response) => {
+    const method = response.config?.method?.toLowerCase();
+    if (method && ['post', 'put', 'patch', 'delete'].includes(method)) {
+      clientCache.handleMutation(response.config?.url);
+    }
+    return response;
+  },
+  (error) => Promise.reject(error)
+);
+
+/**
+ * Petición GET inteligente con caché en memoria.
+ * Retorna datos en 0ms si existen en memoria y están vigentes.
+ */
+export const cachedGet = async <T = any>(
+  url: string,
+  config?: any,
+  ttlSeconds: number = 60
+): Promise<T> => {
+  const isNoCache = config?.headers?.['Cache-Control']?.includes('no-cache');
+  const cacheKey = `${url}?${JSON.stringify(config?.params || {})}`;
+
+  if (!isNoCache) {
+    const cachedData = clientCache.get<T>(cacheKey);
+    if (cachedData !== null) {
+      return cachedData;
+    }
+  }
+
+  const response = await api.get<T>(url, config);
+  if (!isNoCache && response.data) {
+    clientCache.set(cacheKey, response.data, ttlSeconds);
+  }
+  return response.data;
+};
+
+export { clientCache };
 export default api;
 

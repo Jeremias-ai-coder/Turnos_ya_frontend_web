@@ -524,6 +524,28 @@ body {
   flex-direction: column;
 }
 
+@media (max-width: 840px) {
+  .wizard-card {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    border-radius: 14px;
+  }
+  .wizard-sidebar {
+    padding: 1.25rem 1.15rem;
+    gap: 1rem;
+  }
+  .wizard-content {
+    padding: 1.25rem 1rem;
+  }
+  .services-wizard-grid {
+    grid-template-columns: 1fr !important;
+    max-height: 380px;
+  }
+  .receipt-container {
+    padding: 16px;
+  }
+}
+
 .step-indicator-item {
   display: flex;
   align-items: center;
