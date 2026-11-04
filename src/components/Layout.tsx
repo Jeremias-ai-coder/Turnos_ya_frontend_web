@@ -8,6 +8,7 @@ import { CookieBanner } from './CookieBanner';
 import { LegalModals } from './LegalModals';
 import { BugReportModal } from './BugReportModal';
 import { FloatingReportButton } from './FloatingReportButton';
+import { BrandLogo } from './common/BrandLogo';
 
 
 export const Layout: React.FC = () => {
@@ -78,11 +79,7 @@ export const Layout: React.FC = () => {
         <div className="container">
           <div className="navbar-inner">
             <Link to="/" className="navbar-brand" title="Turnos Ya - Inicio">
-              <img
-                src="/assets/brand/logo-white.png"
-                alt="Turnos Ya"
-                className="brand-logo-nav"
-              />
+              <BrandLogo variant="white" size="md" />
             </Link>
 
             <form className="search-group" onSubmit={handleSearchSubmit} role="search">

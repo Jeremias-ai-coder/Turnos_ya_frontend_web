@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { BrandLogo } from '../components/common/BrandLogo';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { UserPlus } from 'lucide-react';
@@ -44,11 +45,7 @@ const Register: React.FC = () => {
     <div style={{ maxWidth: '400px', margin: '4rem auto' }}>
       <div className="ml-card" style={{ padding: '2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-          <img
-            src="/assets/brand/logo-color.png"
-            alt="Turnos Ya"
-            style={{ height: '44px', objectFit: 'contain' }}
-          />
+          <BrandLogo variant="color" size="lg" />
         </div>
         <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--text-title)' }}>
           Crear Cuenta

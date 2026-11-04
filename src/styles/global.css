@@ -52,14 +52,31 @@ body {
 }
 
 .navbar-brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.625rem;
   text-decoration: none;
   color: white;
-  font-weight: 800;
-  font-size: 1.2rem;
   flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+.navbar-brand:hover {
+  opacity: 0.95;
+}
+
+.navbar-brand:hover .brand-logo-icon {
+  transform: translateY(-1px) scale(1.04);
+}
+
+.brand-logo-component {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.brand-logo-icon {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .brand-logo-nav {
@@ -1511,9 +1528,27 @@ body {
     padding: 0 1rem;
   }
 
+  .navbar-custom {
+    padding: 0.75rem 0 0.85rem 0;
+  }
+
   .navbar-inner {
     flex-wrap: wrap;
-    gap: 0.6rem;
+    gap: 0.75rem 0.6rem;
+    align-items: center;
+  }
+
+  .navbar-brand {
+    padding: 2px 0;
+  }
+
+  .brand-logo-component.brand-logo-md svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .brand-logo-component.brand-logo-md .brand-logo-text {
+    font-size: 1.18rem !important;
   }
 
   .navbar-actions {

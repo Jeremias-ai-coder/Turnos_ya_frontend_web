@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { BrandLogo } from '../components/common/BrandLogo';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 const Login: React.FC = () => {
@@ -67,11 +68,7 @@ const Login: React.FC = () => {
       <div style={{ width: '100%', maxWidth: '440px' }}>
         <div className="ml-card" style={{ padding: '2.5rem' }}>
           <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-            <img
-              src="/assets/brand/logo-color.png"
-              alt="Turnos Ya"
-              style={{ height: '48px', objectFit: 'contain' }}
-            />
+            <BrandLogo variant="color" size="lg" />
           </div>
           <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.25rem' }}>Iniciar sesión</h2>
           <p className="text-muted text-sm" style={{ marginBottom: '1.75rem' }}>
