@@ -2,20 +2,16 @@ import React from 'react';
 
 export interface BrandLogoProps {
   /**
-   * 'white': 100% pure crisp white for primary blue/dark headers (#009ee3).
-   * 'color': Dark slate (#0f172a) for Turnos/Calendar and vibrant cyan (#009ee3) for Ya/Arrow on white/light backgrounds.
+   * 'white': For primary blue / dark headers (e.g. navbar #009ee3).
+   * 'color': For light surfaces (Login, Register, Dashboard cards).
    */
   variant?: 'white' | 'color';
   /**
-   * 'sm': 28px icon, 1.15rem text (compact headers)
-   * 'md': 34px icon, 1.35rem text (standard navbar)
-   * 'lg': 44px icon, 1.7rem text (login/auth screens)
+   * 'sm': Compact for small headers (fontSize ~20px)
+   * 'md': Standard navbar (fontSize ~26px)
+   * 'lg': Hero / auth screens (fontSize ~38px)
    */
   size?: 'sm' | 'md' | 'lg';
-  /**
-   * Whether to display the text 'Turnos Ya' alongside the isotype icon.
-   */
-  showText?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -23,29 +19,29 @@ export interface BrandLogoProps {
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   variant = 'white',
   size = 'md',
-  showText = true,
   className = '',
   style,
 }) => {
   const isWhite = variant === 'white';
-  const mainStroke = isWhite ? '#ffffff' : '#0f172a';
-  const accentColor = isWhite ? '#ffffff' : '#009ee3';
-  const gridColor = isWhite ? 'rgba(255, 255, 255, 0.65)' : 'rgba(15, 23, 42, 0.2)';
-  const bodyFill = isWhite ? 'rgba(255, 255, 255, 0.12)' : '#ffffff';
 
-  const iconSizes = {
-    sm: 28,
-    md: 34,
-    lg: 44,
-  };
+  // Palette
+  const textTurnosColor = isWhite ? '#ffffff' : '#0f172a';
+  const badgeBg = isWhite ? '#ffffff' : '#009ee3';
+  const badgeTextColor = isWhite ? '#009ee3' : '#ffffff';
 
+  // Font and sizing scaling
   const fontSizes = {
-    sm: '1.15rem',
-    md: '1.35rem',
-    lg: '1.7rem',
+    sm: 20,
+    md: 27,
+    lg: 38,
   };
 
-  const iconDim = iconSizes[size];
+  const fs = fontSizes[size];
+  const badgeFs = Math.round(fs * 0.82);
+  const badgePaddingY = Math.round(fs * 0.14);
+  const badgePaddingX = Math.round(fs * 0.36);
+  const badgeRadius = Math.round(fs * 0.28);
+  const checkSize = Math.round(badgeFs * 0.72);
 
   return (
     <span
@@ -53,101 +49,76 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: size === 'sm' ? '7px' : size === 'lg' ? '12px' : '9px',
+        gap: size === 'sm' ? '6px' : size === 'lg' ? '10px' : '8px',
         userSelect: 'none',
         textDecoration: 'none',
         lineHeight: 1,
+        fontFamily: "var(--font-family-base, 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif)",
         ...style,
       }}
     >
-      {/* Dynamic Vector Isotype */}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 100 100"
-        width={iconDim}
-        height={iconDim}
-        fill="none"
-        className="brand-logo-icon"
-        style={{ flexShrink: 0, display: 'block' }}
-        aria-hidden="true"
+      {/* "Turnos" */}
+      <span
+        className="brand-logo-main"
+        style={{
+          fontSize: `${fs}px`,
+          fontWeight: 800,
+          letterSpacing: '-0.7px',
+          color: textTurnosColor,
+          lineHeight: 1,
+          display: 'inline-block',
+        }}
       >
-        {/* Calendar Hanger Loops */}
-        <rect x="27" y="6" width="9" height="18" rx="4.5" fill={mainStroke} />
-        <rect x="64" y="6" width="9" height="18" rx="4.5" fill={mainStroke} />
+        Turnos
+      </span>
 
-        {/* Calendar Main Outer Shell */}
-        <rect
-          x="13"
-          y="16"
-          width="74"
-          height="72"
-          rx="16"
-          fill={bodyFill}
-          stroke={mainStroke}
-          strokeWidth="6"
-          strokeLinejoin="round"
-        />
-
-        {/* Header Bar Divider */}
-        <line x1="16" y1="35" x2="84" y2="35" stroke={mainStroke} strokeWidth="5" strokeLinecap="round" />
-
-        {/* Calendar Grid (Subtle, balanced) */}
-        <line x1="37" y1="46" x2="37" y2="76" stroke={gridColor} strokeWidth="3" strokeLinecap="round" />
-        <line x1="63" y1="46" x2="63" y2="76" stroke={gridColor} strokeWidth="3" strokeLinecap="round" />
-        <line x1="23" y1="53" x2="77" y2="53" stroke={gridColor} strokeWidth="3" strokeLinecap="round" />
-        <line x1="23" y1="67" x2="52" y2="67" stroke={gridColor} strokeWidth="3" strokeLinecap="round" />
-
-        {/* Speed Trails on Bottom-Left */}
-        <path d="M5 74h10" stroke={accentColor} strokeWidth="3.5" strokeLinecap="round" />
-        <path d="M2 81h14" stroke={accentColor} strokeWidth="4" strokeLinecap="round" />
-        <path d="M6 88h10" stroke={accentColor} strokeWidth="3.5" strokeLinecap="round" />
-
-        {/* Dynamic Swoosh Body (smooth curve) */}
-        <path
-          d="M11 86C26 86 48 82 66 67C76 58 82 49 85 41"
-          stroke={accentColor}
-          strokeWidth="7"
-          strokeLinecap="round"
-        />
-
-        {/* Dynamic Arrowhead */}
-        <path
-          d="M72 38L93 34L87 55L82 45Z"
-          fill={accentColor}
-          stroke={accentColor}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-      </svg>
-
-      {/* Typography: Turnos Ya in a single horizontal line */}
-      {showText && (
+      {/* Speed-Badge "Ya ✓" */}
+      <span
+        className="brand-speed-badge"
+        style={{
+          background: badgeBg,
+          color: badgeTextColor,
+          fontSize: `${badgeFs}px`,
+          fontWeight: 900,
+          letterSpacing: '-0.2px',
+          padding: `${badgePaddingY}px ${badgePaddingX}px`,
+          borderRadius: `${badgeRadius}px`,
+          display: 'inline-flex',
+          alignItems: 'center',
+          transform: 'skewX(-10deg)',
+          boxShadow: isWhite
+            ? '0 2px 8px rgba(0, 0, 0, 0.12)'
+            : '0 3px 10px rgba(0, 158, 227, 0.25)',
+          transition: 'all 0.2s ease',
+          lineHeight: 1,
+        }}
+      >
         <span
-          className="brand-logo-text"
           style={{
-            fontFamily: "var(--font-family-base, 'Plus Jakarta Sans', sans-serif)",
-            fontSize: fontSizes[size],
-            fontWeight: 800,
-            letterSpacing: '-0.5px',
-            lineHeight: 1,
-            color: isWhite ? '#ffffff' : '#0f172a',
-            whiteSpace: 'nowrap',
+            transform: 'skewX(10deg)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
           }}
         >
-          Turnos
-          <span
-            className="brand-logo-accent"
-            style={{
-              fontWeight: 900,
-              color: isWhite ? '#ffffff' : '#009ee3',
-              marginLeft: '2px',
-            }}
+          Ya
+          {/* Crisp Checkmark */}
+          <svg
+            viewBox="0 0 24 24"
+            width={checkSize}
+            height={checkSize}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ display: 'block', marginLeft: '1px' }}
+            aria-hidden="true"
           >
-            Ya
-          </span>
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
         </span>
-      )}
+      </span>
     </span>
   );
 };
-

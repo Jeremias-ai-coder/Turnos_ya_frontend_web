@@ -62,21 +62,23 @@ body {
 }
 
 .navbar-brand:hover {
-  opacity: 0.95;
+  opacity: 0.96;
 }
 
-.navbar-brand:hover .brand-logo-icon {
-  transform: translateY(-1px) scale(1.04);
+.navbar-brand:hover .brand-speed-badge {
+  transform: skewX(-10deg) translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
 .brand-logo-component {
   display: inline-flex;
   align-items: center;
   line-height: 1;
+  transition: transform 0.2s ease;
 }
 
-.brand-logo-icon {
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+.brand-speed-badge {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
 }
 
 .brand-logo-nav {
@@ -1542,13 +1544,13 @@ body {
     padding: 2px 0;
   }
 
-  .brand-logo-component.brand-logo-md svg {
-    width: 30px;
-    height: 30px;
+  .brand-logo-component.brand-logo-md .brand-logo-main {
+    font-size: 1.25rem !important;
   }
 
-  .brand-logo-component.brand-logo-md .brand-logo-text {
-    font-size: 1.18rem !important;
+  .brand-logo-component.brand-logo-md .brand-speed-badge {
+    font-size: 1.05rem !important;
+    padding: 3px 8px !important;
   }
 
   .navbar-actions {
