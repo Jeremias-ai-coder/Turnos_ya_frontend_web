@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
   CalendarDays,
@@ -19,7 +19,8 @@ import {
   X,
   ExternalLink,
   MapPin,
-  Phone
+  Phone,
+  AlertTriangle
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -45,6 +46,7 @@ const formatTime = (timeStr: string) => {
 };
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBiz, setSelectedBiz] = useState<Business | null>(null);
   const [activeTab, setActiveTab] = useState<'agenda' | 'services' | 'schedules' | 'reviews' | 'settings'>('agenda');
@@ -80,7 +82,6 @@ const Dashboard: React.FC = () => {
 
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState('');
-  const [noBusinessForm, setNoBusinessForm] = useState({ name: '', description: '', address: '' });
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -197,18 +198,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleCreateBusiness = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await api.post('/businesses', noBusinessForm);
-      setBusinesses([res.data]);
-      setSelectedBiz(res.data);
-      showToast('¡Negocio creado con éxito!');
-    } catch {
-      showToast('Error al crear negocio.');
-    } finally { setSubmitting(false); }
-  };
 
   const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,38 +318,97 @@ const Dashboard: React.FC = () => {
           <div className="skeleton-box" style={{ height: '360px', borderRadius: '12px' }} />
         </div>
       ) : businesses.length === 0 ? (
-        <div className="ml-card dashboard-card-responsive" style={{ padding: '3rem', textAlign: 'center' }}>
-          <Building2 size={56} color="var(--primary-color)" style={{ marginBottom: '1rem' }} />
-          <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.5rem' }}>¡Bienvenido a Turnos Ya!</h2>
-          <p className="text-muted" style={{ marginBottom: '2rem', maxWidth: '460px', margin: '0 auto 2rem' }}>
-            Para comenzar a administrar tus citas, primero debes registrar tu negocio.
+        <div className="ml-card dashboard-card-responsive" style={{ padding: '3.5rem 2rem', textAlign: 'center', maxWidth: '640px', margin: '2rem auto' }}>
+          <div style={{ width: '72px', height: '72px', borderRadius: '20px', background: '#e0f2fe', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+            <Building2 size={38} />
+          </div>
+          <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.75rem', fontSize: '1.65rem' }}>
+            ¡Llevá tu negocio al siguiente nivel!
+          </h2>
+          <p className="text-muted" style={{ marginBottom: '2rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
+            Sumá tu comercio a Turnos Ya para que tus clientes descubran tus servicios, consulten tus horarios y reserven turnos online en segundos con verificación profesional.
           </p>
-          <form onSubmit={handleCreateBusiness} style={{ maxWidth: '420px', margin: '0 auto', textAlign: 'left' }}>
-            <div className="form-group">
-              <label className="form-label">Nombre del negocio *</label>
-              <input className="form-control" placeholder="Ej. Barbería Central" value={noBusinessForm.name} onChange={e => setNoBusinessForm(f => ({ ...f, name: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Descripción</label>
-              <textarea className="form-control" rows={2} placeholder="Descripción breve..." value={noBusinessForm.description} onChange={e => setNoBusinessForm(f => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Dirección comercial</label>
-              <input className="form-control" placeholder="Av. de Mayo 1234, CABA" value={noBusinessForm.address} onChange={e => setNoBusinessForm(f => ({ ...f, address: e.target.value }))} />
-            </div>
-            <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? (
-                <LoadingSpinner size="sm" inline text="Guardando negocio..." color="white" />
-              ) : (
-                'Guardar negocio e iniciar'
-              )}
-            </button>
-          </form>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate('/register-business')}
+            style={{ padding: '12px 32px', fontSize: '1rem', fontWeight: 800, borderRadius: '10px' }}
+          >
+            Registrar mi Negocio Ahora →
+          </button>
         </div>
       ) : null}
 
       {selectedBiz && (
         <>
+          {/* Banner de Estado de Verificación */}
+          {selectedBiz.status === 'pending_approval' && (
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#dbeafe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Clock size={22} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h4 style={{ margin: 0, fontWeight: 800, color: '#1e3a8a', fontSize: '1.05rem' }}>
+                      Comercio en Proceso de Verificación
+                    </h4>
+                    <span className="badge badge-warning" style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
+                      ⏳ En Revisión por Administración
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#1e40af' }}>
+                    Tu solicitud está siendo auditada por el equipo de Turnos Ya. Mientras tanto, podés configurar tus servicios y horarios para que cuando sea aprobado esté listo de inmediato.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline-primary"
+                onClick={() => navigate('/register-business', { state: { business: selectedBiz } })}
+                style={{ fontSize: '0.84rem', padding: '8px 16px', fontWeight: 700 }}
+              >
+                Editar datos / Evidencias
+              </button>
+            </div>
+          )}
+
+          {selectedBiz.status === 'rejected' && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontWeight: 800, color: '#991b1b', fontSize: '1.05rem' }}>
+                        Solicitud de Negocio Observada
+                      </h4>
+                      <span className="badge badge-danger" style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
+                        ✕ Requiere Modificaciones
+                      </span>
+                    </div>
+                    <p style={{ margin: '6px 0', fontSize: '0.88rem', color: '#b91c1c' }}>
+                      <strong>Motivo de la observación:</strong> {selectedBiz.rejectionReason || 'Se requiere verificar la información del local o corregir las evidencias.'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#7f1d1d' }}>
+                      Podés modificar los datos solicitados y reenviar la solicitud para que un administrador la revise nuevamente.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => navigate('/register-business', { state: { business: selectedBiz } })}
+                  style={{ fontSize: '0.86rem', padding: '9px 18px', fontWeight: 800 }}
+                >
+                  Corregir y Reenviar Solicitud
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Hero Card del Negocio */}
           <div className="dashboard-hero-card">
             <div className="dashboard-hero-left">

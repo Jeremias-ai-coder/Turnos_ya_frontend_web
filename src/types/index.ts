@@ -23,11 +23,16 @@ export interface BusinessService {
   durationMinutes?: number;
 }
 
+export type BusinessStatus = 'pending_approval' | 'approved' | 'rejected' | 'suspended';
+
 export interface Business {
   id: number;
   name: string;
   address: string;
+  city?: string;
+  province?: string;
   phone: string;
+  email?: string;
   category: string;
   categoryId?: number;
   description?: string;
@@ -44,7 +49,22 @@ export interface Business {
     id: number;
     name: string;
     email: string;
+    phone?: string;
   };
+
+  // Evidencias de veracidad y redes sociales
+  instagramUrl?: string;
+  facebookUrl?: string;
+  websiteUrl?: string;
+  googleMapsUrl?: string;
+  cuit?: string;
+
+  // Estado y auditoría
+  status?: BusinessStatus;
+  rejectionReason?: string | null;
+  reviewedAt?: string | null;
+  reviewedById?: number | null;
+  createdAt?: string;
 }
 
 export interface Schedule {

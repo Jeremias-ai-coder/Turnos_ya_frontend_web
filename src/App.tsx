@@ -15,6 +15,7 @@ import MyAppointments from './pages/MyAppointments';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import SystemAdmin from './pages/SystemAdmin';
+import RegisterBusiness from './pages/RegisterBusiness';
 
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
   const { user, isLoading } = useAuth();
@@ -52,6 +53,9 @@ function App() {
               <ProtectedRoute><Profile /></ProtectedRoute>
             } />
 
+            <Route path="register-business" element={
+              <ProtectedRoute><RegisterBusiness /></ProtectedRoute>
+            } />
             <Route path="dashboard" element={
               <ProtectedRoute><Dashboard /></ProtectedRoute>
             } />
