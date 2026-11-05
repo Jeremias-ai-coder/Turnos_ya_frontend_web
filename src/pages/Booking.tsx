@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../services/api';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
+import api, { cachedGet, clientCache } from '../services/api';
 import { Clock, DollarSign, ChevronLeft, ChevronRight, Check, ArrowLeft, MapPin, AlertCircle } from 'lucide-react';
 import {
   format,
@@ -29,14 +30,54 @@ const Booking: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [business, setBusiness] = useState<Business | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const previewBiz: Business | null = location.state?.business || null;
+  const previewSvc: Service | null = location.state?.service || null;
+  const serviceIdParam = searchParams.get('serviceId');
+
+  // Recuperar servicios conocidos sincrónicamente de preview o cache
+  const cachedSvc = id ? clientCache.get<any>(`/businesses/${id}/services?{}`) : null;
+  const initialServices: Service[] = Array.isArray(cachedSvc)
+    ? cachedSvc
+    : (Array.isArray(cachedSvc?.data) ? cachedSvc.data : (previewBiz?.services || []));
+
+  // Determinar servicio y paso inicial de forma sincrónica en Frame 0
+  const initialService: Service | null = previewSvc
+    || (serviceIdParam ? initialServices.find(s => s.id === Number(serviceIdParam)) : null)
+    || null;
+
+  // Si ya se eligió el servicio, arrancar directo en Paso 2 (Calendario) para que el snapshot sea 100% exacto
+  const initialStep: Step = (initialService || serviceIdParam) ? 2 : 1;
+
+  // Recuperar horarios sincrónicamente de cache o state
+  const cachedSch = id ? clientCache.get<any>(`/businesses/${id}/schedules?{}`) : null;
+  const initialSchedules: Schedule[] = Array.isArray(cachedSch)
+    ? cachedSch
+    : (Array.isArray(cachedSch?.data) ? cachedSch.data : (location.state?.schedules || []));
+
+  const [business, setBusiness] = useState<Business | null>(previewBiz);
+  const [services, setServices] = useState<Service[]>(initialServices);
+  const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules);
+  const [loading, setLoading] = useState<boolean>(!previewBiz);
 
   // Wizard state
-  const [step, setStep] = useState<Step>(1);
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [step, setStepState] = useState<Step>(initialStep);
+  const [stepDir, setStepDir] = useState<'slide-in-right' | 'slide-in-left'>('slide-in-right');
+  const [selectedService, setSelectedService] = useState<Service | null>(initialService);
+
+  // Lock de animación interna en primer montaje para evitar doble deslizamiento
+  const isFirstMount = React.useRef(true);
+  useEffect(() => {
+    isFirstMount.current = false;
+  }, []);
+
+  const setStep = (newStep: Step | ((prev: Step) => Step)) => {
+    setStepState(prev => {
+      const next = typeof newStep === 'function' ? newStep(prev) : newStep;
+      setStepDir(next >= prev ? 'slide-in-right' : 'slide-in-left');
+      return next;
+    });
+  };
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -58,24 +99,39 @@ const Booking: React.FC = () => {
     const fetchData = async () => {
       try {
         const [bRes, sRes, schRes] = await Promise.all([
-          api.get(`/businesses/${id}`),
-          api.get(`/businesses/${id}/services`),
-          api.get(`/businesses/${id}/schedules`)
+          cachedGet(`/businesses/${id}`, undefined, 180),
+          cachedGet(`/businesses/${id}/services`, undefined, 180),
+          cachedGet(`/businesses/${id}/schedules`, undefined, 180)
         ]);
-        setBusiness(bRes.data);
 
-        const loadedServices: Service[] = sRes.data.data ?? sRes.data ?? [];
+        const bData = bRes?.data ?? bRes;
+        if (bData && typeof bData === 'object') {
+          setBusiness(bData);
+        }
+
+        const loadedServices: Service[] = Array.isArray(sRes)
+          ? sRes
+          : (Array.isArray(sRes?.data)
+            ? sRes.data
+            : (Array.isArray(bData?.services) ? bData.services : []));
         setServices(loadedServices);
 
-        const loadedSchedules: Schedule[] = schRes.data.data ?? schRes.data ?? [];
+        const loadedSchedules: Schedule[] = Array.isArray(schRes)
+          ? schRes
+          : (Array.isArray(schRes?.data) ? schRes.data : []);
         setSchedules(loadedSchedules);
 
-        // Si viene ?serviceId en la URL, preseleccionar y avanzar directo al paso 2
-        const serviceIdParam = searchParams.get('serviceId');
-        if (serviceIdParam) {
-          const match = loadedServices.find(s => s.id === Number(serviceIdParam));
-          if (match) {
-            setSelectedService(match);
+        // Solo si no fue preseleccionado sincrónicamente
+        if (!selectedService) {
+          const serviceIdParam = searchParams.get('serviceId');
+          if (serviceIdParam) {
+            const match = loadedServices.find(s => s.id === Number(serviceIdParam));
+            if (match) {
+              setSelectedService(match);
+              setStep(2);
+            }
+          } else if (previewSvc) {
+            setSelectedService(previewSvc);
             setStep(2);
           }
         }
@@ -300,6 +356,7 @@ const Booking: React.FC = () => {
         time: toISOTimeString(selectedTime),
         holdToken,
       });
+      window.dispatchEvent(new CustomEvent('notification-refresh'));
       navigate('/my-appointments');
     } catch (err: any) {
       setError(err.response?.data?.message || err.response?.data?.detail || 'Error al confirmar el turno.');
@@ -308,14 +365,24 @@ const Booking: React.FC = () => {
     }
   };
 
-  if (loading) return <SkeletonDetail />;
+  if (loading && !business) return <SkeletonDetail />;
   if (!business) return <div>Negocio no encontrado</div>;
 
   const businessInitials = business.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto' }}>
-      <button onClick={() => navigate(-1)} className="btn btn-light" style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}>
+      <button
+        onClick={() => {
+          if (window.history.length > 1) {
+            startSmoothNavigation(navigate, -1);
+          } else {
+            startSmoothNavigation(navigate, `/businesses/${id}`);
+          }
+        }}
+        className="btn btn-light"
+        style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}
+      >
         <ArrowLeft size={16} /> Volver
       </button>
 
@@ -374,6 +441,7 @@ const Booking: React.FC = () => {
 
         {/* Contenido del wizard */}
         <div className="wizard-content">
+          <div key={step} className={`wizard-step-container ${isFirstMount.current ? '' : stepDir}`}>
           {error && (
             <div className="alert-danger" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <AlertCircle size={16} />
@@ -588,6 +656,7 @@ const Booking: React.FC = () => {
               </button>
             </>
           )}
+          </div>
         </div>
       </div>
     </div>

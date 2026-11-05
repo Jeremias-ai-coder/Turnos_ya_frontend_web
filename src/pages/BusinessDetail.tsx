@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
+import { cachedGet, clientCache } from '../services/api';
 import {
   Clock,
   DollarSign,
@@ -35,25 +36,61 @@ const INITIAL_REVIEWS_COUNT = 3;
 const BusinessDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [business, setBusiness] = useState<Business | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
+  const location = useLocation();
+
+  const previewBusiness: Business | null = location.state?.business || null;
+  const cachedSvc = id ? clientCache.get<any>(`/businesses/${id}/services?{}`) : null;
+  const initialServices: Service[] = Array.isArray(cachedSvc)
+    ? cachedSvc
+    : (Array.isArray(cachedSvc?.data) ? cachedSvc.data : (previewBusiness?.services || []));
+
+  const cachedSch = id ? clientCache.get<any>(`/businesses/${id}/schedules?{}`) : null;
+  const initialSchedules = Array.isArray(cachedSch) ? cachedSch : (Array.isArray(cachedSch?.data) ? cachedSch.data : []);
+
+  const [business, setBusiness] = useState<Business | null>(previewBusiness);
+  const [services, setServices] = useState<Service[]>(initialServices);
+  const [schedules, setSchedules] = useState<any[]>(initialSchedules);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsStats, setReviewsStats] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
   const [visibleReviewsCount, setVisibleReviewsCount] = useState(INITIAL_REVIEWS_COUNT);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(!previewBusiness);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bRes, sRes, rRes] = await Promise.all([
-          api.get(`/businesses/${id}`),
-          api.get(`/businesses/${id}/services`),
-          api.get(`/businesses/${id}/reviews`)
+        const [bRes, sRes, rRes, schRes] = await Promise.all([
+          cachedGet(`/businesses/${id}`, undefined, 180),
+          cachedGet(`/businesses/${id}/services`, undefined, 180),
+          cachedGet(`/businesses/${id}/reviews`, undefined, 60),
+          cachedGet(`/businesses/${id}/schedules`, undefined, 180)
         ]);
-        setBusiness(bRes.data);
-        setServices(sRes.data.data ?? sRes.data ?? []);
-        setReviews(rRes.data.data ?? []);
-        setReviewsStats(rRes.data.stats ?? { average: 0, count: 0 });
+
+        const loadedSchedules = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
+        setSchedules(loadedSchedules);
+
+        const bData = bRes?.data ?? bRes;
+        if (bData && typeof bData === 'object') {
+          setBusiness(bData);
+        }
+
+        // Parsear servicios de forma robusta soportando array directo o envoltorio { data: [] }
+        const sList: Service[] = Array.isArray(sRes)
+          ? sRes
+          : (Array.isArray(sRes?.data)
+            ? sRes.data
+            : (Array.isArray(bData?.services) ? bData.services : []));
+        if (sList.length > 0 || !previewBusiness?.services?.length) {
+          setServices(sList);
+        }
+
+        // Parsear reviews de forma robusta
+        const rList: Review[] = Array.isArray(rRes)
+          ? rRes
+          : (Array.isArray(rRes?.data) ? rRes.data : []);
+        setReviews(rList);
+
+        const stats = rRes?.stats || (bData?.rating ? { average: Number(bData.rating), count: Number(bData.reviewCount || 0) } : { average: 0, count: 0 });
+        setReviewsStats(stats);
       } catch {
         /* ignore */
       } finally {
@@ -63,7 +100,7 @@ const BusinessDetail: React.FC = () => {
     if (id) fetchData();
   }, [id]);
 
-  if (loading) return <SkeletonDetail />;
+  if (loading && !business) return <SkeletonDetail />;
   if (!business) return <div>Negocio no encontrado.</div>;
 
 
@@ -82,7 +119,17 @@ const BusinessDetail: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      <button onClick={() => navigate(-1)} className="btn btn-light" style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}>
+      <button
+        onClick={() => {
+          if (window.history.length > 1) {
+            startSmoothNavigation(navigate, -1);
+          } else {
+            startSmoothNavigation(navigate, '/');
+          }
+        }}
+        className="btn btn-light"
+        style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}
+      >
         <ArrowLeft size={16} /> Volver al catálogo
       </button>
 
@@ -147,7 +194,13 @@ const BusinessDetail: React.FC = () => {
           Servicios Disponibles
         </h2>
 
-        {services.length === 0 ? (
+        {loading && services.length === 0 ? (
+          <div className="services-grid">
+            {[1, 2, 3].map(n => (
+              <div key={n} className="skeleton-box" style={{ height: '140px', borderRadius: '12px' }} />
+            ))}
+          </div>
+        ) : services.length === 0 ? (
           <div className="empty-state">
             <p className="text-muted">Este local aún no tiene servicios publicados.</p>
           </div>
@@ -173,7 +226,7 @@ const BusinessDetail: React.FC = () => {
 
                 <button
                   className="btn btn-primary btn-full"
-                  onClick={() => navigate(`/businesses/${id}/book?serviceId=${svc.id}`)}
+                  onClick={() => startSmoothNavigation(navigate, `/businesses/${id}/book?serviceId=${svc.id}`, { state: { business: { ...business, services }, service: svc, schedules } })}
                 >
                   <CalendarCheck size={17} /> Reservar Turno
                 </button>

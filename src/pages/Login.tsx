@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
@@ -22,6 +22,7 @@ const Login: React.FC = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +38,12 @@ const Login: React.FC = () => {
       }
       login(response.data.token, response.data.user);
       const role = response.data.user?.role;
-      navigate(role === 'owner' || role === 'administrator' ? '/' : '/');
+      const fromLocation = (location.state as any)?.from;
+      if (fromLocation) {
+        navigate(fromLocation.pathname + (fromLocation.search || ''), { state: fromLocation.state, replace: true });
+      } else {
+        navigate(role === 'owner' || role === 'administrator' ? '/' : '/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Correo electrónico o contraseña incorrectos.');
     } finally {

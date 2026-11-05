@@ -42,6 +42,7 @@ export const NotificationBell: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -57,19 +58,59 @@ export const NotificationBell: React.FC = () => {
     }
   };
 
-  // Carga inicial y polling periódico inteligente (solo cuando la pestaña está activa)
+  // Carga inicial, Server-Sent Events (SSE en tiempo real instantáneo) y sincronización local
   useEffect(() => {
     if (!user?.id) return;
+    const token = localStorage.getItem('token');
     fetchNotifications();
 
-    const interval = setInterval(() => {
-      // Solo consultar al servidor si la pestaña está visible
+    let eventSource: EventSource | null = null;
+    if (token) {
+      try {
+        // Conexión nativa de streaming SSE en tiempo real
+        eventSource = new EventSource(`/api/v1/notifications/stream?token=${encodeURIComponent(token)}`);
+
+        eventSource.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'NEW_NOTIFICATION') {
+              // Agregar al inicio y actualizar contador sin latencia
+              setNotifications(prev => [payload.notification, ...prev.filter(n => n.id !== payload.notification.id)]);
+              setUnreadCount(payload.unreadCount);
+            } else if (payload.type === 'UPDATE_UNREAD') {
+              setNotifications(prev => prev.map(n => n.id === payload.readId ? { ...n, isRead: true } : n));
+              setUnreadCount(payload.unreadCount);
+            } else if (payload.type === 'ALL_READ') {
+              setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+              setUnreadCount(0);
+            }
+          } catch {
+            // Ignorar pings de heartbeat
+          }
+        };
+
+        eventSource.onerror = () => {
+          // El navegador reintenta la conexión automáticamente
+        };
+      } catch (err) {
+        console.warn('[SSE] EventSource no disponible:', err);
+      }
+    }
+
+    // Escuchar eventos locales de mutaciones inmediatas en frontend
+    const handleLocalRefresh = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('notification-refresh', handleLocalRefresh);
+
+    // Polling de respaldo de seguridad inteligente (60s) solo si la pestaña está activa
+    const fallbackInterval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchNotifications();
       }
-    }, 30000);
+    }, 60000);
 
-    // Al volver a la pestaña de Turnos Ya, actualizar de inmediato
+    // Al volver a la pestaña de Turnos Ya, sincronizar estado
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         fetchNotifications();
@@ -79,16 +120,29 @@ export const NotificationBell: React.FC = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      clearInterval(interval);
+      if (eventSource) eventSource.close();
+      window.removeEventListener('notification-refresh', handleLocalRefresh);
+      clearInterval(fallbackInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user?.id]);
+
+  const handleCloseDropdown = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+    }, 340);
+  };
 
   // Cerrar al hacer clic afuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        if (isOpen && !isClosing) {
+          handleCloseDropdown();
+        }
       }
     };
 
@@ -98,12 +152,13 @@ export const NotificationBell: React.FC = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, isClosing]);
 
   const toggleDropdown = () => {
-    const nextState = !isOpen;
-    setIsOpen(nextState);
-    if (nextState) {
+    if (isOpen) {
+      handleCloseDropdown();
+    } else {
+      setIsOpen(true);
       fetchNotifications();
     }
   };
@@ -133,7 +188,7 @@ export const NotificationBell: React.FC = () => {
       }
     }
 
-    setIsOpen(false);
+    handleCloseDropdown();
 
     // Navegar al panel correspondiente según el rol
     if (user?.role === 'owner') {
@@ -183,21 +238,21 @@ export const NotificationBell: React.FC = () => {
   return (
     <div className="notification-bell-container" ref={dropdownRef}>
       <button
-        className={`notification-bell-btn ${isOpen ? 'active' : ''}`}
+        className={`notification-bell-btn ${isOpen ? 'active' : ''} ${unreadCount > 0 ? 'has-unread' : ''}`}
         onClick={toggleDropdown}
         title="Notificaciones"
         aria-label="Ver notificaciones"
       >
-        <Bell size={18} />
+        <Bell size={18} className="bell-icon" />
         {unreadCount > 0 && (
-          <span className="notification-badge">
+          <span className="notification-badge" key={unreadCount}>
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {isOpen && (
-        <div className="notification-dropdown">
+      {(isOpen || isClosing) && (
+        <div className={`notification-dropdown ${isClosing ? 'is-closing' : 'is-entering'}`}>
           <div className="notification-header">
             <div className="notification-title-group">
               <span className="notification-title">Notificaciones</span>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { cachedGet } from '../services/api';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
+import { cachedGet, clientCache } from '../services/api';
 import { Building2, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
@@ -20,10 +21,14 @@ const normalizeText = (text: string = '') =>
   text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const Home: React.FC = () => {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [filtered, setFiltered] = useState<Business[]>([]);
+  const navigate = useNavigate();
+  const cachedBizData = clientCache.get<any>('/businesses?{}');
+  const cachedList: Business[] = Array.isArray(cachedBizData?.data) ? cachedBizData.data : (Array.isArray(cachedBizData) ? cachedBizData : []);
+
+  const [businesses, setBusinesses] = useState<Business[]>(cachedList);
+  const [filtered, setFiltered] = useState<Business[]>(cachedList);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(cachedList.length === 0);
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') || '';
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -413,7 +418,18 @@ const Home: React.FC = () => {
             <>
               <div className="business-grid">
                 {paginated.map(business => (
-                  <Link to={`/businesses/${business.id}`} key={business.id} style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
+                  <Link
+                      to={`/businesses/${business.id}`}
+                      state={{ business }}
+                      onClick={(e) => {
+                        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+                          e.preventDefault();
+                          startSmoothNavigation(navigate, `/businesses/${business.id}`, { state: { business } });
+                        }
+                      }}
+                      key={business.id}
+                      style={{ textDecoration: 'none', display: 'block', width: '100%' }}
+                    >
                     <div className="ml-card ml-card-hoverable" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
                       {/* Fondo por defecto de negocio con patrón de turnos y avatar */}
                       <DefaultBusinessCover name={business.name} size="card" />
