@@ -243,7 +243,17 @@ const BusinessDetail: React.FC = () => {
       {schedules.length > 0 && (() => {
         const jsDay = new Date().getDay();
         const todayDayOfWeek = jsDay === 0 ? 7 : jsDay;
-        const todaySchedule = schedules.find((s: any) => s.dayOfWeek === todayDayOfWeek);
+        const todaySchedules = schedules
+          .filter((s: any) => s.dayOfWeek === todayDayOfWeek)
+          .sort((a: any, b: any) => (a.startTime > b.startTime ? 1 : -1));
+
+        const todayHoursSummary = todaySchedules
+          .map((s: any) => `${formatTimeToHHMM(s.startTime)} a ${formatTimeToHHMM(s.endTime)}`)
+          .reduce((acc: string, curr: string, i: number, arr: string[]) => {
+            if (i === 0) return curr;
+            if (i === arr.length - 1) return `${acc} y ${curr}`;
+            return `${acc}, ${curr}`;
+          }, '');
 
         return (
           <div className="ml-card" style={{ padding: 'clamp(1.2rem, 3.5vw, 1.75rem)', marginBottom: '2.5rem' }}>
@@ -272,10 +282,10 @@ const BusinessDetail: React.FC = () => {
                 </div>
               </div>
 
-              {todaySchedule ? (
+              {todaySchedules.length > 0 ? (
                 <span className="badge badge-confirmed" style={{ fontSize: '0.82rem', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                   <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                  Abierto hoy ({formatTimeToHHMM(todaySchedule.startTime)} a {formatTimeToHHMM(todaySchedule.endTime)} hs)
+                  Abierto hoy ({todayHoursSummary} hs)
                 </span>
               ) : (
                 <span className="badge badge-cancelled" style={{ fontSize: '0.82rem', padding: '5px 10px' }}>
@@ -293,7 +303,9 @@ const BusinessDetail: React.FC = () => {
               borderRadius: '12px'
             }}>
               {[1, 2, 3, 4, 5, 6, 7].map(d => {
-                const sch = schedules.find((s: any) => s.dayOfWeek === d);
+                const daySchedules = schedules
+                  .filter((s: any) => s.dayOfWeek === d)
+                  .sort((a: any, b: any) => (a.startTime > b.startTime ? 1 : -1));
                 const isTodayDay = d === todayDayOfWeek;
                 return (
                   <div
@@ -305,15 +317,28 @@ const BusinessDetail: React.FC = () => {
                       borderRadius: '8px',
                       padding: '8px 10px',
                       textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <div style={{ fontSize: '0.78rem', fontWeight: isTodayDay ? 800 : 600, color: isTodayDay ? 'var(--primary-text)' : 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: isTodayDay ? 800 : 600, color: isTodayDay ? 'var(--primary-text)' : 'var(--text-secondary)', marginBottom: '4px' }}>
                       {DAY_NAMES[d]} {isTodayDay && '•'}
                     </div>
-                    <div style={{ fontSize: '0.82rem', fontWeight: sch ? 700 : 500, color: sch ? 'var(--text-title)' : 'var(--text-disabled)' }}>
-                      {sch ? `${formatTimeToHHMM(sch.startTime)} - ${formatTimeToHHMM(sch.endTime)}` : 'Cerrado'}
-                    </div>
+                    {daySchedules.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {daySchedules.map((sch: any, idx: number) => (
+                          <div key={idx} style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-title)', whiteSpace: 'nowrap' }}>
+                            {formatTimeToHHMM(sch.startTime)} - {formatTimeToHHMM(sch.endTime)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-disabled)' }}>
+                        Cerrado
+                      </div>
+                    )}
                   </div>
                 );
               })}
