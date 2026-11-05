@@ -642,18 +642,29 @@ const Booking: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                className="btn btn-success-fill btn-full"
-                style={{ padding: '0.875rem', fontSize: '1rem' }}
-                disabled={submitting || timeLeft === 0}
-                onClick={handleConfirm}
-              >
-                {submitting ? (
-                  <LoadingSpinner size="sm" inline text="Confirmando turno..." color="white" />
-                ) : (
-                  '✓ Confirmar Turno Definitivamente'
-                )}
-              </button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  className="btn btn-success-fill btn-full"
+                  style={{ padding: '0.875rem', fontSize: '1rem' }}
+                  disabled={submitting || timeLeft === 0}
+                  onClick={handleConfirm}
+                >
+                  {submitting ? (
+                    <LoadingSpinner size="sm" inline text="Confirmando turno..." color="white" />
+                  ) : (
+                    '✓ Confirmar Turno Definitivamente'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-light btn-full"
+                  style={{ fontSize: '0.88rem', padding: '0.625rem', color: 'var(--text-secondary)' }}
+                  disabled={submitting}
+                  onClick={() => setStep(2)}
+                >
+                  <ChevronLeft size={16} /> Modificar fecha u horario
+                </button>
+              </div>
             </>
           )}
           </div>

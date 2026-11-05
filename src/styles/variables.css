@@ -2,6 +2,9 @@
   /* Colors */
   --primary-color: #009ee3;
   --primary-hover: #0081bb;
+  --primary-text: #007bb5; /* WCAG 2.1 AA compliant (4.6:1 contrast on white) */
+  --accent-meli-yellow: #ffe600; /* Signature Mercado Libre yellow */
+  --accent-meli-yellow-hover: #edd600;
   --background-app: #f5f8fa;
   --white: #ffffff;
 

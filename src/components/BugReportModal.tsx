@@ -42,6 +42,38 @@ export const BugReportModal: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        closeBugReportModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, loading]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        closeBugReportModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, loading]);
+
   const handleClose = () => {
     if (loading) return;
     closeBugReportModal();
@@ -102,7 +134,7 @@ export const BugReportModal: React.FC = () => {
   return (
     <div className="modal-overlay" onClick={handleClose}>
       <div
-        className="modal-box"
+        className="modal-box" role="dialog" aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '580px', width: '100%' }}
       >

@@ -413,6 +413,18 @@ const Home: React.FC = () => {
               <Building2 size={48} color="var(--text-disabled)" style={{ marginBottom: '1rem' }} />
               <h3 style={{ color: 'var(--text-title)' }}>No se encontraron negocios</h3>
               <p className="text-muted text-sm">Intentá con otras palabras clave o cambiá los filtros.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('Todos');
+                  setSearchParams({});
+                  handleClearLocation();
+                }}
+                className="btn btn-outline-primary"
+                style={{ marginTop: '1.25rem', fontSize: '0.85rem', padding: '7px 16px' }}
+              >
+                Restablecer todos los filtros
+              </button>
             </div>
           ) : (
             <>
@@ -548,7 +560,7 @@ const Home: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontSize: '0.82rem', fontWeight: 600 }}>
                           <Star size={13} fill="currentColor" /> {business.rating ? `${business.rating.toFixed(1)}${business.reviewCount ? ` (${business.reviewCount})` : ''}` : 'Nuevo'}
                         </div>
-                        <span style={{ color: 'var(--primary-color)', fontWeight: 700, fontSize: '0.85rem' }}>Ver turnos →</span>
+                        <span style={{ color: 'var(--primary-text)', fontWeight: 700, fontSize: '0.86rem' }}>Ver turnos →</span>
                       </div>
                     </div>
                   </Link>

@@ -136,9 +136,9 @@ export const NotificationBell: React.FC = () => {
     }, 340);
   };
 
-  // Cerrar al hacer clic afuera
+    // Cerrar al hacer clic afuera, tocar en móvil o presionar Escape
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         if (isOpen && !isClosing) {
           handleCloseDropdown();
@@ -146,11 +146,21 @@ export const NotificationBell: React.FC = () => {
       }
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isClosing) {
+        handleCloseDropdown();
+      }
+    };
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
+      window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, isClosing]);
 
