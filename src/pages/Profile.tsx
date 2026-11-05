@@ -210,7 +210,7 @@ const Profile: React.FC = () => {
 
   // Modales interactivos específicos para métodos de seguridad
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
-  const [phoneInputValue, setPhoneInputValue] = useState(profileForm.phone || '+54 3435136982');
+  const [phoneInputValue, setPhoneInputValue] = useState(profileForm.phone || '');
   const [phoneSaving, setPhoneSaving] = useState(false);
 
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -2245,7 +2245,7 @@ const Profile: React.FC = () => {
                 type="tel"
                 className="form-control"
                 value={phoneInputValue}
-                placeholder="+54 3435136982"
+                placeholder="+54 9 11 1234-5678"
                 onChange={(e) => setPhoneInputValue(e.target.value)}
               />
             </div>

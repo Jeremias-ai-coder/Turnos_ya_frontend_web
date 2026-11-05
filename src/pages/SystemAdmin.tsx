@@ -19,6 +19,16 @@ import {
   Sparkles,
   Check,
   Zap,
+  Clock,
+  Phone,
+  MapPin,
+  Globe,
+  MessageCircle,
+  Mail,
+  Copy,
+  FileText,
+  CheckCheck,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
@@ -36,6 +46,21 @@ const ROLE_LABELS: Record<string, { label: string; badge: string }> = {
   owner: { label: 'Dueño', badge: 'badge-confirmed' },
   administrator: { label: 'Administrador', badge: 'badge-pending' },
 };
+
+
+const InstagramIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+  </svg>
+);
+
+const FacebookIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+  </svg>
+);
 
 export const SystemAdmin: React.FC = () => {
   const { user } = useAuth();
@@ -74,6 +99,11 @@ export const SystemAdmin: React.FC = () => {
   // Datos principales
   const [users, setUsers] = useState<any[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [bizStatusFilter, setBizStatusFilter] = useState<'ALL' | 'pending_approval' | 'approved' | 'rejected'>('ALL');
+  const [businessToApprove, setBusinessToApprove] = useState<any | null>(null);
+  const [businessToReject, setBusinessToReject] = useState<any | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [processingBizAction, setProcessingBizAction] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   
   // Bug reports
@@ -113,6 +143,14 @@ export const SystemAdmin: React.FC = () => {
   // Modales de Inspección Rápida
   const [inspectedUser, setInspectedUser] = useState<any | null>(null);
   const [inspectedBusiness, setInspectedBusiness] = useState<any | null>(null);
+  const [copiedCuit, setCopiedCuit] = useState(false);
+
+  const handleCopyCuit = (cuit: string) => {
+    if (!cuit) return;
+    navigator.clipboard.writeText(cuit);
+    setCopiedCuit(true);
+    setTimeout(() => setCopiedCuit(false), 2000);
+  };
   const [inspectedAppointment, setInspectedAppointment] = useState<any | null>(null);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [adminNotesInput, setAdminNotesInput] = useState('');
@@ -186,7 +224,7 @@ export const SystemAdmin: React.FC = () => {
         setUsers(res.data.data ?? []);
       }
       if (activeTab === 'businesses' || activeTab === 'cockpit') {
-        const res = await api.get('/businesses?limit=150');
+        const res = await api.get('/admin/businesses?status=ALL&limit=250');
         setBusinesses(res.data.data ?? []);
       }
       if (activeTab === 'appointments' || activeTab === 'cockpit') {
@@ -219,6 +257,40 @@ export const SystemAdmin: React.FC = () => {
     await Promise.all([loadStatsAndReports(), fetchTabData()]);
     setRefreshing(false);
     showToast('✓ Datos del sistema actualizados');
+  };
+
+  // Acciones de Aprobación y Rechazo de Comercio
+  const handleApproveBusiness = async () => {
+    if (!businessToApprove) return;
+    setProcessingBizAction(true);
+    try {
+      await api.patch(`/admin/businesses/${businessToApprove.id}/approve`);
+      showToast(`¡Comercio "${businessToApprove.name}" aprobado y dado de alta exitosamente!`);
+      setBusinessToApprove(null);
+      fetchTabData();
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al aprobar comercio');
+    } finally {
+      setProcessingBizAction(false);
+    }
+  };
+
+  const handleRejectBusiness = async () => {
+    if (!businessToReject || !rejectionReasonInput.trim()) return;
+    setProcessingBizAction(true);
+    try {
+      await api.patch(`/admin/businesses/${businessToReject.id}/reject`, {
+        reason: rejectionReasonInput.trim()
+      });
+      showToast(`Comercio "${businessToReject.name}" observado y notificado al dueño.`);
+      setBusinessToReject(null);
+      setRejectionReasonInput('');
+      fetchTabData();
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al rechazar comercio');
+    } finally {
+      setProcessingBizAction(false);
+    }
   };
 
   // Manejadores de Usuarios
@@ -296,16 +368,23 @@ export const SystemAdmin: React.FC = () => {
     new Set(businesses.map((b) => b.category || (b as any).categoryRel?.name).filter(Boolean))
   ) as string[];
 
+  // Contadores de estado de comercios
+  const pendingBizCount = businesses.filter((b) => b.status === 'pending_approval').length;
+  const approvedBizCount = businesses.filter((b) => (b.status || 'approved') === 'approved').length;
+  const rejectedBizCount = businesses.filter((b) => b.status === 'rejected').length;
+
   // Filtrado reactivo de Comercios
   const filteredBusinesses = businesses.filter((b) => {
     const cat = b.category || (b as any).categoryRel?.name || '';
+    const bStatus = b.status || 'approved';
     const matchesSearch =
       (b.name || '').toLowerCase().includes(bizSearch.toLowerCase()) ||
       (b.address || '').toLowerCase().includes(bizSearch.toLowerCase()) ||
       (b.owner?.name || '').toLowerCase().includes(bizSearch.toLowerCase()) ||
       (b.owner?.email || '').toLowerCase().includes(bizSearch.toLowerCase());
     const matchesCategory = bizCategoryFilter === 'ALL' || cat === bizCategoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesStatus = bizStatusFilter === 'ALL' || bStatus === bizStatusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
   });
   const totalBizPages = Math.ceil(filteredBusinesses.length / PER_PAGE) || 1;
   const paginatedBusinesses = filteredBusinesses.slice((bizPage - 1) * PER_PAGE, bizPage * PER_PAGE);
@@ -1101,8 +1180,56 @@ export const SystemAdmin: React.FC = () => {
             </div>
           </div>
 
+          {/* Filtros por Estado de Moderación */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>
+              Estado de Alta:
+            </span>
+            <button
+              type="button"
+              className={`admin-filter-chip ${bizStatusFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => {
+                setBizStatusFilter('ALL');
+                setBizPage(1);
+              }}
+            >
+              Todos ({businesses.length})
+            </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${bizStatusFilter === 'pending_approval' ? 'active' : ''}`}
+              onClick={() => {
+                setBizStatusFilter('pending_approval');
+                setBizPage(1);
+              }}
+              style={pendingBizCount > 0 ? { borderColor: '#f59e0b', color: '#b45309', fontWeight: 700 } : {}}
+            >
+              ⏳ Pendientes de Alta ({pendingBizCount})
+            </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${bizStatusFilter === 'approved' ? 'active' : ''}`}
+              onClick={() => {
+                setBizStatusFilter('approved');
+                setBizPage(1);
+              }}
+            >
+              ✓ Aprobados ({approvedBizCount})
+            </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${bizStatusFilter === 'rejected' ? 'active' : ''}`}
+              onClick={() => {
+                setBizStatusFilter('rejected');
+                setBizPage(1);
+              }}
+            >
+              ✕ Observados ({rejectedBizCount})
+            </button>
+          </div>
+
           {/* Chips de filtro por categoría */}
-          <div className="admin-chips-filter-row">
+          <div className="admin-chips-filter-row" style={{ marginBottom: '1.25rem' }}>
             <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>
               Categoría:
             </span>
@@ -1114,7 +1241,7 @@ export const SystemAdmin: React.FC = () => {
                 setBizPage(1);
               }}
             >
-              Todas ({businesses.length})
+              Todas
             </button>
             {categoriesList.map((cat) => (
               <button
@@ -1126,13 +1253,13 @@ export const SystemAdmin: React.FC = () => {
                   setBizPage(1);
                 }}
               >
-                {cat} ({businesses.filter((b) => (b.category || (b as any).categoryRel?.name) === cat).length})
+                {cat}
               </button>
             ))}
           </div>
 
           {loadingTab ? (
-            <SkeletonTable rows={6} columns={6} />
+            <SkeletonTable rows={6} columns={7} />
           ) : (
             <>
               <div style={{ overflowX: 'auto' }}>
@@ -1143,16 +1270,16 @@ export const SystemAdmin: React.FC = () => {
                         Comercio
                       </th>
                       <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Categoría
+                        Estado
                       </th>
                       <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Dirección
+                        Ubicación y Contacto
+                      </th>
+                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
+                        Evidencias de Veracidad
                       </th>
                       <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
                         Dueño Responsable
-                      </th>
-                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Servicios
                       </th>
                       <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
                         Acciones
@@ -1169,19 +1296,23 @@ export const SystemAdmin: React.FC = () => {
                     ) : (
                       paginatedBusinesses.map((b: any) => {
                         const initial = (b.name || 'B')[0].toUpperCase();
-                        const servicesCount = b.services?.length || 0;
+                        const bStatus = b.status || 'approved';
 
                         return (
-                          <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9', background: bStatus === 'pending_approval' ? '#fffbeb' : undefined }}>
                             <td style={{ padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+                                onClick={() => setInspectedBusiness(b)}
+                                title="Hacé clic para ver la ficha completa y evidencias"
+                              >
                                 <div
                                   style={{
                                     width: '38px',
                                     height: '38px',
                                     borderRadius: '10px',
-                                    background: '#e0f2fe',
-                                    color: '#0284c7',
+                                    background: bStatus === 'pending_approval' ? '#fef3c7' : '#e0f2fe',
+                                    color: bStatus === 'pending_approval' ? '#b45309' : '#0284c7',
                                     fontWeight: 800,
                                     fontSize: '1rem',
                                     display: 'flex',
@@ -1193,62 +1324,198 @@ export const SystemAdmin: React.FC = () => {
                                   {initial}
                                 </div>
                                 <div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-title)' }}>
+                                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0369a1' }}>
                                     {b.name}
                                   </div>
-                                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>ID #{b.id}</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', gap: '6px' }}>
+                                    <span>ID #{b.id}</span>
+                                    <span>•</span>
+                                    <span>{b.category || b.categoryRel?.name || 'General'}</span>
+                                  </div>
                                 </div>
                               </div>
                             </td>
+
                             <td style={{ padding: '12px 14px' }}>
-                              <span
-                                style={{
-                                  background: '#f1f5f9',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '8px',
-                                  padding: '2px 8px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 600,
-                                  color: '#334155',
-                                }}
-                              >
-                                {b.category || b.categoryRel?.name || 'General'}
-                              </span>
+                              {bStatus === 'pending_approval' && (
+                                <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }}>
+                                  <Clock size={12} /> En Revisión
+                                </span>
+                              )}
+                              {bStatus === 'approved' && (
+                                <span className="badge badge-confirmed" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }}>
+                                  ✓ Activo
+                                </span>
+                              )}
+                              {bStatus === 'rejected' && (
+                                <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }} title={b.rejectionReason || 'Observado'}>
+                                  ✕ Observado
+                                </span>
+                              )}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: '#475569' }}>
-                              {b.address || <span style={{ color: '#cbd5e1' }}>Sin dirección</span>}
+
+                            <td style={{ padding: '12px 14px', fontSize: '0.84rem' }}>
+                              <div style={{ color: 'var(--text-title)', fontWeight: 600 }}>
+                                {b.address || <span style={{ color: '#cbd5e1' }}>Sin dirección</span>}
+                              </div>
+                              {b.city && <div style={{ fontSize: '0.76rem', color: '#64748b' }}>{b.city}, {b.province}</div>}
+                              {b.phone && (
+                                <div style={{ fontSize: '0.76rem', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                  <Phone size={11} /> {b.phone}
+                                </div>
+                              )}
                             </td>
+
+                            {/* Evidencias de Veracidad */}
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {b.instagramUrl && (
+                                  <a
+                                    href={b.instagramUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fff1f2', color: '#e1306c', border: '1px solid #fecdd3', borderRadius: '6px', padding: '3px 7px', fontSize: '0.74rem', fontWeight: 700, textDecoration: 'none' }}
+                                    title="Verificar perfil de Instagram"
+                                  >
+                                    <InstagramIcon size={12} /> IG
+                                  </a>
+                                )}
+                                {b.facebookUrl && (
+                                  <a
+                                    href={b.facebookUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1877f2', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '3px 7px', fontSize: '0.74rem', fontWeight: 700, textDecoration: 'none' }}
+                                    title="Verificar página de Facebook"
+                                  >
+                                    <FacebookIcon size={12} /> FB
+                                  </a>
+                                )}
+                                {b.googleMapsUrl && (
+                                  <a
+                                    href={b.googleMapsUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef2f2', color: '#ea4335', border: '1px solid #fecaca', borderRadius: '6px', padding: '3px 7px', fontSize: '0.74rem', fontWeight: 700, textDecoration: 'none' }}
+                                    title="Verificar en Google Maps"
+                                  >
+                                    <MapPin size={12} /> Maps
+                                  </a>
+                                )}
+                                {b.websiteUrl && (
+                                  <a
+                                    href={b.websiteUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd', borderRadius: '6px', padding: '3px 7px', fontSize: '0.74rem', fontWeight: 700, textDecoration: 'none' }}
+                                    title="Verificar sitio web oficial"
+                                  >
+                                    <Globe size={12} /> Web
+                                  </a>
+                                )}
+                                {b.cuit && (
+                                  <span style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '3px 7px', fontSize: '0.74rem', fontWeight: 700 }}>
+                                    CUIT: {b.cuit}
+                                  </span>
+                                )}
+                                {!b.instagramUrl && !b.facebookUrl && !b.googleMapsUrl && !b.websiteUrl && !b.cuit && (
+                                  <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Sin evidencias</span>
+                                )}
+                              </div>
+                            </td>
+
                             <td style={{ padding: '12px 14px' }}>
                               <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-title)' }}>
                                 {b.owner?.name || 'Sin dueño'}
                               </div>
                               <div style={{ fontSize: '0.76rem', color: '#64748b' }}>{b.owner?.email}</div>
+                              {b.phone && (
+                                <a
+                                  href={`https://wa.me/${b.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', color: '#16a34a', fontWeight: 700, marginTop: '2px', textDecoration: 'none' }}
+                                >
+                                  <MessageCircle size={11} /> WhatsApp
+                                </a>
+                              )}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: '0.84rem' }}>
-                              <span style={{ fontWeight: 700, color: '#0284c7' }}>{servicesCount}</span>{' '}
-                              <span style={{ color: '#64748b' }}>{servicesCount === 1 ? 'servicio' : 'servicios'}</span>
-                            </td>
+
                             <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <button
                                   type="button"
                                   className="btn btn-sm btn-light"
                                   onClick={() => setInspectedBusiness(b)}
-                                  style={{ fontSize: '0.8rem', padding: '5px 10px' }}
-                                  title="Ver ficha técnica del comercio"
+                                  style={{
+                                    fontSize: '0.8rem',
+                                    padding: '5px 10px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#0369a1',
+                                    fontWeight: 700,
+                                    borderRadius: '6px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                  }}
+                                  title="Ver ficha completa y evidencias del comercio"
                                 >
-                                  <Eye size={14} /> Ficha
+                                  <Eye size={14} color="#0284c7" />
+                                  <span>Ficha</span>
                                 </button>
-                                <a
-                                  href={`/businesses/${b.id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="btn btn-sm btn-outline-primary"
-                                  style={{ padding: '5px 9px', fontSize: '0.8rem' }}
-                                  title="Abrir página pública del comercio"
-                                >
-                                  <ExternalLink size={13} />
-                                </a>
+
+                                {bStatus === 'pending_approval' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm"
+                                      onClick={() => setBusinessToApprove(b)}
+                                      style={{ background: '#10b981', color: 'white', border: 'none', padding: '5px 10px', fontSize: '0.78rem', fontWeight: 700, borderRadius: '6px' }}
+                                      title="Aprobar comercio y publicar en catálogo"
+                                    >
+                                      ✓ Aprobar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm"
+                                      onClick={() => {
+                                        setBusinessToReject(b);
+                                        setRejectionReasonInput('');
+                                      }}
+                                      style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 10px', fontSize: '0.78rem', fontWeight: 700, borderRadius: '6px' }}
+                                      title="Observar o rechazar solicitud"
+                                    >
+                                      ✕ Observar
+                                    </button>
+                                  </>
+                                )}
+
+                                {bStatus === 'approved' && (
+                                  <a
+                                    href={`/businesses/${b.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-sm btn-outline-primary"
+                                    style={{ padding: '5px 9px', fontSize: '0.8rem' }}
+                                    title="Abrir página pública del comercio"
+                                  >
+                                    <ExternalLink size={13} />
+                                  </a>
+                                )}
+
+                                {bStatus === 'rejected' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={() => setBusinessToApprove(b)}
+                                    style={{ background: '#10b981', color: 'white', border: 'none', padding: '5px 10px', fontSize: '0.78rem', fontWeight: 700, borderRadius: '6px' }}
+                                    title="Re-aprobar comercio"
+                                  >
+                                    ✓ Aprobar
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1866,136 +2133,385 @@ export const SystemAdmin: React.FC = () => {
       {/* ======================================================================= */}
       {inspectedBusiness && (
         <div className="modal-overlay" onClick={() => setInspectedBusiness(null)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', width: '100%' }}>
+          <div
+            className="modal-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '780px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+          >
             <div className="modal-drag-handle" />
 
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Cabecera del Dossier */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div
                   style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: '#e0f2fe',
-                    color: '#0284c7',
+                    width: '52px',
+                    height: '52px',
+                    borderRadius: '14px',
+                    background: inspectedBusiness.status === 'pending_approval' ? '#fef3c7' : inspectedBusiness.status === 'rejected' ? '#fee2e2' : '#e0f2fe',
+                    color: inspectedBusiness.status === 'pending_approval' ? '#b45309' : inspectedBusiness.status === 'rejected' ? '#dc2626' : '#0284c7',
                     fontWeight: 800,
-                    fontSize: '1.3rem',
+                    fontSize: '1.4rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
                   }}
                 >
                   {(inspectedBusiness.name || 'B')[0].toUpperCase()}
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                    {inspectedBusiness.name}
-                  </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                    <span
-                      style={{
-                        background: '#f1f5f9',
-                        padding: '2px 8px',
-                        borderRadius: '8px',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        color: '#334155',
-                      }}
-                    >
-                      {inspectedBusiness.category || inspectedBusiness.categoryRel?.name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                      {inspectedBusiness.name}
+                    </h3>
+                    {inspectedBusiness.status === 'pending_approval' && (
+                      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }}>
+                        <Clock size={12} /> ⏳ En Revisión por Administración
+                      </span>
+                    )}
+                    {inspectedBusiness.status === 'approved' && (
+                      <span className="badge badge-confirmed" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }}>
+                        <CheckCircle2 size={12} /> ✓ Comercio Activo
+                      </span>
+                    )}
+                    {inspectedBusiness.status === 'rejected' && (
+                      <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }}>
+                        <AlertTriangle size={12} /> ✕ Observado / Requiere Cambios
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '0.8rem', color: '#64748b' }}>
+                    <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, color: '#334155' }}>
+                      {inspectedBusiness.category || inspectedBusiness.categoryRel?.name || 'Comercio General'}
                     </span>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>ID #{inspectedBusiness.id}</span>
+                    <span>•</span>
+                    <span>ID #{inspectedBusiness.id}</span>
+                    {inspectedBusiness.createdAt && (
+                      <>
+                        <span>•</span>
+                        <span>Postulado: {format(new Date(inspectedBusiness.createdAt), "d 'de' MMMM, yyyy", { locale: es })}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setInspectedBusiness(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                title="Cerrar ficha"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Información clave */}
-            <div
-              style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '14px',
-                marginBottom: '1.25rem',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px',
-              }}
-            >
-              <div>
-                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, display: 'block' }}>
-                  DIRECCIÓN
-                </span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-title)' }}>
-                  {inspectedBusiness.address || 'Sin dirección registrada'}
-                </span>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, display: 'block' }}>
-                  DUEÑO ASIGNADO
-                </span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-title)' }}>
-                  {inspectedBusiness.owner?.name} ({inspectedBusiness.owner?.email})
-                </span>
-              </div>
-            </div>
+            {/* Cuerpo del Dossier Scrollable */}
+            <div style={{ overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '14px', margin: '14px 0', flex: 1 }}>
+              {/* Alerta de Observación si fue rechazado */}
+              {inspectedBusiness.status === 'rejected' && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <AlertCircle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ color: '#991b1b', fontSize: '0.88rem', display: 'block' }}>
+                      Motivo de la Observación Registrada por Administración:
+                    </strong>
+                    <p style={{ margin: '4px 0 0', color: '#b91c1c', fontSize: '0.84rem', lineHeight: '1.4' }}>
+                      {inspectedBusiness.rejectionReason || 'No se detallaron observaciones específicas.'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-            {/* Servicios habilitados */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-title)' }}>
-                Servicios Ofrecidos ({inspectedBusiness.services?.length || 0})
-              </h4>
-              <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {(!inspectedBusiness.services || inspectedBusiness.services.length === 0) ? (
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>No tiene servicios configurados todavía.</div>
-                ) : (
-                  inspectedBusiness.services.map((s: any) => (
-                    <div
-                      key={s.id}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #f1f5f9',
-                        background: '#fafbfc',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: '0.86rem', color: 'var(--text-title)' }}>{s.name}</strong>
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '6px' }}>
-                          ⏱ {s.durationMinutes} min
-                        </span>
-                      </div>
-                      <span style={{ fontWeight: 700, color: '#059669', fontSize: '0.88rem' }}>${s.price}</span>
+              {/* 1. Identidad & Descripción */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px' }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Building2 size={14} color="#0284c7" /> Descripción y Datos del Negocio
+                </h4>
+                <div style={{ fontSize: '0.88rem', color: 'var(--text-title)', lineHeight: '1.5', background: '#fff', border: '1px solid #f1f5f9', borderRadius: '8px', padding: '10px 12px', marginBottom: '10px' }}>
+                  {inspectedBusiness.description || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sin descripción comercial ingresada.</span>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>Email Comercial</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-title)', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      {inspectedBusiness.email ? (
+                        <a href={`mailto:${inspectedBusiness.email}`} style={{ color: '#0284c7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Mail size={13} /> {inspectedBusiness.email}
+                        </a>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>No especificado</span>
+                      )}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>Categoría Registrada</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-title)', marginTop: '2px', display: 'block' }}>
+                      {inspectedBusiness.category || inspectedBusiness.categoryRel?.name || 'General'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Ubicación Física & Contacto */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px' }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MapPin size={14} color="#0284c7" /> Ubicación y Canales de Contacto
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>Dirección Física</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-title)', marginTop: '2px', display: 'block' }}>
+                      {inspectedBusiness.address || 'Sin dirección registrada'}
+                    </span>
+                    {(inspectedBusiness.city || inspectedBusiness.province) && (
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                        {[inspectedBusiness.city, inspectedBusiness.province].filter(Boolean).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>Teléfono del Negocio</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-title)', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {inspectedBusiness.phone ? (
+                        <>
+                          <Phone size={13} color="#0284c7" /> {inspectedBusiness.phone}
+                        </>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>Sin teléfono registrado</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Evidencias de Veracidad & Legal */}
+              <div style={{ background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '14px 16px', boxShadow: '0 2px 4px rgba(2,132,199,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldCheck size={16} color="#0284c7" /> Evidencias de Veracidad y Auditoría
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                    Auditoría de Redes y CUIT
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px' }}>
+                  {/* Instagram */}
+                  <div style={{ border: '1px solid #fecdd3', background: '#fff1f2', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 800, color: '#e1306c' }}>
+                        <InstagramIcon size={14} color="#e1306c" /> Instagram
+                      </span>
+                      {inspectedBusiness.instagramUrl && (
+                        <a href={inspectedBusiness.instagramUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.74rem', color: '#e1306c', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          Abrir <ExternalLink size={10} />
+                        </a>
+                      )}
                     </div>
-                  ))
+                    <div style={{ fontSize: '0.8rem', color: '#881337', fontWeight: 600, wordBreak: 'break-all' }}>
+                      {inspectedBusiness.instagramUrl || <span style={{ color: '#fda4af', fontStyle: 'italic' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* Facebook */}
+                  <div style={{ border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 800, color: '#1877f2' }}>
+                        <FacebookIcon size={14} color="#1877f2" /> Facebook
+                      </span>
+                      {inspectedBusiness.facebookUrl && (
+                        <a href={inspectedBusiness.facebookUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.74rem', color: '#1877f2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          Abrir <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#1e3a8a', fontWeight: 600, wordBreak: 'break-all' }}>
+                      {inspectedBusiness.facebookUrl || <span style={{ color: '#93c5fd', fontStyle: 'italic' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* Google Maps */}
+                  <div style={{ border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 800, color: '#dc2626' }}>
+                        <MapPin size={14} color="#dc2626" /> Google Maps
+                      </span>
+                      {inspectedBusiness.googleMapsUrl && (
+                        <a href={inspectedBusiness.googleMapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          Abrir <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#7f1d1d', fontWeight: 600, wordBreak: 'break-all' }}>
+                      {inspectedBusiness.googleMapsUrl || <span style={{ color: '#fca5a5', fontStyle: 'italic' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* Sitio Web */}
+                  <div style={{ border: '1px solid #bae6fd', background: '#f0f9ff', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 800, color: '#0284c7' }}>
+                        <Globe size={14} color="#0284c7" /> Sitio Web Oficial
+                      </span>
+                      {inspectedBusiness.websiteUrl && (
+                        <a href={inspectedBusiness.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          Abrir <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#0c4a6e', fontWeight: 600, wordBreak: 'break-all' }}>
+                      {inspectedBusiness.websiteUrl || <span style={{ color: '#7dd3fc', fontStyle: 'italic' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* CUIT */}
+                  <div style={{ border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                        <FileText size={14} color="#475569" /> CUIT Tributario
+                      </span>
+                      {inspectedBusiness.cuit && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCuit(inspectedBusiness.cuit)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.74rem', color: '#0284c7', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px', padding: 0 }}
+                          title="Copiar CUIT al portapapeles"
+                        >
+                          {copiedCuit ? <CheckCheck size={12} color="#16a34a" /> : <Copy size={12} />}
+                          {copiedCuit ? '¡Copiado!' : 'Copiar'}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.84rem', color: '#0f172a', fontWeight: 700, fontFamily: 'monospace' }}>
+                      {inspectedBusiness.cuit || <span style={{ color: '#94a3b8', fontStyle: 'italic', fontFamily: 'inherit' }}>No declarado</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Titular / Solicitante de la cuenta */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px' }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={14} color="#0284c7" /> Usuario Solicitante y Dueño
+                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#e0f2fe', color: '#0369a1', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {(inspectedBusiness.owner?.name || 'U')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-title)' }}>
+                        {inspectedBusiness.owner?.name || 'Sin dueño asignado'}
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                        {inspectedBusiness.owner?.email || 'Sin correo registrado'}
+                      </div>
+                    </div>
+                  </div>
+                  {inspectedBusiness.phone && (
+                    <a
+                      href={`https://wa.me/${inspectedBusiness.phone.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(inspectedBusiness.owner?.name || '')},%20te%20escribimos%20de%20Turnos%20Ya%20respecto%20a%20tu%20solicitud%20para%20${encodeURIComponent(inspectedBusiness.name)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-sm"
+                      style={{ background: '#16a34a', color: 'white', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.8rem', padding: '6px 12px', borderRadius: '6px' }}
+                    >
+                      <MessageCircle size={14} /> Chatear por WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* 5. Servicios Ofrecidos */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px' }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Servicios Ofrecidos ({inspectedBusiness.services?.length || 0})
+                </h4>
+                {(!inspectedBusiness.services || inspectedBusiness.services.length === 0) ? (
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                    El comercio no tiene servicios cargados todavía.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                    {inspectedBusiness.services.map((s: any) => (
+                      <div key={s.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ fontSize: '0.84rem', color: 'var(--text-title)', display: 'block' }}>{s.name}</strong>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>⏱ {s.durationMinutes} min</span>
+                        </div>
+                        <span style={{ fontWeight: 800, color: '#059669', fontSize: '0.88rem' }}>${s.price}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="modal-footer-responsive" style={{ margin: 0 }}>
+            {/* Pie del Modal con Acciones de Moderación */}
+            <div className="modal-footer-responsive" style={{ margin: 0, paddingTop: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', flexShrink: 0 }}>
               <button type="button" className="btn btn-light" onClick={() => setInspectedBusiness(null)}>
-                Cerrar
+                Cerrar Ficha
               </button>
-              <a
-                href={`/businesses/${inspectedBusiness.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary"
-              >
-                <ExternalLink size={15} /> Ver en sitio público
-              </a>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {inspectedBusiness.status === 'pending_approval' && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        const b = inspectedBusiness;
+                        setInspectedBusiness(null);
+                        setBusinessToReject(b);
+                        setRejectionReasonInput('');
+                      }}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '8px 14px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                      ✕ Observar Solicitud
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        const b = inspectedBusiness;
+                        setInspectedBusiness(null);
+                        setBusinessToApprove(b);
+                      }}
+                      style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', boxShadow: '0 2px 4px rgba(16,185,129,0.3)', cursor: 'pointer' }}
+                    >
+                      ✓ Aprobar Comercio
+                    </button>
+                  </>
+                )}
+
+                {inspectedBusiness.status === 'approved' && (
+                  <a
+                    href={`/businesses/${inspectedBusiness.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.84rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <ExternalLink size={14} /> Ver en sitio público
+                  </a>
+                )}
+
+                {inspectedBusiness.status === 'rejected' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      const b = inspectedBusiness;
+                      setInspectedBusiness(null);
+                      setBusinessToApprove(b);
+                    }}
+                    style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', cursor: 'pointer' }}
+                  >
+                    ✓ Reconsiderar y Aprobar
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2441,6 +2957,135 @@ export const SystemAdmin: React.FC = () => {
               >
                 <Trash2 size={14} />
                 <span>{clearingCache ? 'Purgando...' : 'Purgar Toda la Caché'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Aprobación de Comercio */}
+      {businessToApprove && (
+        <div className="admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToApprove(null)}>
+          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-title)' }}>
+                    Confirmar Alta y Aprobación
+                  </h3>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Revisión de veracidad completada</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBusinessToApprove(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', marginBottom: '1.25rem' }}>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-title)', marginBottom: '4px' }}>
+                {businessToApprove.name}
+              </div>
+              <div style={{ fontSize: '0.84rem', color: '#64748b', marginBottom: '8px' }}>
+                Rubro: <strong>{businessToApprove.category || businessToApprove.categoryRel?.name}</strong> • Dirección: <strong>{businessToApprove.address}</strong>
+              </div>
+              <div style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                Dueño: <strong>{businessToApprove.owner?.name}</strong> ({businessToApprove.owner?.email})
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '1.5rem' }}>
+              Al aprobar este comercio, el negocio se publicará inmediatamente en el catálogo público de Turnos Ya, su dueño obtendrá rol de comerciante (owner) y se le enviará un correo electrónico de confirmación.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={processingBizAction}
+                onClick={() => setBusinessToApprove(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-success"
+                disabled={processingBizAction}
+                onClick={handleApproveBusiness}
+                style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+              >
+                {processingBizAction ? 'Aprobando...' : '✓ Confirmar Alta y Publicar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Rechazo / Observación de Comercio */}
+      {businessToReject && (
+        <div className="admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToReject(null)}>
+          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.15rem', color: '#991b1b' }}>
+                    Observar Solicitud de Negocio
+                  </h3>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b' }}>{businessToReject.name}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBusinessToReject(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-title)' }}>
+                Motivo de la observación <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <textarea
+                className="form-control"
+                rows={4}
+                placeholder="Describe claramente por qué se observa la solicitud (ej. 'El link de Instagram no coincide con el local declarado', 'Dirección incompleta, falta número de local')..."
+                value={rejectionReasonInput}
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
+                autoFocus
+              />
+              <span className="text-muted text-xs" style={{ display: 'block', marginTop: '6px' }}>
+                Este mensaje se enviará por notificación y correo al dueño para que pueda corregir los datos y reenviar la solicitud.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={processingBizAction}
+                onClick={() => setBusinessToReject(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={processingBizAction || rejectionReasonInput.trim().length < 5}
+                onClick={handleRejectBusiness}
+                style={{ fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+              >
+                {processingBizAction ? 'Enviando...' : '✕ Confirmar Observación'}
               </button>
             </div>
           </div>
