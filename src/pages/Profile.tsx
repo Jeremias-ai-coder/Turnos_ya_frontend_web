@@ -30,6 +30,8 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { flushSync } from 'react-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
 import { openLegalModal } from '../services/legalModalService';
 
 // Íconos SVG ultra fieles a la interfaz de Mercado Libre / Fotos adjuntas
@@ -105,10 +107,69 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Tab activo desde la URL ('profile' | 'security' | 'notifications' | 'privacy') o null para el HUB
-  const currentTab = searchParams.get('tab') as ActiveTab | null;
-  // Sub-sección para seguridad ('menu' | 'methods' | 'devices')
-  const securitySub = searchParams.get('sub') || 'menu';
+  // Tab activo y subsección sincronizados en estado local para permitir a flushSync sincronizar el DOM de inmediato
+  const [activeTab, setActiveTab] = useState<ActiveTab | null>(() => searchParams.get('tab') as ActiveTab | null);
+  const [activeSub, setActiveSub] = useState<string>(() => searchParams.get('sub') || 'menu');
+
+  // Sincronizar estado local si el usuario navega con botones Adelante/Atrás del navegador o links externos
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as ActiveTab | null;
+    const subFromUrl = searchParams.get('sub') || 'menu';
+    setActiveTab(tabFromUrl);
+    setActiveSub(subFromUrl);
+  }, [searchParams]);
+
+  const currentTab = activeTab;
+  const securitySub = activeSub;
+
+  // Nivel de profundidad para determinar la dirección de la transición
+  const getDepth = (tab: ActiveTab | null, sub: string): number => {
+    if (!tab) return 0; // Hub principal
+    if (tab === 'security' && (sub === 'methods' || sub === 'devices')) return 2; // Sub-secciones de seguridad
+    return 1; // Sub-vistas nivel 1
+  };
+
+  const currentDepth = getDepth(currentTab, securitySub);
+
+  // Navegación con View Transitions interna de Profile (coexistencia perfecta de capas sin pantalla en blanco)
+  const navigateProfileTab = (targetTab: ActiveTab | null, targetSub: string = 'menu') => {
+    const nextDepth = getDepth(targetTab, targetSub);
+    const direction = nextDepth < currentDepth ? 'backward' : 'forward';
+
+    // Establecer dirección para las keyframes nativas de View Transitions
+    document.documentElement.dataset.transitionDir = direction;
+
+    const performSyncDOMUpdate = () => {
+      // 1. Actualizar estado local síncronamente forzado por flushSync
+      setActiveTab(targetTab);
+      setActiveSub(targetSub);
+      // 2. Sincronizar URL de React Router en segundo plano
+      if (!targetTab) {
+        setSearchParams({}, { replace: false });
+      } else if (targetSub && targetSub !== 'menu') {
+        setSearchParams({ tab: targetTab, sub: targetSub }, { replace: false });
+      } else {
+        setSearchParams({ tab: targetTab }, { replace: false });
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    };
+
+    const doc = document as any;
+    if (typeof doc !== 'undefined' && typeof doc.startViewTransition === 'function') {
+      const vt = doc.startViewTransition(() => {
+        flushSync(() => {
+          performSyncDOMUpdate();
+        });
+      });
+      if (vt && typeof vt.finished?.then === 'function') {
+        vt.finished.finally(() => {
+          delete document.documentElement.dataset.transitionDir;
+        });
+      }
+    } else {
+      performSyncDOMUpdate();
+    }
+  };
 
   const [profileForm, setProfileForm] = useState<ProfileData>({
     name: user?.name || '',
@@ -692,20 +753,20 @@ const Profile: React.FC = () => {
     // FOTO 1: MENÚ PRINCIPAL DE SEGURIDAD
     if (securitySub === 'menu') {
       pageContent = (
-        <div className="profile-subview-container">
+        <div className="profile-subview-container" key="subview-security-menu">
           {/* Barra de navegación ergonómica y retroceso táctil */}
           <div className="profile-nav-header-wrap">
             <button
               type="button"
               className="profile-back-btn"
-              onClick={() => setSearchParams({})}
+              onClick={() => navigateProfileTab(null)}
               aria-label="Volver a Mi perfil"
             >
               <ArrowLeft size={18} />
               <span>Volver a Mi perfil</span>
             </button>
             <div className="profile-breadcrumb">
-              <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+              <button type="button" onClick={() => navigateProfileTab(null)}>Mi perfil</button>
               <span className="profile-breadcrumb-separator">&gt;</span>
               <span className="profile-breadcrumb-current">Seguridad</span>
             </div>
@@ -721,7 +782,7 @@ const Profile: React.FC = () => {
             <button
               type="button"
               className="security-list-item"
-              onClick={() => setSearchParams({ tab: 'security', sub: 'methods' })}
+              onClick={() => navigateProfileTab('security', 'methods')}
             >
               <div className="security-item-left">
                 <div className="security-item-icon">
@@ -750,7 +811,7 @@ const Profile: React.FC = () => {
             <button
               type="button"
               className="security-list-item"
-              onClick={() => setSearchParams({ tab: 'security', sub: 'devices' })}
+              onClick={() => navigateProfileTab('security', 'devices')}
             >
               <div className="security-item-left">
                 <div className="security-item-icon">
@@ -772,22 +833,22 @@ const Profile: React.FC = () => {
       );
     } else if (securitySub === 'methods') {
       pageContent = (
-        <div className="profile-subview-container">
+        <div className="profile-subview-container" key="subview-security-methods">
           {/* Barra de navegación ergonómica y retroceso táctil */}
           <div className="profile-nav-header-wrap">
             <button
               type="button"
               className="profile-back-btn"
-              onClick={() => setSearchParams({ tab: 'security' })}
+              onClick={() => navigateProfileTab('security', 'menu')}
               aria-label="Volver a Seguridad"
             >
               <ArrowLeft size={18} />
               <span>Volver a Seguridad</span>
             </button>
             <div className="profile-breadcrumb">
-              <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+              <button type="button" onClick={() => navigateProfileTab(null)}>Mi perfil</button>
               <span className="profile-breadcrumb-separator">&gt;</span>
-              <button type="button" onClick={() => setSearchParams({ tab: 'security' })}>Seguridad</button>
+              <button type="button" onClick={() => navigateProfileTab('security', 'menu')}>Seguridad</button>
               <span className="profile-breadcrumb-separator">&gt;</span>
               <span className="profile-breadcrumb-current">Métodos de verificación</span>
             </div>
@@ -1042,22 +1103,22 @@ const Profile: React.FC = () => {
       );
     } else if (securitySub === 'devices') {
       pageContent = (
-        <div className="profile-subview-container">
+        <div className="profile-subview-container" key="subview-security-devices">
           {/* Barra de navegación ergonómica y retroceso táctil */}
           <div className="profile-nav-header-wrap">
             <button
               type="button"
               className="profile-back-btn"
-              onClick={() => setSearchParams({ tab: 'security' })}
+              onClick={() => navigateProfileTab('security', 'menu')}
               aria-label="Volver a Seguridad"
             >
               <ArrowLeft size={18} />
               <span>Volver a Seguridad</span>
             </button>
             <div className="profile-breadcrumb">
-              <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+              <button type="button" onClick={() => navigateProfileTab(null)}>Mi perfil</button>
               <span className="profile-breadcrumb-separator">&gt;</span>
-              <button type="button" onClick={() => setSearchParams({ tab: 'security' })}>Seguridad</button>
+              <button type="button" onClick={() => navigateProfileTab('security', 'menu')}>Seguridad</button>
               <span className="profile-breadcrumb-separator">&gt;</span>
               <span className="profile-breadcrumb-current">Dispositivos vinculados</span>
             </div>
@@ -1196,20 +1257,20 @@ const Profile: React.FC = () => {
     };
 
     pageContent = (
-      <div className="profile-subview-container">
+      <div className="profile-subview-container" key={`subview-${currentTab}`}>
         {/* Barra de navegación ergonómica y retroceso táctil */}
         <div className="profile-nav-header-wrap">
           <button
             type="button"
             className="profile-back-btn"
-            onClick={() => setSearchParams({})}
+            onClick={() => navigateProfileTab(null)}
             aria-label="Volver a Mi perfil"
           >
             <ArrowLeft size={18} />
             <span>Volver a Mi perfil</span>
           </button>
           <div className="profile-breadcrumb">
-            <button type="button" onClick={() => setSearchParams({})}>Mi perfil</button>
+            <button type="button" onClick={() => navigateProfileTab(null)}>Mi perfil</button>
             <span className="profile-breadcrumb-separator">&gt;</span>
             <span className="profile-breadcrumb-current">{titles[currentTab]?.title}</span>
           </div>
@@ -1516,7 +1577,7 @@ const Profile: React.FC = () => {
     // VISTA PRINCIPAL: HUB ESTILO MERCADO LIBRE
     // ==========================================
     pageContent = (
-      <div className="profile-hub-wrapper">
+      <div className="profile-hub-wrapper" key="profile-hub-main">
       {/* Encabezado del usuario */}
       <div className="profile-hub-header">
         <div className="profile-hub-avatar">
@@ -1568,7 +1629,7 @@ const Profile: React.FC = () => {
             type="button"
             className="btn btn-primary"
             style={{ fontSize: '0.84rem', padding: '7px 16px', whiteSpace: 'nowrap' }}
-            onClick={() => setSearchParams({ tab: 'profile' })}
+            onClick={() => navigateProfileTab('profile')}
           >
             Verificar ahora →
           </button>
@@ -1580,7 +1641,7 @@ const Profile: React.FC = () => {
         {/* 1. Información de tu perfil */}
         <div
           className="profile-hub-card"
-          onClick={() => setSearchParams({ tab: 'profile' })}
+          onClick={() => navigateProfileTab('profile')}
           role="button"
           tabIndex={0}
         >
@@ -1598,7 +1659,7 @@ const Profile: React.FC = () => {
         {/* 2. Seguridad */}
         <div
           className="profile-hub-card"
-          onClick={() => setSearchParams({ tab: 'security' })}
+          onClick={() => navigateProfileTab('security')}
           role="button"
           tabIndex={0}
         >
@@ -1642,7 +1703,7 @@ const Profile: React.FC = () => {
         {/* 3. Mis Turnos */}
         <div
           className="profile-hub-card"
-          onClick={() => navigate('/my-appointments')}
+          onClick={() => startSmoothNavigation(navigate, '/my-appointments')}
           role="button"
           tabIndex={0}
         >
@@ -1660,7 +1721,7 @@ const Profile: React.FC = () => {
         {/* 4. Comunicaciones */}
         <div
           className="profile-hub-card"
-          onClick={() => setSearchParams({ tab: 'notifications' })}
+          onClick={() => navigateProfileTab('notifications')}
           role="button"
           tabIndex={0}
         >
@@ -1678,7 +1739,7 @@ const Profile: React.FC = () => {
         {/* 5. Privacidad */}
         <div
           className="profile-hub-card"
-          onClick={() => setSearchParams({ tab: 'privacy' })}
+          onClick={() => navigateProfileTab('privacy')}
           role="button"
           tabIndex={0}
         >
@@ -1696,7 +1757,7 @@ const Profile: React.FC = () => {
         {/* 6. Mi Comercio / Registrar Negocio */}
         <div
           className="profile-hub-card"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => startSmoothNavigation(navigate, '/dashboard')}
           role="button"
           tabIndex={0}
         >

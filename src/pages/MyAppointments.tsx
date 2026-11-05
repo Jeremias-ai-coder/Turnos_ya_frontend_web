@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import api, { cachedGet, clientCache } from '../services/api';
 import { Calendar as CalendarIcon, Clock, XCircle, Info, Star, CheckCircle, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,8 +30,13 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 const MyAppointments: React.FC = () => {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedAppts = clientCache.get<any>('/appointments?{}');
+  const initialAppts: Appointment[] = Array.isArray(cachedAppts?.data)
+    ? cachedAppts.data
+    : (Array.isArray(cachedAppts) ? cachedAppts : []);
+
+  const [appointments, setAppointments] = useState<Appointment[]>(initialAppts);
+  const [loading, setLoading] = useState(initialAppts.length === 0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [page, setPage] = useState(1);
   const PER_PAGE = 6;
@@ -55,8 +60,9 @@ const MyAppointments: React.FC = () => {
 
   const fetchAppointments = async () => {
     try {
-      const res = await api.get('/appointments');
-      setAppointments(res.data.data ?? res.data ?? []);
+      const res = await cachedGet('/appointments', undefined, 60);
+      const list = res?.data ?? (Array.isArray(res) ? res : []);
+      setAppointments(list);
     } catch {
       setAppointments([]);
     } finally {
@@ -81,6 +87,7 @@ const MyAppointments: React.FC = () => {
     setCancelError('');
     try {
       await api.patch(`/appointments/${selectedId}/cancel`, { reason: cancelReason });
+      window.dispatchEvent(new CustomEvent('notification-refresh'));
       setCancelModalOpen(false);
       setCancelReason('');
       setSelectedId(null);

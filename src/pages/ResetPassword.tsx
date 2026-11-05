@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { Lock, Eye, EyeOff, CheckCircle2, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { BrandLogo } from '../components/common/BrandLogo';
 
 export const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -59,11 +60,7 @@ export const ResetPassword: React.FC = () => {
       <div style={{ width: '100%', maxWidth: '440px' }}>
         <div className="ml-card" style={{ padding: '2.5rem' }}>
           <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-            <img
-              src="/assets/brand/logo-color.png"
-              alt="Turnos Ya"
-              style={{ height: '48px', objectFit: 'contain' }}
-            />
+            <BrandLogo variant="color" size="lg" />
           </div>
 
           {!success ? (

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Search, X, Home, Calendar, Building2, User, AlertTriangle } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
@@ -8,15 +9,49 @@ import { CookieBanner } from './CookieBanner';
 import { LegalModals } from './LegalModals';
 import { BugReportModal } from './BugReportModal';
 import { FloatingReportButton } from './FloatingReportButton';
+import { BrandLogo } from './common/BrandLogo';
 
 
 export const Layout: React.FC = () => {
+  // Manejo de la dirección ante eventos de retroceso del navegador (Back button)
+  useEffect(() => {
+    const handlePopState = () => {
+      document.documentElement.dataset.transitionDir = 'backward';
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Reset scroll synchronously before paint to avoid awkward jump
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+  // Interceptar todos los clicks en enlaces internos para aplicar suavemente View Transitions en toda la app
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#') || anchor.target === '_blank') return;
+
+      e.preventDefault();
+      startSmoothNavigation(navigate, href);
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, [navigate]);
 
   // Keep input in sync if URL query parameter changes
   useEffect(() => {
@@ -78,11 +113,7 @@ export const Layout: React.FC = () => {
         <div className="container">
           <div className="navbar-inner">
             <Link to="/" className="navbar-brand" title="Turnos Ya - Inicio">
-              <img
-                src="/assets/brand/logo-white.png"
-                alt="Turnos Ya"
-                className="brand-logo-nav"
-              />
+              <BrandLogo variant="white" size="md" />
             </Link>
 
             <form className="search-group" onSubmit={handleSearchSubmit} role="search">
@@ -154,6 +185,7 @@ export const Layout: React.FC = () => {
         <div
           role="region"
           aria-label="Aviso de verificación de correo"
+          className="global-email-banner"
           style={{
             background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
             borderBottom: '1px solid #fde68a',
@@ -206,12 +238,12 @@ export const Layout: React.FC = () => {
         </div>
       )}
 
-      <main className="container page-main">
-        <Outlet />
-      </main>
-
-      {/* Pie de página institucional estilo Mercado Libre (solamente en inicio) */}
-      {location.pathname === '/' && <Footer />}
+      <div className="page-main-transition" style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <main className="container page-main" style={{ flex: 1 }}>
+          <Outlet />
+        </main>
+        {location.pathname === '/' && <Footer />}
+      </div>
 
       {/* Cartel flotante de cookies */}
       <CookieBanner />

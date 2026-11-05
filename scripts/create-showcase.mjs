@@ -1,0 +1,400 @@
+import fs from 'fs';
+import path from 'path';
+
+// VARIATION 1: Bold Solid Arrow with Negative Space Knockout (Mask)
+// The arrow is a thick solid ribbon with a large, unmistakable arrowhead.
+// A protective gap (negative space) clears the calendar grid and borders around the arrow.
+function getVar1Svg(colorMode = 'white', width = 100, height = 100) {
+  const isWhite = colorMode === 'white';
+  const strokeColor = isWhite ? '#ffffff' : '#0f172a';
+  const arrowColor = isWhite ? '#ffffff' : '#009ee3';
+  const maskColor = isWhite ? '#009ee3' : '#ffffff'; // The background color to create the cutout gap
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${width}" height="${height}" fill="none">
+  <!-- Top Rings -->
+  <rect x="26" y="8" width="10" height="18" rx="5" fill="${strokeColor}" />
+  <rect x="64" y="8" width="10" height="18" rx="5" fill="${strokeColor}" />
+
+  <!-- Calendar Outer Box -->
+  <rect x="14" y="18" width="72" height="70" rx="16" stroke="${strokeColor}" stroke-width="6" />
+
+  <!-- Header Divider -->
+  <line x1="16" y1="36" x2="84" y2="36" stroke="${strokeColor}" stroke-width="5" stroke-linecap="round" />
+
+  <!-- Clean Calendar Days (Only top 2 dots/lines so it never clutters) -->
+  <rect x="26" y="44" width="8" height="6" rx="3" fill="${strokeColor}" opacity="0.6" />
+  <rect x="46" y="44" width="8" height="6" rx="3" fill="${strokeColor}" opacity="0.6" />
+  <rect x="66" y="44" width="8" height="6" rx="3" fill="${strokeColor}" opacity="0.6" />
+  <rect x="26" y="58" width="8" height="6" rx="3" fill="${strokeColor}" opacity="0.6" />
+  <rect x="46" y="58" width="8" height="6" rx="3" fill="${strokeColor}" opacity="0.6" />
+
+  <!-- Cutout Gap around the Arrow (Negative Space Knockout) -->
+  <path d="M4 92 C24 92 48 86 66 68 L78 54 L98 46 L86 28 L64 36 L60 48 C44 64 24 72 8 72 Z" fill="${maskColor}" />
+
+  <!-- Speed Lines -->
+  <path d="M4 76h12M1 84h15M6 92h10" stroke="${arrowColor}" stroke-width="4" stroke-linecap="round" />
+
+  <!-- BOLD DYNAMIC ARROW (Solid filled ribbon + prominent arrowhead) -->
+  <path d="M10 88C26 88 48 82 66 66C72 60 76 52 80 44L72 42L95 34L88 57L82 50C77 58 72 64 64 71C46 86 26 92 10 92Z" fill="${arrowColor}" />
+</svg>`;
+}
+
+// VARIATION 2: Faithful to Original (Solid White Calendar Card + Big Punchy Blue/White Arrow)
+// In original, the calendar has a solid filled white face, so the arrow sits on top with total clarity.
+function getVar2Svg(colorMode = 'white', width = 100, height = 100) {
+  const isWhite = colorMode === 'white';
+  
+  if (isWhite) {
+    // Monochromatic high-contrast: Solid white calendar with cutout arrow
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${width}" height="${height}" fill="none">
+      <!-- Calendar Rings -->
+      <rect x="26" y="8" width="10" height="18" rx="5" fill="#ffffff" />
+      <rect x="64" y="8" width="10" height="18" rx="5" fill="#ffffff" />
+      
+      <!-- Calendar Body (Stroked) -->
+      <rect x="14" y="18" width="72" height="70" rx="16" stroke="#ffffff" stroke-width="6.5" />
+      <line x1="16" y1="36" x2="84" y2="36" stroke="#ffffff" stroke-width="5" />
+      
+      <!-- Subtle Grid -->
+      <line x1="38" y1="44" x2="38" y2="78" stroke="#ffffff" stroke-width="3" opacity="0.35" stroke-dasharray="2 6" />
+      <line x1="62" y1="44" x2="62" y2="78" stroke="#ffffff" stroke-width="3" opacity="0.35" stroke-dasharray="2 6" />
+      <line x1="22" y1="56" x2="78" y2="56" stroke="#ffffff" stroke-width="3" opacity="0.35" stroke-dasharray="2 6" />
+      <line x1="22" y1="70" x2="52" y2="70" stroke="#ffffff" stroke-width="3" opacity="0.35" stroke-dasharray="2 6" />
+      
+      <!-- Negative Space Mask behind Arrow -->
+      <path d="M6 94C24 94 48 88 66 70C74 62 80 52 84 42L70 38L97 32L90 60L82 48C76 58 70 66 62 74C44 90 22 98 6 98Z" stroke="#009ee3" stroke-width="6" stroke-linejoin="round" fill="#009ee3" />
+
+      <!-- Speed Trails -->
+      <path d="M4 75h12M0 83h16M5 91h11" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+
+      <!-- BOLD SWOOSH ARROW (Thick and unmistakable) -->
+      <path d="M8 88C26 88 50 82 66 66C73 59 78 50 82 42" stroke="#ffffff" stroke-width="9" stroke-linecap="round" />
+      <!-- Big Arrow Head -->
+      <polygon points="68,40 96,33 87,61 80,48" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" />
+    </svg>`;
+  } else {
+    // Light mode: Navy calendar + Vibrant Cyan arrow
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${width}" height="${height}" fill="none">
+      <rect x="26" y="8" width="10" height="18" rx="5" fill="#0f172a" />
+      <rect x="64" y="8" width="10" height="18" rx="5" fill="#0f172a" />
+      <rect x="14" y="18" width="72" height="70" rx="16" fill="#ffffff" stroke="#0f172a" stroke-width="6.5" />
+      <line x1="16" y1="36" x2="84" y2="36" stroke="#0f172a" stroke-width="5" />
+      
+      <line x1="38" y1="44" x2="38" y2="78" stroke="#0f172a" stroke-width="3" opacity="0.2" stroke-dasharray="2 6" />
+      <line x1="62" y1="44" x2="62" y2="78" stroke="#0f172a" stroke-width="3" opacity="0.2" stroke-dasharray="2 6" />
+      <line x1="22" y1="56" x2="78" y2="56" stroke="#0f172a" stroke-width="3" opacity="0.2" stroke-dasharray="2 6" />
+      <line x1="22" y1="70" x2="52" y2="70" stroke="#0f172a" stroke-width="3" opacity="0.2" stroke-dasharray="2 6" />
+      
+      <!-- Knockout around arrow -->
+      <path d="M6 94C24 94 48 88 66 70C74 62 80 52 84 42L70 38L97 32L90 60L82 48C76 58 70 66 62 74C44 90 22 98 6 98Z" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" fill="#ffffff" />
+
+      <path d="M4 75h12M0 83h16M5 91h11" stroke="#009ee3" stroke-width="4.5" stroke-linecap="round" />
+      <path d="M8 88C26 88 50 82 66 66C73 59 78 50 82 42" stroke="#009ee3" stroke-width="9" stroke-linecap="round" />
+      <polygon points="68,40 96,33 87,61 80,48" fill="#009ee3" stroke="#009ee3" stroke-width="2" stroke-linejoin="round" />
+    </svg>`;
+  }
+}
+
+// VARIATION 3: Modern Clean Badge (Calendar shape where the arrow is integrated as a power icon)
+function getVar3Svg(colorMode = 'white', width = 100, height = 100) {
+  const isWhite = colorMode === 'white';
+  const mainColor = isWhite ? '#ffffff' : '#0f172a';
+  const accent = isWhite ? '#ffffff' : '#009ee3';
+  
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${width}" height="${height}" fill="none">
+    <!-- Clean Minimalist Calendar -->
+    <rect x="28" y="8" width="9" height="16" rx="4.5" fill="${mainColor}" />
+    <rect x="63" y="8" width="9" height="16" rx="4.5" fill="${mainColor}" />
+    
+    <!-- Top Bar is SOLID (immediately recognizable as calendar) -->
+    <path d="M16 34C16 26 22 20 30 20H70C78 20 84 26 84 34V36H16V34Z" fill="${mainColor}" />
+    
+    <!-- Lower Body -->
+    <path d="M16 36H84V72C84 80 78 86 70 86H30C22 86 16 80 16 72V36Z" stroke="${mainColor}" stroke-width="6" />
+    
+    <!-- BIG PUNCHY ARROW IN FRONT -->
+    <!-- Knockout gap -->
+    <path d="M10 88 C30 88 52 80 70 62 L74 54 L98 42 L88 22 L66 32 L68 44 C52 60 32 68 12 68 Z" fill="${isWhite ? '#009ee3' : '#ffffff'}" />
+    
+    <!-- Arrow Swoosh Ribbon -->
+    <path d="M12 84 C28 84 48 78 64 62" stroke="${accent}" stroke-width="9" stroke-linecap="round" />
+    <polygon points="62,44 94,36 84,66 76,52" fill="${accent}" stroke="${accent}" stroke-width="2" stroke-linejoin="round" />
+    <path d="M4 74h10M1 82h12" stroke="${accent}" stroke-width="4" stroke-linecap="round" />
+  </svg>`;
+}
+
+// VARIATION 4: The Original Isotype Restored & Digitized with Exact Negative Space
+// Identical concept to the user's original logo:
+// Calendar with white grid, large cyan/white sweeping arrow that bursts out of the right side!
+function getVar4Svg(colorMode = 'white', width = 100, height = 100) {
+  const isWhite = colorMode === 'white';
+  const bgBlue = '#009ee3';
+  
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${width}" height="${height}" fill="none">
+    <!-- Binder Rings -->
+    <rect x="27" y="6" width="9" height="18" rx="4.5" fill="#ffffff" />
+    <rect x="64" y="6" width="9" height="18" rx="4.5" fill="#ffffff" />
+
+    <!-- Calendar Frame with Solid White Header -->
+    <rect x="14" y="16" width="72" height="72" rx="16" stroke="#ffffff" stroke-width="6" />
+    <path d="M16 32C16 24 22 18 30 18H70C78 18 84 24 84 32V36H16V32Z" fill="#ffffff" />
+
+    <!-- Inside Grid: Clean 4-cell calendar -->
+    <line x1="50" y1="44" x2="50" y2="76" stroke="#ffffff" stroke-width="3.5" opacity="0.4" stroke-linecap="round" />
+    <line x1="24" y1="58" x2="76" y2="58" stroke="#ffffff" stroke-width="3.5" opacity="0.4" stroke-linecap="round" />
+
+    <!-- KNOCKOUT MASK FOR THE ARROW (Separates arrow completely from the calendar!) -->
+    <path d="M4 80 C24 80 46 74 62 60 L68 52 L96 42 L88 20 L62 32 L64 42 C50 56 30 64 8 64 Z" fill="${bgBlue}" />
+    <path d="M6 86 C24 86 46 80 62 66" stroke="${bgBlue}" stroke-width="16" stroke-linecap="round" />
+
+    <!-- SPEED LINES -->
+    <line x1="2" y1="74" x2="14" y2="74" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+    <line x1="-1" y1="82" x2="15" y2="82" stroke="#ffffff" stroke-width="5" stroke-linecap="round" />
+    <line x1="3" y1="90" x2="13" y2="90" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- THE BIG PROMINENT ARROW -->
+    <!-- Swoosh tail -->
+    <path d="M8 86 C26 86 48 80 66 64 C74 56 80 48 84 38" stroke="#ffffff" stroke-width="9" stroke-linecap="round" />
+    
+    <!-- Big Sharp Arrow Head (extends past calendar) -->
+    <polygon points="68,36 96,28 88,58 79,45" fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" />
+  </svg>`;
+}
+
+// Generate comparison HTML page
+const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Comparación de Variaciones de Logo - Turnos Ya</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #009ee3;
+      color: white;
+      padding: 2.5rem;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 0.5rem; font-weight: 800; }
+    p.subtitle { opacity: 0.9; margin-bottom: 2rem; font-size: 0.95rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    .option-card {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1.5px solid rgba(255, 255, 255, 0.25);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(10px);
+    }
+    .option-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .option-desc {
+      font-size: 0.82rem;
+      opacity: 0.85;
+      margin-bottom: 1.25rem;
+      line-height: 1.4;
+    }
+    .preview-row {
+      background: #009ee3;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .brand-preview {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      line-height: 1;
+    }
+    .brand-text {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .brand-text span {
+      font-weight: 900;
+      margin-left: 2px;
+    }
+    .mobile-mock {
+      max-width: 320px;
+      background: #009ee3;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      padding: 10px 14px;
+    }
+    .mobile-mock-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .mobile-search {
+      background: white;
+      border-radius: 6px;
+      padding: 6px 12px;
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+    .zoom-box {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+  </style>
+</head>
+<body>
+  <h1>Comparación de Opciones para el Isotipo (Calendario + Flecha)</h1>
+  <p class="subtitle">Observa cómo cada opción resuelve la legibilidad de la flecha y evita que se pierda entre las líneas del calendario.</p>
+
+  <div class="grid">
+    <!-- OPCION A: Flecha Gigante con Knockout y Cabecera Sólida -->
+    <div class="option-card">
+      <div class="option-title">Opción A: Flecha Grande con Corte Limpio (Recomendada)</div>
+      <div class="option-desc">
+        La flecha es <strong>el doble de gruesa</strong> y tiene un <strong>corte de espacio negativo</strong> que borra las líneas a su alrededor. No compite con el calendario: la flecha se ve a kilómetros.
+      </div>
+
+      <div class="preview-row">
+        <div class="brand-preview">
+          ${getVar4Svg('white', 38, 38)}
+          <span class="brand-text">Turnos<span>Ya</span></span>
+        </div>
+        <div style="font-size: 0.8rem; opacity: 0.75;">Desktop Navbar (38px)</div>
+      </div>
+
+      <div class="mobile-mock">
+        <div class="mobile-mock-top">
+          <div class="brand-preview">
+            ${getVar4Svg('white', 30, 30)}
+            <span class="brand-text" style="font-size: 1.15rem;">Turnos<span>Ya</span></span>
+          </div>
+          <span style="font-size: 0.8rem;">🔔 👤</span>
+        </div>
+        <div class="mobile-search">Buscar negocios...</div>
+      </div>
+
+      <div class="zoom-box">
+        <div>Zoom 64px:</div>
+        ${getVar4Svg('white', 64, 64)}
+      </div>
+    </div>
+
+    <!-- OPCION B: Cabecera Sólida + Flecha Ribbon -->
+    <div class="option-card">
+      <div class="option-title">Opción B: Calendario con Cabecera Rellena + Flecha Cinta</div>
+      <div class="option-desc">
+        La barra superior del calendario es rellena (estilo insignia) y el cuerpo inferior tiene un corte total donde cruza la flecha.
+      </div>
+
+      <div class="preview-row">
+        <div class="brand-preview">
+          ${getVar3Svg('white', 38, 38)}
+          <span class="brand-text">Turnos<span>Ya</span></span>
+        </div>
+        <div style="font-size: 0.8rem; opacity: 0.75;">Desktop Navbar (38px)</div>
+      </div>
+
+      <div class="mobile-mock">
+        <div class="mobile-mock-top">
+          <div class="brand-preview">
+            ${getVar3Svg('white', 30, 30)}
+            <span class="brand-text" style="font-size: 1.15rem;">Turnos<span>Ya</span></span>
+          </div>
+          <span style="font-size: 0.8rem;">🔔 👤</span>
+        </div>
+        <div class="mobile-search">Buscar negocios...</div>
+      </div>
+
+      <div class="zoom-box">
+        <div>Zoom 64px:</div>
+        ${getVar3Svg('white', 64, 64)}
+      </div>
+    </div>
+
+    <!-- OPCION C: Grid Punteado Sutil -->
+    <div class="option-card">
+      <div class="option-title">Opción C: Cuadrícula Desvanecida (Subtle Dots)</div>
+      <div class="option-desc">
+        En vez de líneas continuas, el calendario usa un patrón tenue de cuadrícula al 35% de opacidad, dejando que la flecha sólida blanca domine la vista.
+      </div>
+
+      <div class="preview-row">
+        <div class="brand-preview">
+          ${getVar2Svg('white', 38, 38)}
+          <span class="brand-text">Turnos<span>Ya</span></span>
+        </div>
+        <div style="font-size: 0.8rem; opacity: 0.75;">Desktop Navbar (38px)</div>
+      </div>
+
+      <div class="mobile-mock">
+        <div class="mobile-mock-top">
+          <div class="brand-preview">
+            ${getVar2Svg('white', 30, 30)}
+            <span class="brand-text" style="font-size: 1.15rem;">Turnos<span>Ya</span></span>
+          </div>
+          <span style="font-size: 0.8rem;">🔔 👤</span>
+        </div>
+        <div class="mobile-search">Buscar negocios...</div>
+      </div>
+
+      <div class="zoom-box">
+        <div>Zoom 64px:</div>
+        ${getVar2Svg('white', 64, 64)}
+      </div>
+    </div>
+
+    <!-- OPCION D: Minimalista de Puntos -->
+    <div class="option-card">
+      <div class="option-title">Opción D: Días en Píldoras Minimalistas</div>
+      <div class="option-desc">
+        Sustituye el enrejado de líneas por pequeños indicadores de días (píldoras). Cero confusión con la flecha.
+      </div>
+
+      <div class="preview-row">
+        <div class="brand-preview">
+          ${getVar1Svg('white', 38, 38)}
+          <span class="brand-text">Turnos<span>Ya</span></span>
+        </div>
+        <div style="font-size: 0.8rem; opacity: 0.75;">Desktop Navbar (38px)</div>
+      </div>
+
+      <div class="mobile-mock">
+        <div class="mobile-mock-top">
+          <div class="brand-preview">
+            ${getVar1Svg('white', 30, 30)}
+            <span class="brand-text" style="font-size: 1.15rem;">Turnos<span>Ya</span></span>
+          </div>
+          <span style="font-size: 0.8rem;">🔔 👤</span>
+        </div>
+        <div class="mobile-search">Buscar negocios...</div>
+      </div>
+
+      <div class="zoom-box">
+        <div>Zoom 64px:</div>
+        ${getVar1Svg('white', 64, 64)}
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+fs.writeFileSync('Turnos_ya_frontend_web-main/public/options-showcase.html', html);
+console.log('Options showcase created!');
+
