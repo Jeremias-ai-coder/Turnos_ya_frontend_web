@@ -21,6 +21,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -432,7 +433,7 @@ export const SystemAdmin: React.FC = () => {
           <button
             type="button"
             className="btn btn-outline-primary"
-            onClick={() => navigate('/')}
+            onClick={() => startSmoothNavigation(navigate, '/', { direction: 'backward' })}
             style={{ fontSize: '0.84rem', padding: '8px 16px' }}
           >
             ← Volver al sitio

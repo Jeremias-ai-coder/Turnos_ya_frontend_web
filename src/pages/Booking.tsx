@@ -61,8 +61,10 @@ const Booking: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(!previewBiz);
 
   // Wizard state
-  const [step, setStepState] = useState<Step>(initialStep);
-  const [stepDir, setStepDir] = useState<'slide-in-right' | 'slide-in-left'>('slide-in-right');
+  const [{ step, stepDir }, setStepConfig] = useState<{ step: Step; stepDir: 'slide-in-right' | 'slide-in-left' }>({
+    step: initialStep,
+    stepDir: 'slide-in-right'
+  });
   const [selectedService, setSelectedService] = useState<Service | null>(initialService);
 
   // Lock de animación interna en primer montaje para evitar doble deslizamiento
@@ -72,11 +74,14 @@ const Booking: React.FC = () => {
   }, []);
 
   const setStep = (newStep: Step | ((prev: Step) => Step)) => {
-    setStepState(prev => {
-      const next = typeof newStep === 'function' ? newStep(prev) : newStep;
-      setStepDir(next >= prev ? 'slide-in-right' : 'slide-in-left');
-      return next;
+    setStepConfig(prev => {
+      const next = typeof newStep === 'function' ? newStep(prev.step) : newStep;
+      return {
+        step: next,
+        stepDir: next >= prev.step ? 'slide-in-right' : 'slide-in-left'
+      };
     });
+    window.scrollTo({ top: 80, behavior: 'smooth' });
   };
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -373,12 +378,12 @@ const Booking: React.FC = () => {
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto' }}>
       <button
+        type="button"
         onClick={() => {
-          if (window.history.length > 1) {
-            startSmoothNavigation(navigate, -1);
-          } else {
-            startSmoothNavigation(navigate, `/businesses/${id}`);
-          }
+          startSmoothNavigation(navigate, `/businesses/${id}`, {
+            direction: 'backward',
+            state: { business }
+          });
         }}
         className="btn btn-light"
         style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}
