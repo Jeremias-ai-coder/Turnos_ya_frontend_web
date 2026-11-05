@@ -122,12 +122,10 @@ const BusinessDetail: React.FC = () => {
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
       <button
+        type="button"
         onClick={() => {
-          if (window.history.length > 1) {
-            startSmoothNavigation(navigate, -1);
-          } else {
-            startSmoothNavigation(navigate, '/');
-          }
+          const returnUrl = (location.state as any)?.from || '/';
+          startSmoothNavigation(navigate, returnUrl, { direction: 'backward' });
         }}
         className="btn btn-light"
         style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}

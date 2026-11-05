@@ -436,7 +436,7 @@ const Home: React.FC = () => {
                       onClick={(e) => {
                         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
                           e.preventDefault();
-                          startSmoothNavigation(navigate, `/businesses/${business.id}`, { state: { business } });
+                          startSmoothNavigation(navigate, `/businesses/${business.id}`, { state: { business, from: location.pathname + location.search } });
                         }
                       }}
                       key={business.id}
