@@ -20,7 +20,12 @@ import {
   ExternalLink,
   MapPin,
   Phone,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  Mail,
+  Globe,
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -45,10 +50,33 @@ const formatTime = (timeStr: string) => {
   return formatTimeToHHMM(timeStr);
 };
 
+const InstagramIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+  </svg>
+);
+
+const FacebookIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+  </svg>
+);
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBiz, setSelectedBiz] = useState<Business | null>(null);
+  const [showFichaModal, setShowFichaModal] = useState(false);
+  const [copiedCuit, setCopiedCuit] = useState(false);
+
+  const handleCopyCuit = (cuit: string) => {
+    if (!cuit) return;
+    navigator.clipboard.writeText(cuit);
+    setCopiedCuit(true);
+    setTimeout(() => setCopiedCuit(false), 2000);
+  };
   const [activeTab, setActiveTab] = useState<'agenda' | 'services' | 'schedules' | 'reviews' | 'settings'>('agenda');
 
   const [agendaDate, setAgendaDate] = useState(new Date());
@@ -362,14 +390,24 @@ const Dashboard: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                className="btn btn-outline-primary"
-                onClick={() => navigate('/register-business', { state: { business: selectedBiz } })}
-                style={{ fontSize: '0.84rem', padding: '8px 16px', fontWeight: 700 }}
-              >
-                Editar datos / Evidencias
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-light"
+                  onClick={() => setShowFichaModal(true)}
+                  style={{ fontSize: '0.84rem', padding: '8px 14px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #bfdbfe', background: '#fff', color: '#1e40af' }}
+                >
+                  <Eye size={15} /> Ver Ficha Enviada
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary"
+                  onClick={() => navigate('/register-business', { state: { business: selectedBiz } })}
+                  style={{ fontSize: '0.84rem', padding: '8px 16px', fontWeight: 700 }}
+                >
+                  Editar datos / Evidencias
+                </button>
+              </div>
             </div>
           )}
 
@@ -397,14 +435,24 @@ const Dashboard: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={() => navigate('/register-business', { state: { business: selectedBiz } })}
-                  style={{ fontSize: '0.86rem', padding: '9px 18px', fontWeight: 800 }}
-                >
-                  Corregir y Reenviar Solicitud
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light"
+                    onClick={() => setShowFichaModal(true)}
+                    style={{ fontSize: '0.84rem', padding: '8px 14px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #fecaca', background: '#fff', color: '#991b1b' }}
+                  >
+                    <Eye size={15} /> Ver Ficha Enviada
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => navigate('/register-business', { state: { business: selectedBiz } })}
+                    style={{ fontSize: '0.86rem', padding: '9px 18px', fontWeight: 800 }}
+                  >
+                    Corregir y Reenviar Solicitud
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -442,6 +490,17 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                onClick={() => setShowFichaModal(true)}
+                style={{ padding: '7px 12px', fontSize: '0.82rem', gap: '6px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center' }}
+                title="Ver ficha técnica completa y evidencias registradas"
+              >
+                <Eye size={14} color="#0284c7" />
+                <span>Ficha Técnica</span>
+              </button>
+
               <Link
                 to={`/businesses/${selectedBiz.id}`}
                 className="btn btn-light"
@@ -1243,6 +1302,235 @@ const Dashboard: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal Ficha Completa del Negocio para el Propietario */}
+      {showFichaModal && selectedBiz && (
+        <div className="modal-overlay" onClick={() => setShowFichaModal(false)}>
+          <div
+            className="modal-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '720px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+          >
+            <div className="modal-drag-handle" />
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: selectedBiz.status === 'pending_approval' ? '#fef3c7' : selectedBiz.status === 'rejected' ? '#fee2e2' : '#e0f2fe',
+                    color: selectedBiz.status === 'pending_approval' ? '#b45309' : selectedBiz.status === 'rejected' ? '#dc2626' : '#0284c7',
+                    fontWeight: 800,
+                    fontSize: '1.3rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {(selectedBiz.name || 'B')[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                      {selectedBiz.name}
+                    </h3>
+                    {selectedBiz.status === 'pending_approval' && (
+                      <span className="badge badge-warning" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
+                        ⏳ En Revisión por Administración
+                      </span>
+                    )}
+                    {selectedBiz.status === 'approved' && (
+                      <span className="badge badge-confirmed" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
+                        ✓ Aprobado y Publicado
+                      </span>
+                    )}
+                    {selectedBiz.status === 'rejected' && (
+                      <span className="badge badge-danger" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
+                        ✕ Requiere Modificaciones
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                    <span>{selectedBiz.category || 'General'}</span> • <span>ID #{selectedBiz.id}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFichaModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px', margin: '14px 0', flex: 1 }}>
+              {selectedBiz.status === 'rejected' && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ color: '#991b1b', fontSize: '0.86rem' }}>Observación del Administrador:</strong>
+                    <p style={{ margin: '4px 0 0', color: '#b91c1c', fontSize: '0.82rem' }}>
+                      {selectedBiz.rejectionReason || 'No se registraron detalles específicos.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Identidad */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Descripción Comercial
+                </span>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-title)', lineHeight: '1.4' }}>
+                  {selectedBiz.description || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sin descripción.</span>}
+                </p>
+                {selectedBiz.email && (
+                  <div style={{ marginTop: '8px', fontSize: '0.82rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Mail size={13} color="#0284c7" /> Email: <strong>{selectedBiz.email}</strong>
+                  </div>
+                )}
+              </div>
+
+              {/* Ubicación */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Ubicación y Contacto
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '0.84rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Dirección:</span> <strong>{selectedBiz.address || 'N/A'}</strong>
+                    {(selectedBiz.city || selectedBiz.province) && (
+                      <span style={{ display: 'block', color: '#64748b', fontSize: '0.78rem' }}>
+                        {[selectedBiz.city, selectedBiz.province].filter(Boolean).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Teléfono:</span> <strong>{selectedBiz.phone || 'N/A'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Evidencias de Veracidad */}
+              <div style={{ background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px' }}>
+                <span style={{ fontSize: '0.74rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                  Evidencias de Veracidad y Redes
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                  {/* IG */}
+                  <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#e1306c', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <InstagramIcon size={12} color="#e1306c" /> Instagram
+                      </span>
+                      {selectedBiz.instagramUrl && (
+                        <a href={selectedBiz.instagramUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: '#e1306c', fontWeight: 700 }}>
+                          Ver ↗
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#881337', fontWeight: 600, marginTop: '2px', wordBreak: 'break-all' }}>
+                      {selectedBiz.instagramUrl || <span style={{ color: '#fda4af' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* FB */}
+                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1877f2', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <FacebookIcon size={12} color="#1877f2" /> Facebook
+                      </span>
+                      {selectedBiz.facebookUrl && (
+                        <a href={selectedBiz.facebookUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: '#1877f2', fontWeight: 700 }}>
+                          Ver ↗
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#1e3a8a', fontWeight: 600, marginTop: '2px', wordBreak: 'break-all' }}>
+                      {selectedBiz.facebookUrl || <span style={{ color: '#93c5fd' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* Maps */}
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <MapPin size={12} color="#dc2626" /> Google Maps
+                      </span>
+                      {selectedBiz.googleMapsUrl && (
+                        <a href={selectedBiz.googleMapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 700 }}>
+                          Ver ↗
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#7f1d1d', fontWeight: 600, marginTop: '2px', wordBreak: 'break-all' }}>
+                      {selectedBiz.googleMapsUrl || <span style={{ color: '#fca5a5' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* Web */}
+                  <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Globe size={12} color="#0284c7" /> Sitio Web
+                      </span>
+                      {selectedBiz.websiteUrl && (
+                        <a href={selectedBiz.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700 }}>
+                          Ver ↗
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#0c4a6e', fontWeight: 600, marginTop: '2px', wordBreak: 'break-all' }}>
+                      {selectedBiz.websiteUrl || <span style={{ color: '#7dd3fc' }}>No adjuntado</span>}
+                    </div>
+                  </div>
+
+                  {/* CUIT */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <FileText size={12} color="#475569" /> CUIT
+                      </span>
+                      {selectedBiz.cuit && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCuit(selectedBiz.cuit!)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', color: '#0284c7', fontWeight: 700, padding: 0 }}
+                        >
+                          {copiedCuit ? '¡Copiado!' : 'Copiar'}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '2px', fontFamily: 'monospace' }}>
+                      {selectedBiz.cuit || <span style={{ color: '#94a3b8', fontStyle: 'italic', fontFamily: 'inherit' }}>No declarado</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer-responsive" style={{ margin: 0, paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <button type="button" className="btn btn-light" onClick={() => setShowFichaModal(false)}>
+                Cerrar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowFichaModal(false);
+                  navigate('/register-business', { state: { business: selectedBiz } });
+                }}
+              >
+                <Pencil size={14} /> Editar Información
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
