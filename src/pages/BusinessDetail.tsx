@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SkeletonDetail } from '../components/common/SkeletonLoaders';
 import { DefaultBusinessCover } from '../components/common/DefaultBusinessCover';
+import { formatTimeToHHMM } from '../utils/timeHelper';
 import { type Business, type BusinessService as Service } from '../types';
 
 interface Review {
@@ -32,6 +33,7 @@ interface Review {
 }
 
 const INITIAL_REVIEWS_COUNT = 3;
+const DAY_NAMES = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 const BusinessDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -235,6 +237,90 @@ const BusinessDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      
+      {/* Horarios de Atención del Comercio */}
+      {schedules.length > 0 && (() => {
+        const jsDay = new Date().getDay();
+        const todayDayOfWeek = jsDay === 0 ? 7 : jsDay;
+        const todaySchedule = schedules.find((s: any) => s.dayOfWeek === todayDayOfWeek);
+
+        return (
+          <div className="ml-card" style={{ padding: 'clamp(1.2rem, 3.5vw, 1.75rem)', marginBottom: '2.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'var(--status-pending-bg)',
+                  color: 'var(--primary-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Clock size={20} />
+                </div>
+                <div>
+                  <h3 style={{ color: 'var(--text-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+                    Horarios de Atención
+                  </h3>
+                  <p className="text-muted text-xs" style={{ margin: '2px 0 0 0' }}>
+                    Días y franjas horarias de atención presencial
+                  </p>
+                </div>
+              </div>
+
+              {todaySchedule ? (
+                <span className="badge badge-confirmed" style={{ fontSize: '0.82rem', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                  Abierto hoy ({formatTimeToHHMM(todaySchedule.startTime)} a {formatTimeToHHMM(todaySchedule.endTime)} hs)
+                </span>
+              ) : (
+                <span className="badge badge-cancelled" style={{ fontSize: '0.82rem', padding: '5px 10px' }}>
+                  Cerrado hoy
+                </span>
+              )}
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+              gap: '10px',
+              background: 'var(--background-app)',
+              padding: '12px',
+              borderRadius: '12px'
+            }}>
+              {[1, 2, 3, 4, 5, 6, 7].map(d => {
+                const sch = schedules.find((s: any) => s.dayOfWeek === d);
+                const isTodayDay = d === todayDayOfWeek;
+                return (
+                  <div
+                    key={d}
+                    style={{
+                      background: isTodayDay ? '#ffffff' : 'transparent',
+                      border: isTodayDay ? '1.5px solid var(--primary-color)' : '1px solid transparent',
+                      boxShadow: isTodayDay ? 'var(--shadow-sm)' : 'none',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', fontWeight: isTodayDay ? 800 : 600, color: isTodayDay ? 'var(--primary-text)' : 'var(--text-secondary)', marginBottom: '2px' }}>
+                      {DAY_NAMES[d]} {isTodayDay && '•'}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: sch ? 700 : 500, color: sch ? 'var(--text-title)' : 'var(--text-disabled)' }}>
+                      {sch ? `${formatTimeToHHMM(sch.startTime)} - ${formatTimeToHHMM(sch.endTime)}` : 'Cerrado'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sección Permanente de Opiniones y Reseñas (Coincide con el ancho de arriba) */}
       <div className="ml-card" style={{ padding: 'clamp(1.2rem, 3.5vw, 2rem)', marginBottom: '3rem' }}>

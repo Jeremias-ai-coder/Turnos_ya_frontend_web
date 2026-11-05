@@ -31,6 +31,20 @@ export const LegalModals: React.FC = () => {
   const [cookiesSavedToast, setCookiesSavedToast] = useState(false);
 
   useEffect(() => {
+    if (!activeModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLegalModal();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [activeModal]);
+
+  useEffect(() => {
     const unsubscribe = subscribeLegalModal((type) => {
       setActiveModal(type);
       if (type === 'cookies') {
@@ -75,7 +89,7 @@ export const LegalModals: React.FC = () => {
   return (
     <div className="modal-overlay" onClick={closeLegalModal}>
       <div
-        className="modal-box"
+        className="modal-box" role="dialog" aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: activeModal === 'cookies' ? '560px' : '680px',

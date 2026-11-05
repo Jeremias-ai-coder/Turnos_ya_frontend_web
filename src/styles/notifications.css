@@ -46,7 +46,7 @@
 
 .notification-bell-btn.active {
   background: white;
-  color: var(--primary-color, #aa3bff);
+  color: var(--primary-color);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -204,7 +204,7 @@
 .btn-mark-all-read {
   background: none;
   border: none;
-  color: var(--primary-color, #aa3bff);
+  color: var(--primary-color);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -217,7 +217,7 @@
 }
 
 .btn-mark-all-read:hover {
-  background: rgba(170, 59, 255, 0.08);
+  background: rgba(0, 158, 227, 0.08);
 }
 
 .notification-list {
@@ -251,7 +251,7 @@
 }
 
 .notification-item.unread {
-  background: #fdf8ff;
+  background: #f0f9ff;
 }
 
 .notification-item.unread::before {
@@ -261,7 +261,7 @@
   top: 0;
   bottom: 0;
   width: 3.5px;
-  background: var(--primary-color, #aa3bff);
+  background: var(--primary-color);
 }
 
 .notification-icon-wrapper {
@@ -332,7 +332,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--primary-color, #aa3bff);
+  background: var(--primary-color);
   flex-shrink: 0;
   align-self: center;
 }
