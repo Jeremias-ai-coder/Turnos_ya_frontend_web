@@ -16,6 +16,7 @@ import {
   type AppNotification 
 } from '../services/notification.service';
 import { useAuth } from '../context/AuthContext';
+import { normalizeApiBaseUrl } from '../services/api';
 
 function formatRelativeTime(dateString: string): string {
   try {
@@ -68,7 +69,9 @@ export const NotificationBell: React.FC = () => {
     if (token) {
       try {
         // Conexión nativa de streaming SSE en tiempo real
-        eventSource = new EventSource(`/api/v1/notifications/stream?token=${encodeURIComponent(token)}`);
+        const apiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
+        const sseUrl = `${apiBase}/notifications/stream?token=${encodeURIComponent(token)}`;
+        eventSource = new EventSource(sseUrl);
 
         eventSource.onmessage = (event) => {
           try {
@@ -108,7 +111,7 @@ export const NotificationBell: React.FC = () => {
       if (document.visibilityState === 'visible') {
         fetchNotifications();
       }
-    }, 60000);
+    }, 12000); // Polling ágil de respaldo (12s en vez de 60s)
 
     // Al volver a la pestaña de Turnos Ya, sincronizar estado
     const handleVisibilityChange = () => {

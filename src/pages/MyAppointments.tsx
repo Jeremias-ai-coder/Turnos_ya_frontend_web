@@ -207,7 +207,7 @@ const MyAppointments: React.FC = () => {
             {filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE).map(apt => {
 
             const hoursUntil = getHoursUntil(apt.date, apt.time);
-            const noticeHours = apt.service?.minCancellationNoticeHours ?? 24;
+            const noticeHours = Math.max(24, apt.service?.minCancellationNoticeHours || 24);
             const canCancel = (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && hoursUntil >= noticeHours;
 
             return (
