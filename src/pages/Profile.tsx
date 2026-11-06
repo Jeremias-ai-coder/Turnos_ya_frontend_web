@@ -27,7 +27,9 @@ import {
   QrCode,
   Info,
   MonitorSmartphone,
-  ArrowLeft
+  ArrowLeft,
+  ShieldAlert,
+  ArrowRight
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { flushSync } from 'react-dom';
@@ -190,10 +192,11 @@ const Profile: React.FC = () => {
 
   // Modal y flujo de cambio de contraseña
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [passwordModalStep, setPasswordModalStep] = useState<'verify_code' | 'set_passwords'>('verify_code');
+  const [passwordModalStep, setPasswordModalStep] = useState<'no_methods' | 'choose_method' | 'verify_email' | 'verify_2fa' | 'set_passwords'>('verify_email');
   const [changeToken, setChangeToken] = useState<string | null>(null);
   const [changeAuthToken, setChangeAuthToken] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
+  const [twoFactorPasswordCode, setTwoFactorPasswordCode] = useState('');
   const [qaPasswordCode, setQaPasswordCode] = useState<string | null>(null);
   const [securityLoading, setSecurityLoading] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -465,25 +468,114 @@ const Profile: React.FC = () => {
     setSecurityMessage(null);
     setModalMessage(null);
     setVerificationCode('');
+    setTwoFactorPasswordCode('');
     setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     setForgotPasswordActive(false);
     setForgotPasswordMode('email_link');
 
+    const hasEmail = Boolean(profileForm.emailVerified);
+    const has2FA = Boolean(profileForm.twoFactorEnabled);
+
+    if (!hasEmail && !has2FA) {
+      setPasswordModalStep('no_methods');
+      setIsPasswordModalOpen(true);
+      setSecurityLoading(false);
+      return;
+    }
+
+    if (hasEmail && has2FA) {
+      setPasswordModalStep('choose_method');
+      setIsPasswordModalOpen(true);
+      setSecurityLoading(false);
+      return;
+    }
+
+    if (has2FA && !hasEmail) {
+      setPasswordModalStep('verify_2fa');
+      setIsPasswordModalOpen(true);
+      setSecurityLoading(false);
+      return;
+    }
+
+    // Only email verified
     try {
       const res = await api.post('/auth/request-password-change-code');
       setChangeToken(res.data.confirmationToken);
       setQaPasswordCode(res.data.qaCode || null);
-      setPasswordModalStep('verify_code');
+      setPasswordModalStep('verify_email');
       setIsPasswordModalOpen(true);
-    } catch {
-      // Si no se puede enviar código por SMTP en pruebas, habilitamos creación directa
-      setPasswordModalStep('set_passwords');
-      setForgotPasswordActive(true);
-      setForgotPasswordMode('reset_directly');
-      setIsPasswordModalOpen(true);
+    } catch (err: any) {
+      setSecurityMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo enviar el código de verificación por correo.',
+      });
     } finally {
       setSecurityLoading(false);
     }
+  };
+
+  const handleChooseEmailMethod = async () => {
+    setSecurityLoading(true);
+    setModalMessage(null);
+    try {
+      const res = await api.post('/auth/request-password-change-code');
+      setChangeToken(res.data.confirmationToken);
+      setQaPasswordCode(res.data.qaCode || null);
+      setPasswordModalStep('verify_email');
+    } catch (err: any) {
+      setModalMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo enviar el código por correo.',
+      });
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleChoose2FAMethod = () => {
+    setModalMessage(null);
+    setTwoFactorPasswordCode('');
+    setPasswordModalStep('verify_2fa');
+  };
+
+  const handleVerifyPassword2FACode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalMessage(null);
+
+    const clean = twoFactorPasswordCode.trim();
+    if (clean.length < 6) {
+      setModalMessage({ type: 'error', text: 'Ingresa el código de 6 dígitos de Google Authenticator o código de respaldo.' });
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const res = await api.post('/auth/verify-password-change-2fa', { code: clean });
+      setChangeAuthToken(res.data.changeAuthToken);
+      setPasswordModalStep('set_passwords');
+      setModalMessage({
+        type: 'success',
+        text: 'Identidad verificada exitosamente. Ya puedes ingresar tu nueva contraseña.',
+      });
+    } catch (err: any) {
+      setModalMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Código de Authenticator incorrecto o expirado.',
+      });
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleStartEmailFromModal = () => {
+    setIsPasswordModalOpen(false);
+    navigateProfileTab('profile');
+    handleSendVerificationEmail();
+  };
+
+  const handleStart2FAFromModal = () => {
+    setIsPasswordModalOpen(false);
+    handleOpenTwoFactorModal();
   };
 
   const handleVerifyPasswordCode = async (e: React.FormEvent) => {
@@ -600,6 +692,7 @@ const Profile: React.FC = () => {
     setIsPasswordModalOpen(false);
     setModalMessage(null);
     setVerificationCode('');
+    setTwoFactorPasswordCode('');
     setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     setChangeToken(null);
     setChangeAuthToken(null);
@@ -1855,7 +1948,11 @@ const Profile: React.FC = () => {
                     Cambiar contraseña
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700 }}>
-                    {passwordModalStep === 'verify_code' ? 'Paso 1 de 2: Verificación de código por mail' : 'Paso 2 de 2: Establecer nueva contraseña'}
+                    {passwordModalStep === 'no_methods' && 'Paso previo: Verificación de identidad requerida'}
+                    {passwordModalStep === 'choose_method' && 'Paso 1 de 2: Elegir método de verificación'}
+                    {passwordModalStep === 'verify_email' && 'Paso 1 de 2: Verificación de código por mail'}
+                    {passwordModalStep === 'verify_2fa' && 'Paso 1 de 2: Verificación con Google Authenticator'}
+                    {passwordModalStep === 'set_passwords' && 'Paso 2 de 2: Establecer nueva contraseña'}
                   </span>
                 </div>
               </div>
@@ -1879,7 +1976,234 @@ const Profile: React.FC = () => {
               </div>
             )}
 
-            {passwordModalStep === 'verify_code' ? (
+            {passwordModalStep === 'no_methods' ? (
+              <div style={{ textAlign: 'center', padding: '0.5rem 0 1rem' }}>
+                <div style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '50%',
+                  background: '#fef2f2',
+                  color: '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem',
+                  border: '1px solid #fecaca',
+                }}>
+                  <ShieldAlert size={28} />
+                </div>
+                <h4 style={{ margin: '0 0 0.5rem', fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-title)' }}>
+                  Verificación de identidad requerida
+                </h4>
+                <p style={{ margin: '0 0 1.5rem', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+                  Para proteger tu cuenta, requerimos verificar tu identidad antes de cambiar la contraseña. Actualmente no tienes ningún método de verificación configurado.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', textAlign: 'left' }}>
+                  <button
+                    type="button"
+                    onClick={handleStartEmailFromModal}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    className="btn-outline-hover"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Mail size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>Verificar correo electrónico</div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{profileForm.email || 'Ingresá a tu perfil para verificar'}</div>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} color="#94a3b8" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStart2FAFromModal}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    className="btn-outline-hover"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Smartphone size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>Activar Google Authenticator (2FA)</div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Códigos dinámicos de máxima seguridad</div>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} color="#94a3b8" />
+                  </button>
+                </div>
+
+                <div className="modal-footer-responsive" style={{ justifyContent: 'center' }}>
+                  <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
+                    Entendido, cancelar
+                  </button>
+                </div>
+              </div>
+            ) : passwordModalStep === 'choose_method' ? (
+              <div style={{ padding: '0.5rem 0' }}>
+                <p style={{ margin: '0 0 1.25rem', fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
+                  Tienes dos métodos de verificación activos. Selecciona cuál prefieres utilizar para confirmar tu identidad:
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleChooseEmailMethod}
+                    disabled={securityLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      border: '1px solid #bae6fd',
+                      background: '#f0f9ff',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Mail size={20} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0369a1' }}>Código por correo electrónico</div>
+                        <div style={{ fontSize: '0.8rem', color: '#0284c7' }}>Recibirás un código de 6 dígitos en {profileForm.email}</div>
+                      </div>
+                    </div>
+                    <ArrowRight size={18} color="#0284c7" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleChoose2FAMethod}
+                    disabled={securityLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      border: '1px solid #bbf7d0',
+                      background: '#f0fdf4',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#16a34a', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Smartphone size={20} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#15803d' }}>Google Authenticator (2FA)</div>
+                        <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>Ingresa el código dinámico de tu app</div>
+                      </div>
+                    </div>
+                    <ArrowRight size={18} color="#16a34a" />
+                  </button>
+                </div>
+
+                <div className="modal-footer-responsive">
+                  <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : passwordModalStep === 'verify_2fa' ? (
+              <form onSubmit={handleVerifyPassword2FACode}>
+                <div
+                  style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    marginBottom: '1.25rem',
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <Smartphone size={18} color="#16a34a" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: '#166534', lineHeight: 1.45 }}>
+                    Abre tu aplicación <strong>Google Authenticator</strong> e ingresa el código numérico de 6 dígitos (o uno de tus códigos de respaldo) para validar tu identidad.
+                  </p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
+                  <label className="form-label" style={{ fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>
+                    Código de Google Authenticator
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    className="form-control"
+                    placeholder="123456"
+                    value={twoFactorPasswordCode}
+                    onChange={(e) => setTwoFactorPasswordCode(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                    style={{
+                      fontSize: '1.4rem',
+                      letterSpacing: '6px',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      maxWidth: '220px',
+                      margin: '0 auto',
+                    }}
+                    autoFocus
+                    required
+                  />
+                  <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
+                    El código se renueva cada 30 segundos en tu dispositivo móvil.
+                  </small>
+                </div>
+
+                <div className="modal-footer-responsive">
+                  {profileForm.emailVerified && profileForm.twoFactorEnabled && (
+                    <button
+                      type="button"
+                      className="btn btn-light"
+                      onClick={() => setPasswordModalStep('choose_method')}
+                      style={{ marginRight: 'auto' }}
+                    >
+                      <ArrowLeft size={14} /> Cambiar método
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={securityLoading || twoFactorPasswordCode.trim().length < 6}
+                  >
+                    <CheckCircle2 size={16} /> {securityLoading ? 'Verificando...' : 'Verificar 2FA'}
+                  </button>
+                </div>
+              </form>
+            ) : passwordModalStep === 'verify_email' ? (
               <form onSubmit={handleVerifyPasswordCode}>
                 <div
                   style={{
@@ -1955,6 +2279,16 @@ const Profile: React.FC = () => {
                 </div>
 
                 <div className="modal-footer-responsive">
+                  {profileForm.emailVerified && profileForm.twoFactorEnabled && (
+                    <button
+                      type="button"
+                      className="btn btn-light"
+                      onClick={() => setPasswordModalStep('choose_method')}
+                      style={{ marginRight: 'auto' }}
+                    >
+                      <ArrowLeft size={14} /> Cambiar método
+                    </button>
+                  )}
                   <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
                     Cancelar
                   </button>
