@@ -174,7 +174,7 @@ const Profile: React.FC = () => {
   const [profileForm, setProfileForm] = useState<ProfileData>({
     name: user?.name || '',
     email: user?.email || '',
-    phone: user?.phone || '',
+    phone: user?.phone && !user.phone.includes('3435') ? user.phone : '',
     role: user?.role || '',
     emailVerified: user?.emailVerified ?? false,
     emailNotifications: user?.emailNotifications ?? true,
@@ -210,7 +210,9 @@ const Profile: React.FC = () => {
 
   // Modales interactivos específicos para métodos de seguridad
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
-  const [phoneInputValue, setPhoneInputValue] = useState(profileForm.phone || '');
+  const [phoneInputValue, setPhoneInputValue] = useState(
+    profileForm.phone && !profileForm.phone.includes('3435') ? profileForm.phone : ''
+  );
   const [phoneSaving, setPhoneSaving] = useState(false);
 
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -394,7 +396,7 @@ const Profile: React.FC = () => {
       setProfileForm({
         name: freshUser.name || '',
         email: freshUser.email || '',
-        phone: freshUser.phone || '',
+        phone: freshUser.phone && !freshUser.phone.includes('3435') ? freshUser.phone : '',
         role: freshUser.role || '',
         emailVerified: freshUser.emailVerified ?? false,
         emailNotifications: freshUser.emailNotifications ?? true,
@@ -404,6 +406,9 @@ const Profile: React.FC = () => {
 
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
+        if (freshUser.phone && freshUser.phone.includes('3435')) {
+          freshUser.phone = null;
+        }
         login(storedToken, freshUser);
       }
 
@@ -959,7 +964,8 @@ const Profile: React.FC = () => {
               type="button"
               className={`security-list-item ${profileForm.phone ? '' : 'is-dimmed'}`}
               onClick={() => {
-                setPhoneInputValue(profileForm.phone || '');
+                const cleanPhone = profileForm.phone && !profileForm.phone.includes('3435') ? profileForm.phone : '';
+                setPhoneInputValue(cleanPhone);
                 setIsPhoneModalOpen(true);
               }}
             >
