@@ -29,7 +29,8 @@ import {
   MonitorSmartphone,
   ArrowLeft,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { flushSync } from 'react-dom';
@@ -233,7 +234,8 @@ const Profile: React.FC = () => {
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
   const [twoFactorCopied, setTwoFactorCopied] = useState(false);
 
-  const handleOpenTwoFactorModal = async () => {
+  const handleOpenTwoFactorModal = async (forceReset?: boolean | React.MouseEvent) => {
+    const shouldReset = forceReset === true;
     setTwoFactorError(null);
     setTwoFactorCodeInput('');
     setTwoFactorDisablePassword('');
@@ -247,7 +249,8 @@ const Profile: React.FC = () => {
       setIsTwoFactorModalOpen(true);
       setTwoFactorLoading(true);
       try {
-        const res = await api.get('/auth/2fa/setup');
+        const url = shouldReset ? '/auth/2fa/setup?reset=true' : '/auth/2fa/setup';
+        const res = await api.get(url);
         setTwoFactorQr(res.data.qrCode);
         setTwoFactorSecret(res.data.secret);
       } catch (err: any) {
@@ -2769,11 +2772,38 @@ const Profile: React.FC = () => {
                       Escaneá este código QR con la app <strong>Google Authenticator</strong> o <strong>Authy</strong> en tu teléfono celular:
                     </p>
 
+                    <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', marginBottom: '1rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <Info size={16} color="#0284c7" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ fontSize: '0.8rem', color: '#0369a1', lineHeight: 1.4 }}>
+                        <strong>Recomendación importante:</strong> Si tenías una cuenta guardada de Turnos Ya de un intento anterior en tu app Authenticator, <strong>eliminala primero</strong> antes de escanear este código para asegurarte de que el código que leas corresponda a esta clave.
+                      </div>
+                    </div>
+
                     {twoFactorQr && (
-                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.25rem' }}>
                         <div style={{ padding: '10px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                           <img src={twoFactorQr} alt="Código QR 2FA" style={{ width: '160px', height: '160px', display: 'block' }} />
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTwoFactorModal(true)}
+                          disabled={twoFactorLoading}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#0284c7',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginTop: '8px',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          <RefreshCw size={12} className={twoFactorLoading ? 'spin' : ''} />
+                          ¿Problemas al escanear? Generar una nueva clave QR
+                        </button>
                       </div>
                     )}
 
@@ -2802,8 +2832,14 @@ const Profile: React.FC = () => {
                         placeholder="123456"
                         className="form-control"
                         value={twoFactorCodeInput}
-                        onChange={(e) => setTwoFactorCodeInput(e.target.value.replace(/\D/g, ''))}
+                        onChange={(e) => setTwoFactorCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && twoFactorCodeInput.length === 6 && !twoFactorLoading) {
+                            handleVerifyAndEnableTwoFactor();
+                          }
+                        }}
                         style={{ textAlign: 'center', fontSize: '1.25rem', letterSpacing: '4px', fontWeight: 700 }}
+                        autoFocus
                       />
                     </div>
 

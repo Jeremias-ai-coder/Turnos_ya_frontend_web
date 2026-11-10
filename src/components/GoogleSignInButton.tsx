@@ -52,7 +52,12 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
             prompt: 'select_account',
             callback: handleOAuthResponse,
             error_callback: (nonOAuthErr: any) => {
-              console.error('Error inicializando Google OAuth:', nonOAuthErr);
+              if (nonOAuthErr?.type === 'popup_closed' || nonOAuthErr?.message === 'Popup window closed') {
+                // El usuario cerró la ventana emergente de Google
+                setLoading(false);
+                return;
+              }
+              console.warn('Aviso en Google OAuth:', nonOAuthErr);
             },
           });
         } catch (err) {
