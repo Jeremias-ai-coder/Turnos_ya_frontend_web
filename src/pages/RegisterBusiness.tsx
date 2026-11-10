@@ -73,6 +73,17 @@ export const RegisterBusiness: React.FC = () => {
   // Pestaña de evidencia activa
   const [activeEvidenceTab, setActiveEvidenceTab] = useState<'instagram' | 'facebook' | 'maps' | 'web' | 'cuit'>('instagram');
 
+  // Detección responsive garantizada en runtime (evita fallos de caché CSS)
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
@@ -160,7 +171,16 @@ export const RegisterBusiness: React.FC = () => {
   ];
 
   return (
-    <div className="register-business-container">
+    <div
+      className="register-business-container"
+      style={{
+        maxWidth: '820px',
+        margin: '0 auto',
+        boxSizing: 'border-box',
+        width: '100%',
+        padding: isMobile ? '0.75rem 0.85rem calc(6rem + env(safe-area-inset-bottom, 20px))' : '1.5rem 1rem 4rem'
+      }}
+    >
       {/* Botón Volver */}
       <button
         type="button"
@@ -178,91 +198,166 @@ export const RegisterBusiness: React.FC = () => {
       </button>
 
       {/* Hero Header */}
-      <div className="register-business-hero">
-        <div className="register-hero-badge">
+      <div className="register-business-hero" style={{ textAlign: 'center', marginBottom: isMobile ? '1.25rem' : '2rem' }}>
+        <div
+          className="register-hero-badge"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: '#e0f2fe',
+            color: '#0369a1',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            marginBottom: '0.65rem'
+          }}
+        >
           <ShieldCheck size={16} /> Verificación de Comercios Profesionales
         </div>
-        <h1 className="register-hero-title">
+        <h1
+          className="register-hero-title"
+          style={{
+            fontWeight: 800,
+            color: 'var(--text-title)',
+            fontSize: isMobile ? '1.35rem' : '1.85rem',
+            margin: '0 0 8px',
+            lineHeight: 1.25
+          }}
+        >
           {editingBusiness ? 'Corregir y Reenviar Solicitud de Negocio' : 'Registrá tu Negocio en Turnos Ya'}
         </h1>
-        <p className="register-hero-subtitle">
+        <p
+          className="register-hero-subtitle"
+          style={{
+            color: '#64748b',
+            fontSize: isMobile ? '0.84rem' : '0.95rem',
+            maxWidth: '580px',
+            margin: '0 auto',
+            lineHeight: 1.5
+          }}
+        >
           Completá los datos de tu comercio y las evidencias de veracidad para que nuestro equipo valide tu alta comercial y active tu catálogo.
         </p>
       </div>
 
-      {/* Stepper Desktop */}
-      <div className="register-stepper-desktop">
-        {[
-          { num: 1, label: 'Identidad' },
-          { num: 2, label: 'Ubicación y Contacto' },
-          { num: 3, label: 'Evidencias y Redes' },
-          { num: 4, label: 'Confirmación' }
-        ].map((item, idx) => {
-          const isActive = step === item.num;
-          const isDone = step > item.num;
-          return (
-            <React.Fragment key={item.num}>
-              {idx > 0 && (
-                <div style={{ width: '40px', height: '2px', background: isDone ? 'var(--primary-color)' : '#e2e8f0', transition: 'background 0.3s' }} />
-              )}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: isDone ? 'pointer' : 'default',
-                  opacity: isActive || isDone ? 1 : 0.6
-                }}
-                onClick={() => isDone && setStep(item.num)}
-              >
+      {/* Stepper Adaptativo (Garantiza cero desbordamiento en móvil) */}
+      {isMobile ? (
+        <div
+          style={{
+            background: '#ffffff',
+            border: '1px solid var(--border-default)',
+            borderRadius: '14px',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
+            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.03)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '0.65rem' }}>
+            <span
+              style={{
+                background: '#eff6ff',
+                color: 'var(--primary-color)',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                padding: '3px 8px',
+                borderRadius: '12px',
+                letterSpacing: '0.4px',
+                flexShrink: 0
+              }}
+            >
+              PASO {step} DE 4
+            </span>
+            <span
+              style={{
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                color: 'var(--text-title)',
+                textAlign: 'right',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {stepTitles[step - 1]}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {[1, 2, 3, 4].map(num => {
+              const isDone = step > num;
+              const isActive = step === num;
+              return (
+                <div
+                  key={num}
+                  onClick={() => isDone && setStep(num)}
+                  style={{
+                    flex: 1,
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: isActive ? 'var(--primary-color)' : isDone ? '#0284c7' : '#e2e8f0',
+                    boxShadow: isActive ? '0 0 6px rgba(0, 158, 227, 0.35)' : 'none',
+                    cursor: isDone ? 'pointer' : 'default',
+                    transition: 'all 0.25s ease'
+                  }}
+                  title={stepTitles[num - 1]}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="register-stepper-desktop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
+          {[
+            { num: 1, label: 'Identidad' },
+            { num: 2, label: 'Ubicación y Contacto' },
+            { num: 3, label: 'Evidencias y Redes' },
+            { num: 4, label: 'Confirmación' }
+          ].map((item, idx) => {
+            const isActive = step === item.num;
+            const isDone = step > item.num;
+            return (
+              <React.Fragment key={item.num}>
+                {idx > 0 && (
+                  <div style={{ width: '40px', height: '2px', background: isDone ? 'var(--primary-color)' : '#e2e8f0', transition: 'background 0.3s' }} />
+                )}
                 <div
                   style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: isDone ? 'var(--primary-color)' : isActive ? '#e0f2fe' : '#f1f5f9',
-                    color: isDone ? 'white' : isActive ? 'var(--primary-color)' : '#94a3b8',
-                    border: isActive ? '2px solid var(--primary-color)' : 'none',
-                    fontWeight: 800,
-                    fontSize: '0.88rem',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s'
+                    gap: '6px',
+                    cursor: isDone ? 'pointer' : 'default',
+                    opacity: isActive || isDone ? 1 : 0.6
                   }}
+                  onClick={() => isDone && setStep(item.num)}
                 >
-                  {isDone ? '✓' : item.num}
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: isDone ? 'var(--primary-color)' : isActive ? '#e0f2fe' : '#f1f5f9',
+                      color: isDone ? 'white' : isActive ? 'var(--primary-color)' : '#94a3b8',
+                      border: isActive ? '2px solid var(--primary-color)' : 'none',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {isDone ? '✓' : item.num}
+                  </div>
+                  <span style={{ fontSize: '0.84rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-title)' : '#64748b' }}>
+                    {item.label}
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.84rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-title)' : '#64748b' }}>
-                  {item.label}
-                </span>
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      {/* Stepper Mobile */}
-      <div className="register-stepper-mobile">
-        <div className="register-mobile-step-header">
-          <span className="register-mobile-step-badge">PASO {step} DE 4</span>
-          <span className="register-mobile-step-title">{stepTitles[step - 1]}</span>
-        </div>
-        <div className="register-mobile-progress-track">
-          {[1, 2, 3, 4].map(num => {
-            const isDone = step > num;
-            const isActive = step === num;
-            return (
-              <div
-                key={num}
-                className={`register-mobile-progress-segment ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
-                onClick={() => isDone && setStep(num)}
-                title={stepTitles[num - 1]}
-              />
+              </React.Fragment>
             );
           })}
         </div>
-      </div>
+      )}
 
       {/* Error Banner */}
       {errorMsg && (
@@ -273,7 +368,7 @@ export const RegisterBusiness: React.FC = () => {
       )}
 
       {/* Main Card */}
-      <div className="register-business-card">
+      <div className="register-business-card" style={{ padding: isMobile ? '1.25rem 1rem' : '2rem' }}>
         <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); setStep(s => s + 1); }}>
 
           {/* PASO 1: Identidad del Comercio */}
@@ -346,13 +441,13 @@ export const RegisterBusiness: React.FC = () => {
                 />
               </div>
 
-              <div className="register-buttons-row" style={{ justifyContent: 'flex-end' }}>
+              <div className="register-buttons-row" style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', marginTop: '1.5rem' }}>
                 <button
                   type="button"
                   className="btn btn-primary"
                   disabled={!canProceedStep1}
                   onClick={() => setStep(2)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px', fontSize: '0.95rem' }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 24px', fontSize: '0.95rem' }}
                 >
                   Continuar a Ubicación y Contacto <ArrowRight size={18} />
                 </button>
@@ -446,12 +541,12 @@ export const RegisterBusiness: React.FC = () => {
                 </div>
               </div>
 
-              <div className="register-buttons-row">
+              <div className="register-buttons-row" style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.5rem' }}>
                 <button
                   type="button"
                   className="btn btn-light"
                   onClick={() => setStep(1)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
                   <ArrowLeft size={16} /> Paso anterior
                 </button>
@@ -460,7 +555,7 @@ export const RegisterBusiness: React.FC = () => {
                   className="btn btn-primary"
                   disabled={!canProceedStep2}
                   onClick={() => setStep(3)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px', fontSize: '0.95rem' }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 24px', fontSize: '0.95rem' }}
                 >
                   Continuar a Evidencias <ArrowRight size={18} />
                 </button>
@@ -750,12 +845,12 @@ export const RegisterBusiness: React.FC = () => {
                 </span>
               </div>
 
-              <div className="register-buttons-row">
+              <div className="register-buttons-row" style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.5rem' }}>
                 <button
                   type="button"
                   className="btn btn-light"
                   onClick={() => setStep(2)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
                   <ArrowLeft size={16} /> Paso anterior
                 </button>
@@ -764,7 +859,7 @@ export const RegisterBusiness: React.FC = () => {
                   className="btn btn-primary"
                   disabled={!hasAtLeastOneEvidence}
                   onClick={() => setStep(4)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px', fontSize: '0.95rem' }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 24px', fontSize: '0.95rem' }}
                 >
                   Revisar y Confirmar <ArrowRight size={18} />
                 </button>
@@ -875,13 +970,13 @@ export const RegisterBusiness: React.FC = () => {
                 </div>
               </div>
 
-              <div className="register-buttons-row">
+              <div className="register-buttons-row" style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.5rem' }}>
                 <button
                   type="button"
                   className="btn btn-light"
                   disabled={submitting}
                   onClick={() => setStep(3)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
                   <ArrowLeft size={16} /> Modificar evidencias
                 </button>
@@ -889,7 +984,7 @@ export const RegisterBusiness: React.FC = () => {
                   type="submit"
                   className="btn btn-primary"
                   disabled={submitting}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 28px', fontSize: '1rem', fontWeight: 800 }}
+                  style={{ width: isMobile ? '100%' : 'auto', minHeight: '48px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 28px', fontSize: '1rem', fontWeight: 800 }}
                 >
                   {submitting ? (
                     <LoadingSpinner size="sm" inline text="Enviando solicitud al administrador..." color="white" />
