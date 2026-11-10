@@ -103,9 +103,24 @@ const Dashboard: React.FC = () => {
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
-  const [settingsForm, setSettingsForm] = useState({ name: '', description: '', address: '', phone: '', category: '' });
+  const [settingsForm, setSettingsForm] = useState({
+    name: '',
+    description: '',
+    address: '',
+    city: '',
+    province: '',
+    phone: '',
+    email: '',
+    category: '',
+    logoUrl: '',
+    instagramUrl: '',
+    facebookUrl: '',
+    websiteUrl: '',
+    googleMapsUrl: '',
+    cuit: '',
+  });
   const [availableCategories, setAvailableCategories] = useState<string[]>([
-    'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Otros'
+    'Peluquería', 'Estética', 'Salud', 'Deportes', 'Trámites', 'Mascotas', 'Gastronomía', 'Educación', 'Automotor', 'Otros'
   ]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -181,8 +196,17 @@ const Dashboard: React.FC = () => {
       name: selectedBiz.name || '',
       description: selectedBiz.description || '',
       address: selectedBiz.address || '',
+      city: selectedBiz.city || '',
+      province: selectedBiz.province || '',
       phone: selectedBiz.phone || '',
+      email: selectedBiz.email || '',
       category: selectedBiz.category || '',
+      logoUrl: selectedBiz.logoUrl || '',
+      instagramUrl: selectedBiz.instagramUrl || '',
+      facebookUrl: selectedBiz.facebookUrl || '',
+      websiteUrl: selectedBiz.websiteUrl || '',
+      googleMapsUrl: selectedBiz.googleMapsUrl || '',
+      cuit: selectedBiz.cuit || '',
     });
     Promise.all([
       api.get(`/businesses/${selectedBiz.id}/services`),
@@ -1258,47 +1282,446 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ======= CONFIGURACIÓN ======= */}
+          {/* ======= CONFIGURACIÓN (REDISEÑO SAAS PREMIUM EN GRID) ======= */}
           {activeTab === 'settings' && (
-            <div className="ml-card dashboard-card-responsive" style={{ maxWidth: '640px' }}>
-              <h3 style={{ fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-title)', fontSize: '1.15rem' }}>Configuración del Negocio</h3>
-              <p className="text-muted text-xs" style={{ margin: '0 0 1.25rem 0' }}>
-                Actualiza los datos de tu comercio visibles para los clientes
-              </p>
-              <form onSubmit={handleSaveSettings}>
-                <div className="form-group">
-                  <label className="form-label">Nombre del Negocio *</label>
-                  <input className="form-control" value={settingsForm.name} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Descripción</label>
-                  <textarea className="form-control" rows={3} placeholder="Describe los servicios y especialidad de tu local..." value={settingsForm.description} onChange={e => setSettingsForm(f => ({ ...f, description: e.target.value }))} />
-                </div>
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Dirección</label>
-                    <input className="form-control" placeholder="Ej. Calle 123, CABA" value={settingsForm.address} onChange={e => setSettingsForm(f => ({ ...f, address: e.target.value }))} />
+            <div className="dashboard-panel-grid" style={{ alignItems: 'start' }}>
+              {/* Columna Principal: Formulario Estructurado */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* Header de Configuración con Avatar */}
+                <div className="ml-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', background: '#fff' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, #009ee3 0%, #0284c7 100%)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '1.4rem',
+                      boxShadow: '0 4px 12px rgba(0, 158, 227, 0.25)'
+                    }}>
+                      {settingsForm.name?.charAt(0).toUpperCase() || <Building2 size={24} />}
+                    </div>
+                    <div>
+                      <h2 style={{ margin: 0, fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-title)' }}>
+                        {settingsForm.name || 'Mi Comercio'}
+                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                        <span className="badge badge-confirmed" style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
+                          {settingsForm.category || 'Sin categoría'}
+                        </span>
+                        <span className="text-muted text-xs">
+                          ID Oficial #{selectedBiz.id}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Teléfono</label>
-                    <input className="form-control" placeholder="Ej. 11 2345-6789" value={settingsForm.phone} onChange={e => setSettingsForm(f => ({ ...f, phone: e.target.value }))} />
+
+                  <Link
+                    to={`/businesses/${selectedBiz.id}`}
+                    target="_blank"
+                    className="btn btn-outline-primary"
+                    style={{ fontSize: '0.84rem', padding: '8px 14px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <ExternalLink size={14} /> Ver perfil público ↗
+                  </Link>
+                </div>
+
+                <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  
+                  {/* Bloque 1: Identidad Comercial */}
+                  <div className="ml-card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-default)' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Building2 size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-title)' }}>Identidad Comercial</h4>
+                        <p className="text-muted text-xs" style={{ margin: 0 }}>Nombre, rubro principal y cómo presentás tu comercio</p>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700 }}>Nombre del Negocio *</label>
+                      <input
+                        className="form-control"
+                        placeholder="Ej. Barbería Central, Centro de Estética..."
+                        value={settingsForm.name}
+                        onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700 }}>Categoría Principal *</label>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                        {availableCategories.map(cat => {
+                          const isSelected = settingsForm.category === cat;
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setSettingsForm(f => ({ ...f, category: cat }))}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                fontSize: '0.82rem',
+                                fontWeight: isSelected ? 700 : 500,
+                                border: isSelected ? '1.5px solid var(--primary-color)' : '1px solid var(--border-default)',
+                                background: isSelected ? '#e0f2fe' : '#ffffff',
+                                color: isSelected ? 'var(--primary-color)' : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isSelected ? `✓ ${cat}` : cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <select
+                        className="form-control"
+                        value={settingsForm.category}
+                        onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))}
+                        required
+                      >
+                        <option value="">O seleccionar de la lista completa...</option>
+                        {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="form-label" style={{ fontWeight: 700 }}>Descripción Comercial</label>
+                        <span className="text-muted text-xs">{settingsForm.description.length}/500</span>
+                      </div>
+                      <textarea
+                        className="form-control"
+                        rows={3}
+                        maxLength={500}
+                        placeholder="Describe los servicios, especialidad, comodidades y propuesta de valor de tu negocio..."
+                        value={settingsForm.description}
+                        onChange={e => setSettingsForm(f => ({ ...f, description: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bloque 2: Ubicación & Contacto Directo */}
+                  <div className="ml-card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-default)' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <MapPin size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-title)' }}>Ubicación & Contacto</h4>
+                        <p className="text-muted text-xs" style={{ margin: 0 }}>Donde concurren tus clientes y tus canales directos de atención</p>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700 }}>Dirección Física *</label>
+                      <div style={{ position: 'relative' }}>
+                        <MapPin size={16} color="var(--text-disabled)" style={{ position: 'absolute', left: 12, top: 12 }} />
+                        <input
+                          className="form-control"
+                          style={{ paddingLeft: '36px' }}
+                          placeholder="Ej. Av. Santa Fe 3250, Piso 1 Local 4"
+                          value={settingsForm.address}
+                          onChange={e => setSettingsForm(f => ({ ...f, address: e.target.value }))}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-grid-2">
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700 }}>Ciudad / Localidad</label>
+                        <input
+                          className="form-control"
+                          placeholder="Ej. CABA, Crespo..."
+                          value={settingsForm.city}
+                          onChange={e => setSettingsForm(f => ({ ...f, city: e.target.value }))}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700 }}>Provincia</label>
+                        <input
+                          className="form-control"
+                          placeholder="Ej. Buenos Aires, Entre Ríos"
+                          value={settingsForm.province}
+                          onChange={e => setSettingsForm(f => ({ ...f, province: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-grid-2">
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700 }}>Teléfono o WhatsApp *</label>
+                        <div style={{ position: 'relative' }}>
+                          <Phone size={16} color="var(--text-disabled)" style={{ position: 'absolute', left: 12, top: 12 }} />
+                          <input
+                            className="form-control"
+                            style={{ paddingLeft: '36px' }}
+                            placeholder="Ej. +54 9 11 2345-6789"
+                            value={settingsForm.phone}
+                            onChange={e => setSettingsForm(f => ({ ...f, phone: e.target.value }))}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700 }}>Email Comercial</label>
+                        <div style={{ position: 'relative' }}>
+                          <Mail size={16} color="var(--text-disabled)" style={{ position: 'absolute', left: 12, top: 12 }} />
+                          <input
+                            type="email"
+                            className="form-control"
+                            style={{ paddingLeft: '36px' }}
+                            placeholder="contacto@tunegocio.com"
+                            value={settingsForm.email}
+                            onChange={e => setSettingsForm(f => ({ ...f, email: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloque 3: Canales Digitales y Veracidad Oficial */}
+                  <div className="ml-card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-default)' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Globe size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-title)' }}>Presencia Digital & Enlaces Oficiales</h4>
+                        <p className="text-muted text-xs" style={{ margin: 0 }}>Redes y evidencias que dan confianza a clientes y administradores</p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid-2">
+                      {/* Instagram */}
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <label className="form-label" style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <InstagramIcon size={14} color="#e1306c" /> Instagram
+                          </label>
+                          {settingsForm.instagramUrl && (
+                            <a href={settingsForm.instagramUrl.startsWith('http') ? settingsForm.instagramUrl : `https://${settingsForm.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: '#e1306c', fontWeight: 600 }}>
+                              Probar link ↗
+                            </a>
+                          )}
+                        </div>
+                        <input
+                          className="form-control"
+                          placeholder="https://instagram.com/tu_comercio"
+                          value={settingsForm.instagramUrl}
+                          onChange={e => setSettingsForm(f => ({ ...f, instagramUrl: e.target.value }))}
+                        />
+                      </div>
+
+                      {/* Facebook */}
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <label className="form-label" style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <FacebookIcon size={14} color="#1877f2" /> Facebook
+                          </label>
+                          {settingsForm.facebookUrl && (
+                            <a href={settingsForm.facebookUrl.startsWith('http') ? settingsForm.facebookUrl : `https://${settingsForm.facebookUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: '#1877f2', fontWeight: 600 }}>
+                              Probar link ↗
+                            </a>
+                          )}
+                        </div>
+                        <input
+                          className="form-control"
+                          placeholder="https://facebook.com/tu_negocio"
+                          value={settingsForm.facebookUrl}
+                          onChange={e => setSettingsForm(f => ({ ...f, facebookUrl: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-grid-2">
+                      {/* Google Maps */}
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <label className="form-label" style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <MapPin size={14} color="#dc2626" /> Google Maps
+                          </label>
+                          {settingsForm.googleMapsUrl && (
+                            <a href={settingsForm.googleMapsUrl.startsWith('http') ? settingsForm.googleMapsUrl : `https://${settingsForm.googleMapsUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: '#dc2626', fontWeight: 600 }}>
+                              Probar link ↗
+                            </a>
+                          )}
+                        </div>
+                        <input
+                          className="form-control"
+                          placeholder="https://maps.app.goo.gl/... o enlace de maps"
+                          value={settingsForm.googleMapsUrl}
+                          onChange={e => setSettingsForm(f => ({ ...f, googleMapsUrl: e.target.value }))}
+                        />
+                      </div>
+
+                      {/* Sitio Web */}
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <label className="form-label" style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Globe size={14} color="#0284c7" /> Sitio Web Oficial
+                          </label>
+                          {settingsForm.websiteUrl && (
+                            <a href={settingsForm.websiteUrl.startsWith('http') ? settingsForm.websiteUrl : `https://${settingsForm.websiteUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: '#0284c7', fontWeight: 600 }}>
+                              Probar link ↗
+                            </a>
+                          )}
+                        </div>
+                        <input
+                          className="form-control"
+                          placeholder="https://www.tucomercio.com"
+                          value={settingsForm.websiteUrl}
+                          onChange={e => setSettingsForm(f => ({ ...f, websiteUrl: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FileText size={14} color="#475569" /> CUIT Tributario (Opcional)
+                      </label>
+                      <input
+                        className="form-control"
+                        placeholder="Ej: 20-12345678-9 (sin guiones o con formato)"
+                        value={settingsForm.cuit}
+                        onChange={e => setSettingsForm(f => ({ ...f, cuit: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Barra de Acciones de Guardado */}
+                  <div className="ml-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', background: '#fff' }}>
+                    <p className="text-muted text-xs" style={{ margin: 0 }}>
+                      Los cambios se sincronizan en vivo con tu ficha pública y la app mobile.
+                    </p>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={submitting}
+                      style={{ padding: '0.85rem 2rem', fontWeight: 800, borderRadius: '10px', boxShadow: '0 4px 14px rgba(0, 158, 227, 0.28)' }}
+                    >
+                      {submitting ? (
+                        <LoadingSpinner size="sm" inline text="Guardando Cambios..." color="white" />
+                      ) : (
+                        <><Settings size={18} /> Guardar Configuración</>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Columna Lateral (Sidebar de Soporte, Estado & Visibilidad) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* Tarjeta de Estado del Comercio */}
+                <div className="ml-card" style={{ padding: '1.25rem' }}>
+                  <h4 style={{ margin: '0 0 0.75rem', fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-title)' }}>
+                    Estado del Local
+                  </h4>
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '10px',
+                    background: selectedBiz.status === 'pending_approval' ? '#fef3c7' : selectedBiz.status === 'rejected' ? '#fee2e2' : '#e6f7ed',
+                    border: `1px solid ${selectedBiz.status === 'pending_approval' ? '#fde68a' : selectedBiz.status === 'rejected' ? '#fecaca' : '#bbf7d0'}`,
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        fontWeight: 800,
+                        fontSize: '0.88rem',
+                        color: selectedBiz.status === 'pending_approval' ? '#b45309' : selectedBiz.status === 'rejected' ? '#dc2626' : '#15803d'
+                      }}>
+                        {selectedBiz.status === 'pending_approval' ? '⏳ En Revisión Oficial' : selectedBiz.status === 'rejected' ? '✕ Observado por Auditoría' : '✓ Comercio Aprobado'}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: selectedBiz.status === 'pending_approval' ? '#92400e' : selectedBiz.status === 'rejected' ? '#991b1b' : '#166534', lineHeight: 1.4 }}>
+                      {selectedBiz.status === 'pending_approval'
+                        ? 'Tu comercio está siendo auditado por el equipo de Turnos Ya. Podés editar los datos libremente.'
+                        : selectedBiz.status === 'rejected'
+                        ? `Motivo: ${selectedBiz.rejectionReason || 'Se requiere corregir las evidencias o dirección.'}`
+                        : 'Tu comercio está activo y recibiendo turnos con normalidad.'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-light"
+                    onClick={() => setShowFichaModal(true)}
+                    style={{ width: '100%', padding: '9px', fontSize: '0.84rem', fontWeight: 700, gap: '6px', borderRadius: '8px' }}
+                  >
+                    <Eye size={15} color="#0284c7" /> Ver Ficha Técnica Completa
+                  </button>
+                </div>
+
+                {/* Checklist de Salud del Perfil */}
+                <div className="ml-card" style={{ padding: '1.25rem' }}>
+                  <h4 style={{ margin: '0 0 0.5rem', fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-title)' }}>
+                    Completitud del Perfil
+                  </h4>
+                  {(() => {
+                    const fields = [
+                      settingsForm.name,
+                      settingsForm.category,
+                      settingsForm.description,
+                      settingsForm.address,
+                      settingsForm.city,
+                      settingsForm.phone,
+                      settingsForm.email,
+                      settingsForm.instagramUrl || settingsForm.facebookUrl || settingsForm.websiteUrl,
+                      settingsForm.cuit
+                    ];
+                    const count = fields.filter(f => Boolean(f && String(f).trim())).length;
+                    const pct = Math.round((count / fields.length) * 100);
+                    return (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span className="text-muted text-xs">Nivel de optimización</span>
+                          <span style={{ fontWeight: 800, fontSize: '0.85rem', color: pct > 80 ? '#16a34a' : 'var(--primary-color)' }}>{pct}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '1rem' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: pct > 80 ? '#22c55e' : 'var(--primary-color)', transition: 'width 0.4s ease' }} />
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: settingsForm.description ? '#15803d' : 'var(--text-secondary)' }}>
+                      <Check size={14} color={settingsForm.description ? '#22c55e' : 'var(--text-disabled)'} /> Descripción detallada
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: settingsForm.phone ? '#15803d' : 'var(--text-secondary)' }}>
+                      <Check size={14} color={settingsForm.phone ? '#22c55e' : 'var(--text-disabled)'} /> WhatsApp de contacto
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: (settingsForm.instagramUrl || settingsForm.facebookUrl) ? '#15803d' : 'var(--text-secondary)' }}>
+                      <Check size={14} color={(settingsForm.instagramUrl || settingsForm.facebookUrl) ? '#22c55e' : 'var(--text-disabled)'} /> Redes sociales vinculadas
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: settingsForm.cuit ? '#15803d' : 'var(--text-secondary)' }}>
+                      <Check size={14} color={settingsForm.cuit ? '#22c55e' : 'var(--text-disabled)'} /> CUIT fiscal verificado
+                    </div>
                   </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Categoría *</label>
-                  <select className="form-control" value={settingsForm.category} onChange={e => setSettingsForm(f => ({ ...f, category: e.target.value }))} required>
-                    <option value="">Seleccionar categoría...</option>
-                    {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+
+                {/* Tip Pro de Posicionamiento */}
+                <div style={{ padding: '1rem', borderRadius: '12px', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <AlertCircle size={18} color="#1d4ed8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.4 }}>
+                      <strong>Tip de visibilidad:</strong> Los negocios con dirección completa y enlace a Google Maps reciben hasta un 40% más de reservas confirmadas en la app mobile.
+                    </p>
+                  </div>
                 </div>
-                <button type="submit" className="btn btn-primary" disabled={submitting} style={{ width: '100%', padding: '0.75rem 1.5rem', marginTop: '0.5rem' }}>
-                  {submitting ? (
-                    <LoadingSpinner size="sm" inline text="Guardando..." color="white" />
-                  ) : (
-                    <><Settings size={16} /> Guardar Configuración</>
-                  )}
-                </button>
-              </form>
+
+              </div>
             </div>
           )}
         </>
