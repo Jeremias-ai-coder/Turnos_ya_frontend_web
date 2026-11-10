@@ -3170,3 +3170,211 @@ a:hover {
     transition: none !important;
   }
 }
+
+
+/* ====== REGISTER BUSINESS MODERN & RESPONSIVE WIZARD ====== */
+.register-business-container {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.register-business-hero {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.register-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.register-hero-title {
+  font-weight: 800;
+  color: var(--text-title);
+  font-size: clamp(1.3rem, 4.5vw, 1.85rem);
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+.register-hero-subtitle {
+  color: #64748b;
+  font-size: clamp(0.84rem, 2.8vw, 0.95rem);
+  max-width: 580px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Stepper Desktop */
+.register-stepper-desktop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+/* Stepper Mobile */
+.register-stepper-mobile {
+  display: none;
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.register-mobile-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0.65rem;
+}
+
+.register-mobile-step-badge {
+  background: #eff6ff;
+  color: var(--primary-color);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+.register-mobile-step-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-title);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.register-mobile-progress-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.register-mobile-progress-segment {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.register-mobile-progress-segment.active {
+  background: var(--primary-color);
+  box-shadow: 0 0 6px rgba(0, 158, 227, 0.35);
+}
+
+.register-mobile-progress-segment.done {
+  background: #0284c7;
+  cursor: pointer;
+}
+
+/* Card */
+.register-business-card {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+}
+
+.register-evidence-tab-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.register-evidence-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.register-buttons-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .register-business-container {
+    padding: 0.75rem 0.85rem calc(5.5rem + env(safe-area-inset-bottom, 20px)) !important;
+  }
+
+  .register-business-hero {
+    margin-bottom: 1.25rem !important;
+  }
+
+  .register-stepper-desktop {
+    display: none !important;
+  }
+
+  .register-stepper-mobile {
+    display: block !important;
+  }
+
+  .register-business-card {
+    padding: 1.25rem 1rem !important;
+    border-radius: 14px !important;
+  }
+
+  .register-evidence-tab-bar {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .register-evidence-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .register-evidence-tab-bar button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 7px 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .register-evidence-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .register-buttons-row {
+    flex-direction: column-reverse !important;
+    gap: 0.75rem !important;
+  }
+
+  .register-buttons-row button,
+  .register-buttons-row a {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}

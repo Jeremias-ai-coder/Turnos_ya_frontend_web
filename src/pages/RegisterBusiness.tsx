@@ -152,9 +152,15 @@ export const RegisterBusiness: React.FC = () => {
   };
 
   const selectedCategoryName = categories.find(c => c.id === Number(categoryId))?.name || 'Categoría no seleccionada';
+  const stepTitles = [
+    'Identidad del Comercio',
+    'Ubicación y Contacto',
+    'Evidencias y Redes',
+    'Resumen y Confirmación'
+  ];
 
   return (
-    <div style={{ maxWidth: '820px', margin: '0 auto', padding: '1rem 0 3rem' }}>
+    <div className="register-business-container">
       {/* Botón Volver */}
       <button
         type="button"
@@ -172,20 +178,20 @@ export const RegisterBusiness: React.FC = () => {
       </button>
 
       {/* Hero Header */}
-      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#e0f2fe', color: '#0369a1', padding: '6px 14px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+      <div className="register-business-hero">
+        <div className="register-hero-badge">
           <ShieldCheck size={16} /> Verificación de Comercios Profesionales
         </div>
-        <h1 style={{ fontWeight: 800, color: 'var(--text-title)', fontSize: '1.85rem', margin: '0 0 8px' }}>
+        <h1 className="register-hero-title">
           {editingBusiness ? 'Corregir y Reenviar Solicitud de Negocio' : 'Registrá tu Negocio en Turnos Ya'}
         </h1>
-        <p style={{ color: '#64748b', fontSize: '0.95rem', maxWidth: '580px', margin: '0 auto' }}>
+        <p className="register-hero-subtitle">
           Completá los datos de tu comercio y las evidencias de veracidad para que nuestro equipo valide tu alta comercial y active tu catálogo.
         </p>
       </div>
 
-      {/* Stepper Indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '2.5rem' }}>
+      {/* Stepper Desktop */}
+      <div className="register-stepper-desktop">
         {[
           { num: 1, label: 'Identidad' },
           { num: 2, label: 'Ubicación y Contacto' },
@@ -236,6 +242,28 @@ export const RegisterBusiness: React.FC = () => {
         })}
       </div>
 
+      {/* Stepper Mobile */}
+      <div className="register-stepper-mobile">
+        <div className="register-mobile-step-header">
+          <span className="register-mobile-step-badge">PASO {step} DE 4</span>
+          <span className="register-mobile-step-title">{stepTitles[step - 1]}</span>
+        </div>
+        <div className="register-mobile-progress-track">
+          {[1, 2, 3, 4].map(num => {
+            const isDone = step > num;
+            const isActive = step === num;
+            return (
+              <div
+                key={num}
+                className={`register-mobile-progress-segment ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
+                onClick={() => isDone && setStep(num)}
+                title={stepTitles[num - 1]}
+              />
+            );
+          })}
+        </div>
+      </div>
+
       {/* Error Banner */}
       {errorMsg && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '12px 16px', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -245,7 +273,7 @@ export const RegisterBusiness: React.FC = () => {
       )}
 
       {/* Main Card */}
-      <div className="ml-card" style={{ padding: '2rem' }}>
+      <div className="register-business-card">
         <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); setStep(s => s + 1); }}>
 
           {/* PASO 1: Identidad del Comercio */}
@@ -318,7 +346,7 @@ export const RegisterBusiness: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+              <div className="register-buttons-row" style={{ justifyContent: 'flex-end' }}>
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -365,7 +393,7 @@ export const RegisterBusiness: React.FC = () => {
                 <span className="text-muted text-xs">Incluye número, piso o local si corresponde.</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700 }}>Ciudad / Localidad</label>
                   <input
@@ -389,7 +417,7 @@ export const RegisterBusiness: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700 }}>
                     Teléfono / WhatsApp de Atención <span style={{ color: '#ef4444' }}>*</span>
@@ -418,7 +446,7 @@ export const RegisterBusiness: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+              <div className="register-buttons-row">
                 <button
                   type="button"
                   className="btn btn-light"
@@ -458,7 +486,7 @@ export const RegisterBusiness: React.FC = () => {
               </div>
 
               {/* Botonera de Evidencias */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+              <div className="register-evidence-tab-bar">
                 <button
                   type="button"
                   onClick={() => setActiveEvidenceTab('instagram')}
@@ -572,7 +600,7 @@ export const RegisterBusiness: React.FC = () => {
                     <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <InstagramIcon size={18} color="#e1306c" /> Perfil de Instagram del Negocio
                     </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="register-evidence-row">
                       <input
                         type="text"
                         className="form-control"
@@ -604,7 +632,7 @@ export const RegisterBusiness: React.FC = () => {
                     <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <FacebookIcon size={18} color="#1877f2" /> Página o Perfil de Facebook
                     </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="register-evidence-row">
                       <input
                         type="text"
                         className="form-control"
@@ -636,7 +664,7 @@ export const RegisterBusiness: React.FC = () => {
                     <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <MapPin size={18} color="#ea4335" /> Ficha de Google Maps / Google My Business
                     </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="register-evidence-row">
                       <input
                         type="url"
                         className="form-control"
@@ -668,7 +696,7 @@ export const RegisterBusiness: React.FC = () => {
                     <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Globe size={18} color="#0284c7" /> Sitio Web Oficial o Tienda Online
                     </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="register-evidence-row">
                       <input
                         type="url"
                         className="form-control"
@@ -722,7 +750,7 @@ export const RegisterBusiness: React.FC = () => {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+              <div className="register-buttons-row">
                 <button
                   type="button"
                   className="btn btn-light"
@@ -777,7 +805,7 @@ export const RegisterBusiness: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.88rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1rem', fontSize: '0.88rem' }}>
                   <div>
                     <span style={{ color: '#64748b', display: 'block', fontSize: '0.78rem', fontWeight: 700 }}>DIRECCIÓN</span>
                     <span style={{ color: 'var(--text-title)', fontWeight: 600 }}>{address}</span>
@@ -847,7 +875,7 @@ export const RegisterBusiness: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+              <div className="register-buttons-row">
                 <button
                   type="button"
                   className="btn btn-light"
