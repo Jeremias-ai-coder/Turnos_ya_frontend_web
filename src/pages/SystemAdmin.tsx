@@ -266,8 +266,12 @@ export const SystemAdmin: React.FC = () => {
     try {
       await api.patch(`/admin/businesses/${businessToApprove.id}/approve`);
       showToast(`¡Comercio "${businessToApprove.name}" aprobado y dado de alta exitosamente!`);
+      // Actualización optimista inmediata en la UI
+      setBusinesses((prev) =>
+        prev.map((b) => (b.id === businessToApprove.id ? { ...b, status: 'approved', rejectionReason: null } : b))
+      );
       setBusinessToApprove(null);
-      fetchTabData();
+      await Promise.all([fetchTabData(), loadStatsAndReports()]);
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Error al aprobar comercio');
     } finally {
@@ -283,9 +287,13 @@ export const SystemAdmin: React.FC = () => {
         reason: rejectionReasonInput.trim()
       });
       showToast(`Comercio "${businessToReject.name}" observado y notificado al dueño.`);
+      // Actualización optimista inmediata en la UI
+      setBusinesses((prev) =>
+        prev.map((b) => (b.id === businessToReject.id ? { ...b, status: 'rejected', rejectionReason: rejectionReasonInput.trim() } : b))
+      );
       setBusinessToReject(null);
       setRejectionReasonInput('');
-      fetchTabData();
+      await Promise.all([fetchTabData(), loadStatsAndReports()]);
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Error al rechazar comercio');
     } finally {
@@ -2965,8 +2973,9 @@ export const SystemAdmin: React.FC = () => {
 
       {/* Modal de Aprobación de Comercio */}
       {businessToApprove && (
-        <div className="admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToApprove(null)}>
-          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToApprove(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3000,11 +3009,11 @@ export const SystemAdmin: React.FC = () => {
               </div>
             </div>
 
-            <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '1.5rem', lineHeight: 1.5 }}>
               Al aprobar este comercio, el negocio se publicará inmediatamente en el catálogo público de Turnos Ya, su dueño obtendrá rol de comerciante (owner) y se le enviará un correo electrónico de confirmación.
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
                 className="btn btn-light"
@@ -3018,7 +3027,7 @@ export const SystemAdmin: React.FC = () => {
                 className="btn btn-success"
                 disabled={processingBizAction}
                 onClick={handleApproveBusiness}
-                style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+                style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
               >
                 {processingBizAction ? 'Aprobando...' : '✓ Confirmar Alta y Publicar'}
               </button>
@@ -3029,8 +3038,9 @@ export const SystemAdmin: React.FC = () => {
 
       {/* Modal de Rechazo / Observación de Comercio */}
       {businessToReject && (
-        <div className="admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToReject(null)}>
-          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToReject(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-drag-handle" />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3069,7 +3079,7 @@ export const SystemAdmin: React.FC = () => {
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
                 className="btn btn-light"
@@ -3083,7 +3093,7 @@ export const SystemAdmin: React.FC = () => {
                 className="btn btn-danger"
                 disabled={processingBizAction || rejectionReasonInput.trim().length < 5}
                 onClick={handleRejectBusiness}
-                style={{ fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+                style={{ fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
               >
                 {processingBizAction ? 'Enviando...' : '✕ Confirmar Observación'}
               </button>
