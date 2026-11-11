@@ -35,7 +35,9 @@ import {
   History,
   Plus,
   Edit2,
-  Info
+  Info,
+  EyeOff,
+  Flag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
@@ -460,7 +462,7 @@ export const SystemAdmin: React.FC = () => {
     setDeletingReview(true);
     try {
       await api.delete(`/admin/reviews/${reviewToDelete.id}`);
-      showToast('✓ Reseña eliminada / moderada exitosamente');
+      showToast('✓ Reseña eliminada permanentemente');
       setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
       setReviewsTotal((prev) => Math.max(0, prev - 1));
       setReviewToDelete(null);
@@ -468,6 +470,26 @@ export const SystemAdmin: React.FC = () => {
       showToast(err.response?.data?.message || 'Error al eliminar reseña');
     } finally {
       setDeletingReview(false);
+    }
+  };
+
+  const handleHideReviewAdmin = async (rev: any) => {
+    try {
+      await api.patch(`/admin/reviews/${rev.id}/hide`, { reason: 'Ocultada por moderación administrativa' });
+      setReviews((prev) => prev.map((r) => (r.id === rev.id ? { ...r, isHidden: true, hiddenReason: 'Ocultada por moderación administrativa' } : r)));
+      showToast('✓ Reseña ocultada de la vista pública');
+    } catch {
+      showToast('Error al ocultar reseña');
+    }
+  };
+
+  const handleUnhideReviewAdmin = async (rev: any) => {
+    try {
+      await api.patch(`/admin/reviews/${rev.id}/unhide`);
+      setReviews((prev) => prev.map((r) => (r.id === rev.id ? { ...r, isHidden: false, hiddenReason: null } : r)));
+      showToast('✓ Reseña restaurada a visibilidad pública');
+    } catch {
+      showToast('Error al desocultar reseña');
     }
   };
 
@@ -2294,25 +2316,61 @@ export const SystemAdmin: React.FC = () => {
                           <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{report.user?.email}</div>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <span
-                            style={{
-                              background: '#f1f5f9',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              color: '#334155',
-                              display: 'inline-block',
-                              maxWidth: '170px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={report.section}
-                          >
-                            {report.section}
-                          </span>
+                          {report.section === 'MODERACION_RESENA' ? (
+                            <span
+                              style={{
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '8px',
+                                padding: '3px 8px',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                color: '#dc2626',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Flag size={12} /> Moderación Reseña
+                            </span>
+                          ) : report.section === 'SOLICITUD_RUBRO' ? (
+                            <span
+                              style={{
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: '8px',
+                                padding: '3px 8px',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                color: '#2563eb',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Tags size={12} /> Solicitud Rubro
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                background: '#f1f5f9',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '2px 8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: '#334155',
+                                display: 'inline-block',
+                                maxWidth: '170px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={report.section}
+                            >
+                              {report.section}
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px', maxWidth: '280px' }}>
                           <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-title)' }}>
@@ -2475,9 +2533,10 @@ export const SystemAdmin: React.FC = () => {
                       <th>Comercio</th>
                       <th>Cliente</th>
                       <th>Servicio</th>
-                      <th style={{ width: '140px' }}>Calificación</th>
+                      <th style={{ width: '130px' }}>Calificación</th>
                       <th>Comentario del Cliente</th>
-                      <th style={{ textAlign: 'right', width: '110px' }}>Acciones</th>
+                      <th style={{ width: '90px', textAlign: 'center' }}>Estado</th>
+                      <th style={{ textAlign: 'right', width: '150px' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2523,7 +2582,7 @@ export const SystemAdmin: React.FC = () => {
                             </span>
                           </td>
 
-                          <td style={{ padding: '12px 14px', maxWidth: '320px' }}>
+                          <td style={{ padding: '12px 14px', maxWidth: '300px' }}>
                             {rev.comment ? (
                               <div
                                 style={{
@@ -2545,28 +2604,63 @@ export const SystemAdmin: React.FC = () => {
                             )}
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-light"
-                              onClick={() => setReviewToDelete(rev)}
-                              style={{
-                                color: '#dc2626',
-                                background: '#fef2f2',
-                                borderColor: '#fecaca',
-                                fontSize: '0.78rem',
-                                padding: '5px 9px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontWeight: 700,
-                                borderRadius: '6px'
-                              }}
-                              title="Moderar o eliminar reseña inapropiada"
-                            >
-                              <Trash2 size={13} />
-                              <span>Moderar</span>
-                            </button>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            {rev.isHidden ? (
+                              <span style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <EyeOff size={11} /> Oculta
+                              </span>
+                            ) : (
+                              <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Eye size={11} /> Visible
+                              </span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                              <a
+                                href={`/businesses/${rev.appointment?.businessId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-light"
+                                style={{ padding: '5px 8px', fontSize: '0.76rem' }}
+                                title="Ver en el local público"
+                              >
+                                <ExternalLink size={12} />
+                              </a>
+
+                              {rev.isHidden ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-light"
+                                  onClick={() => handleUnhideReviewAdmin(rev)}
+                                  style={{ padding: '5px 8px', fontSize: '0.76rem', color: '#059669', fontWeight: 700 }}
+                                  title="Restaurar a la vista pública"
+                                >
+                                  <Eye size={12} /> Mostrar
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-light"
+                                  onClick={() => handleHideReviewAdmin(rev)}
+                                  style={{ padding: '5px 8px', fontSize: '0.76rem', color: '#ea580c', fontWeight: 700 }}
+                                  title="Ocultar de la vista pública"
+                                >
+                                  <EyeOff size={12} /> Ocultar
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => setReviewToDelete(rev)}
+                                style={{ color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca', padding: '5px 8px', fontSize: '0.76rem' }}
+                                title="Eliminar permanentemente"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -3902,12 +3996,43 @@ export const SystemAdmin: React.FC = () => {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Bug size={20} />
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background:
+                      selectedReport.section === 'SOLICITUD_RUBRO'
+                        ? '#eff6ff'
+                        : selectedReport.section === 'MODERACION_RESENA'
+                        ? '#fee2e2'
+                        : '#fef2f2',
+                    color:
+                      selectedReport.section === 'SOLICITUD_RUBRO'
+                        ? '#2563eb'
+                        : selectedReport.section === 'MODERACION_RESENA'
+                        ? '#dc2626'
+                        : '#dc2626',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {selectedReport.section === 'SOLICITUD_RUBRO' ? (
+                    <Tags size={20} />
+                  ) : selectedReport.section === 'MODERACION_RESENA' ? (
+                    <Flag size={20} />
+                  ) : (
+                    <Bug size={20} />
+                  )}
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                    Ticket #{selectedReport.id}: {selectedReport.section}
+                    {selectedReport.section === 'SOLICITUD_RUBRO'
+                      ? 'Solicitud de Nuevo Rubro Comercial'
+                      : selectedReport.section === 'MODERACION_RESENA'
+                      ? 'Reclamo y Moderación de Opinión'
+                      : `Ticket #${selectedReport.id}: ${selectedReport.section}`}
                   </h3>
                   <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
                     Reportado por {selectedReport.user?.name} ({selectedReport.user?.email}) · {format(new Date(selectedReport.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
@@ -3924,9 +4049,105 @@ export const SystemAdmin: React.FC = () => {
             </div>
 
             <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
+              {/* Acciones Especiales para Solicitud de Rubro */}
+              {selectedReport.section === 'SOLICITUD_RUBRO' && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <strong style={{ color: '#1e40af', fontSize: '0.88rem', display: 'block' }}>Solicitud de Nuevo Rubro</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#3b82f6' }}>Puedes crear este rubro en el catálogo y resolver el ticket en un solo paso.</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      const reqName = selectedReport.summary.replace(/Solicitud de nuevo rubro:\s*/i, '').trim();
+                      handleOpenCategoryModal();
+                      setCategoryForm((prev) => ({
+                        ...prev,
+                        name: reqName,
+                        slug: reqName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                        description: selectedReport.steps || '',
+                      }));
+                      handleReportStatusChange(selectedReport.id, 'RESOLVED', 'Rubro aprobado y creado en el sistema');
+                      setSelectedReport(null);
+                    }}
+                    style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={14} /> Aprobar y Crear Rubro
+                  </button>
+                </div>
+              )}
+
+              {/* Acciones Especiales para Moderación de Reseña */}
+              {selectedReport.section === 'MODERACION_RESENA' && (() => {
+                const match = selectedReport.summary.match(/ID #(\d+)/) || selectedReport.steps?.match(/ID #(\d+)/);
+                const revId = match ? Number(match[1]) : null;
+                return (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.25rem' }}>
+                    <strong style={{ color: '#991b1b', fontSize: '0.88rem', display: 'block', marginBottom: '4px' }}>
+                      Acciones de Moderación Inmediata
+                    </strong>
+                    <span style={{ fontSize: '0.8rem', color: '#b91c1c', display: 'block', marginBottom: '10px' }}>
+                      Puedes ocultar la reseña para que deje de ser pública o eliminarla definitivamente:
+                    </span>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {selectedReport.pageUrl && (
+                        <a
+                          href={selectedReport.pageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-sm btn-light"
+                          style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <ExternalLink size={12} /> Ver en el comercio
+                        </a>
+                      )}
+                      {revId && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light"
+                            onClick={async () => {
+                              try {
+                                await api.patch(`/admin/reviews/${revId}/hide`, { reason: 'Ocultada tras reporte #' + selectedReport.id });
+                                await handleReportStatusChange(selectedReport.id, 'RESOLVED', 'Reseña ocultada de la vista pública');
+                                showToast('✓ Reseña ocultada y ticket resuelto');
+                                setSelectedReport(null);
+                              } catch {
+                                showToast('Error al ocultar reseña');
+                              }
+                            }}
+                            style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ea580c', background: '#fff7ed', borderColor: '#fed7aa' }}
+                          >
+                            <EyeOff size={12} /> Ocultar Reseña
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            onClick={async () => {
+                              try {
+                                await api.delete(`/admin/reviews/${revId}`);
+                                await handleReportStatusChange(selectedReport.id, 'RESOLVED', 'Reseña eliminada permanentemente');
+                                showToast('✓ Reseña eliminada y ticket resuelto');
+                                setSelectedReport(null);
+                              } catch {
+                                showToast('Error al eliminar reseña');
+                              }
+                            }}
+                            style={{ fontSize: '0.78rem', fontWeight: 700, background: '#dc2626', borderColor: '#dc2626' }}
+                          >
+                            <Trash2 size={12} /> Eliminar Reseña
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div style={{ marginBottom: '1rem' }}>
                 <label className="text-muted text-xs" style={{ fontWeight: 700, display: 'block', marginBottom: '3px' }}>
-                  RESUMEN DEL ERROR
+                  RESUMEN
                 </label>
                 <div style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-title)' }}>
                   {selectedReport.summary}
@@ -3935,7 +4156,7 @@ export const SystemAdmin: React.FC = () => {
 
               <div style={{ marginBottom: '1.25rem' }}>
                 <label className="text-muted text-xs" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                  PASOS A SEGUIR / REPRODUCCIÓN
+                  DETALLES DEL REPORTE
                 </label>
                 <div
                   style={{

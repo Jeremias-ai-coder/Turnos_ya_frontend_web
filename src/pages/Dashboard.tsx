@@ -25,7 +25,8 @@ import {
   Mail,
   Globe,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Tags
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -127,6 +128,34 @@ const Dashboard: React.FC = () => {
   const [toast, setToast] = useState('');
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  // Solicitud de nuevo rubro vía ticket
+  const [requestCategoryModalOpen, setRequestCategoryModalOpen] = useState(false);
+  const [requestedCategoryName, setRequestedCategoryName] = useState('');
+  const [requestedCategoryDesc, setRequestedCategoryDesc] = useState('');
+  const [submittingCategoryRequest, setSubmittingCategoryRequest] = useState(false);
+
+  const handleSendCategoryRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestedCategoryName.trim() || requestedCategoryName.trim().length < 2) return;
+    setSubmittingCategoryRequest(true);
+    try {
+      await api.post('/reports', {
+        section: 'SOLICITUD_RUBRO',
+        summary: `Solicitud de nuevo rubro: ${requestedCategoryName.trim()}`,
+        steps: `Nombre sugerido: ${requestedCategoryName.trim()}\nDescripción / Especialidad: ${requestedCategoryDesc.trim() || 'Sin descripción adicional'}\nSolicitado por el comercio "${selectedBiz?.name || 'Comercio'}"`,
+        pageUrl: window.location.pathname,
+      });
+      showToast('✓ Solicitud de rubro enviada. El administrador revisará tu propuesta.');
+      setRequestCategoryModalOpen(false);
+      setRequestedCategoryName('');
+      setRequestedCategoryDesc('');
+    } catch {
+      showToast('Error al enviar la solicitud');
+    } finally {
+      setSubmittingCategoryRequest(false);
+    }
+  };
 
   const getFormattedTimeForInput = (timeVal: string) => {
     if (!timeVal) return '09:00';
@@ -1392,6 +1421,24 @@ const Dashboard: React.FC = () => {
                         <option value="">O seleccionar de la lista completa...</option>
                         {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
+                      <div style={{ marginTop: '6px', textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          onClick={() => setRequestCategoryModalOpen(true)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#0284c7',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0
+                          }}
+                        >
+                          ¿No encuentras tu rubro? Solicitar nueva categoría
+                        </button>
+                      </div>
                     </div>
 
                     <div className="form-group">
@@ -1952,6 +1999,87 @@ const Dashboard: React.FC = () => {
                 <Pencil size={14} /> Editar Información
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Solicitud de Nueva Categoría */}
+      {requestCategoryModalOpen && (
+        <div className="modal-overlay" onClick={() => !submittingCategoryRequest && setRequestCategoryModalOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Tags size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Solicitar Nuevo Rubro
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Envía una sugerencia al equipo de TurnosYa
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRequestCategoryModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendCategoryRequest}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Nombre sugerido del rubro *
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  required
+                  placeholder="Ej: Tatuajes & Piercing, Veterinaria, Masajes..."
+                  value={requestedCategoryName}
+                  onChange={(e) => setRequestedCategoryName(e.target.value)}
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Descripción o qué servicios agrupa (opcional)
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder="Explica qué tipo de servicios ofrecerías bajo esta categoría..."
+                  value={requestedCategoryDesc}
+                  onChange={(e) => setRequestedCategoryDesc(e.target.value)}
+                  style={{ borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={submittingCategoryRequest}
+                  onClick={() => setRequestCategoryModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingCategoryRequest || !requestedCategoryName.trim()}
+                  style={{ fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {submittingCategoryRequest ? 'Enviando...' : 'Enviar Solicitud'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

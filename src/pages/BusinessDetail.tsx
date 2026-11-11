@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
-import { cachedGet, clientCache } from '../services/api';
+import api, { cachedGet, clientCache } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   Clock,
   DollarSign,
@@ -12,7 +13,13 @@ import {
   Star,
   MessageSquare,
   User,
-  ChevronDown
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Trash2,
+  Flag,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -26,6 +33,8 @@ interface Review {
   rating: number;
   comment?: string | null;
   createdAt: string;
+  isHidden?: boolean;
+  hiddenReason?: string | null;
   appointment?: {
     user?: { id: number; name: string };
     service?: { id: number; name: string };
@@ -56,6 +65,92 @@ const BusinessDetail: React.FC = () => {
   const [reviewsStats, setReviewsStats] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
   const [visibleReviewsCount, setVisibleReviewsCount] = useState(INITIAL_REVIEWS_COUNT);
   const [loading, setLoading] = useState<boolean>(!previewBusiness);
+
+  const { user } = useAuth();
+
+  // Estados de Moderación In-Situ y Reportes
+  const [reviewToReport, setReviewToReport] = useState<Review | null>(null);
+  const [reportReason, setReportReason] = useState('Lenguaje ofensivo o difamatorio');
+  const [reportDetails, setReportDetails] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+
+  const [reviewToHide, setReviewToHide] = useState<Review | null>(null);
+  const [hideReason, setHideReason] = useState('Incumple las normas de la comunidad');
+  const [processingHide, setProcessingHide] = useState(false);
+
+  const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
+  const [deletingReview, setDeletingReview] = useState(false);
+
+  const [toast, setToast] = useState('');
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3500);
+  };
+
+  const handleUnhideReview = async (rev: Review) => {
+    try {
+      await api.patch(`/admin/reviews/${rev.id}/unhide`);
+      setReviews((prev) => prev.map((r) => (r.id === rev.id ? { ...r, isHidden: false, hiddenReason: null } : r)));
+      clientCache.clear();
+      showToast('✓ Reseña restaurada a visibilidad pública');
+    } catch {
+      showToast('Error al desocultar reseña');
+    }
+  };
+
+  const handleConfirmHideReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewToHide) return;
+    setProcessingHide(true);
+    try {
+      await api.patch(`/admin/reviews/${reviewToHide.id}/hide`, { reason: hideReason });
+      setReviews((prev) => prev.map((r) => (r.id === reviewToHide.id ? { ...r, isHidden: true, hiddenReason: hideReason } : r)));
+      clientCache.clear();
+      showToast('✓ Reseña ocultada de la vista pública');
+      setReviewToHide(null);
+    } catch {
+      showToast('Error al ocultar reseña');
+    } finally {
+      setProcessingHide(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!reviewToDelete) return;
+    setDeletingReview(true);
+    try {
+      await api.delete(`/admin/reviews/${reviewToDelete.id}`);
+      setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
+      clientCache.clear();
+      showToast('✓ Reseña eliminada permanentemente');
+      setReviewToDelete(null);
+    } catch {
+      showToast('Error al eliminar reseña');
+    } finally {
+      setDeletingReview(false);
+    }
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewToReport) return;
+    setSubmittingReport(true);
+    try {
+      await api.post('/reports', {
+        section: 'MODERACION_RESENA',
+        summary: `Reporte de reseña en ${business?.name || 'Comercio'} (ID #${reviewToReport.id})`,
+        steps: `Motivo: ${reportReason}\nDetalles adicionales: ${reportDetails || 'Sin detalles adicionales'}\nComentario reportado: "${reviewToReport.comment || 'Calificación sin texto'}"\nCalificación: ${reviewToReport.rating} ⭐\nAutor: ${reviewToReport.appointment?.user?.name || 'Cliente'}`,
+        pageUrl: window.location.pathname,
+      });
+      showToast('✓ Reporte enviado a moderación exitosamente');
+      setReviewToReport(null);
+      setReportDetails('');
+    } catch {
+      showToast('Error al enviar reporte');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -474,6 +569,85 @@ const BusinessDetail: React.FC = () => {
                     El cliente calificó con {rev.rating} estrellas sin comentario escrito.
                   </p>
                 )}
+
+                {/* Barra de Moderación In-Situ para Administradores */}
+                {user?.role === 'administrator' && (
+                  <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        ⚙ Moderación:
+                      </span>
+                      {rev.isHidden ? (
+                        <span style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px', padding: '2px 8px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <EyeOff size={11} /> Oculta al público {rev.hiddenReason ? `(${rev.hiddenReason})` : ''}
+                        </span>
+                      ) : (
+                        <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '2px 8px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Eye size={11} /> Visible
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {rev.isHidden ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUnhideReview(rev)}
+                          className="btn btn-sm btn-light"
+                          style={{ padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669' }}
+                          title="Restaurar a la vista pública"
+                        >
+                          <Eye size={12} />
+                          <span>Desocultar</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReviewToHide(rev);
+                            setHideReason('Incumple las normas de la comunidad');
+                          }}
+                          className="btn btn-sm btn-light"
+                          style={{ padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          title="Ocultar opinión de la vista pública"
+                        >
+                          <EyeOff size={12} />
+                          <span>Ocultar</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setReviewToDelete(rev)}
+                        className="btn btn-sm btn-light"
+                        style={{ padding: '4px 10px', fontSize: '0.76rem', color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        title="Eliminar reseña definitivamente"
+                      >
+                        <Trash2 size={12} />
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Botón Reportar para Dueño del Local o Clientes (si no es admin) */}
+                {user && user.role !== 'administrator' && (
+                  <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReviewToReport(rev);
+                        setReportReason('Lenguaje ofensivo o difamatorio');
+                        setReportDetails('');
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.74rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 6px' }}
+                      title="Reportar reseña inapropiada o falsa"
+                    >
+                      <Flag size={11} />
+                      <span>Reportar opinión</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -499,6 +673,221 @@ const BusinessDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Feedback */}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: '#0f172a',
+            color: '#ffffff',
+            padding: '12px 20px',
+            borderRadius: '10px',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <CheckCircle2 size={18} color="#10b981" />
+          <span>{toast}</span>
+        </div>
+      )}
+
+      {/* Modal 1: Reportar Reseña (Dueño o Cliente) */}
+      {reviewToReport && (
+        <div className="modal-overlay" onClick={() => !submittingReport && setReviewToReport(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Flag size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Reportar Opinión
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Se enviará una solicitud de revisión al equipo de moderación
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewToReport(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Resumen de la reseña reportada */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', marginBottom: '1rem', fontSize: '0.84rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <strong style={{ color: 'var(--text-title)' }}>{reviewToReport.appointment?.user?.name || 'Cliente'}</strong>
+                <span style={{ color: '#d97706', fontWeight: 700 }}>{reviewToReport.rating} ⭐</span>
+              </div>
+              <p style={{ margin: 0, color: '#475569', fontStyle: 'italic' }}>
+                "{reviewToReport.comment || 'Calificación sin comentario escrito'}"
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmitReport}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Motivo principal del reclamo *
+                </label>
+                <select
+                  className="form-control"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  required
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                >
+                  <option value="Lenguaje ofensivo o difamatorio">Lenguaje ofensivo, insultos o difamación</option>
+                  <option value="Spam o publicidad no deseada">Spam, publicidad o contenido no relacionado</option>
+                  <option value="Reseña falsa o de la competencia">Reseña falsa (el usuario no fue cliente o es competidor)</option>
+                  <option value="Información privada o datos sensibles">Revela datos privados o contacto personal</option>
+                  <option value="Otro motivo">Otro motivo</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Detalles adicionales (opcional)
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder="Explica brevemente por qué consideras que esta opinión debe ser moderada u oculta..."
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  style={{ borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={submittingReport}
+                  onClick={() => setReviewToReport(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                  disabled={submittingReport}
+                  style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {submittingReport ? 'Enviando reporte...' : 'Enviar Reporte'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Ocultar Reseña con Motivo (Admin) */}
+      {reviewToHide && (
+        <div className="modal-overlay" onClick={() => !processingHide && setReviewToHide(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ textAlign: 'center', padding: '0.5rem 0 1rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fff7ed', color: '#ea580c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <EyeOff size={24} />
+              </div>
+              <h3 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                Ocultar Opinión del Público
+              </h3>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5 }}>
+                Esta opinión dejará de ser visible para los clientes y su puntuación se excluirá del promedio público del comercio. Podrás restaurarla en cualquier momento.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmHideReview}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Motivo de la moderación *
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  required
+                  value={hideReason}
+                  onChange={(e) => setHideReason(e.target.value)}
+                  placeholder="Ej: Incumple normas de respeto / En revisión"
+                  style={{ height: '40px', borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={processingHide}
+                  onClick={() => setReviewToHide(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-warning"
+                  disabled={processingHide || !hideReason.trim()}
+                  style={{ background: '#ea580c', color: 'white', border: 'none', fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {processingHide ? 'Ocultando...' : 'Confirmar y Ocultar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Eliminar Reseña Definitivamente (Admin) */}
+      {reviewToDelete && (
+        <div className="modal-overlay" onClick={() => !deletingReview && setReviewToDelete(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center', padding: '1.5rem' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+              <Trash2 size={24} />
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+              ¿Eliminar Opinión Permanentemente?
+            </h3>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5 }}>
+              Esta acción eliminará de forma irreversible el registro de esta reseña de la base de datos.
+            </p>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={deletingReview}
+                onClick={() => setReviewToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={deletingReview}
+                onClick={handleDeleteReview}
+                style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+              >
+                {deletingReview ? 'Eliminando...' : '🗑 Sí, Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
