@@ -28,7 +28,8 @@ import {
   Copy,
   FileText,
   CheckCheck,
-  AlertCircle
+  AlertCircle,
+  Star
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
@@ -67,7 +68,7 @@ export const SystemAdmin: React.FC = () => {
   const navigate = useNavigate();
 
   // Navegación principal de pestañas
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports'>('cockpit');
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports' | 'reviews'>('cockpit');
 
   // Estadísticas avanzadas del Centro de Control Ejecutivo
   const [stats, setStats] = useState<{
@@ -99,9 +100,12 @@ export const SystemAdmin: React.FC = () => {
   // Datos principales
   const [users, setUsers] = useState<any[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [bizStatusFilter, setBizStatusFilter] = useState<'ALL' | 'pending_approval' | 'approved' | 'rejected'>('ALL');
+  const [bizStatusFilter, setBizStatusFilter] = useState<'ALL' | 'pending_approval' | 'approved' | 'rejected' | 'suspended'>('ALL');
   const [businessToApprove, setBusinessToApprove] = useState<any | null>(null);
   const [businessToReject, setBusinessToReject] = useState<any | null>(null);
+  const [businessToSuspend, setBusinessToSuspend] = useState<any | null>(null);
+  const [suspendReasonInput, setSuspendReasonInput] = useState('');
+  const [businessToReactivate, setBusinessToReactivate] = useState<any | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [processingBizAction, setProcessingBizAction] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -112,6 +116,16 @@ export const SystemAdmin: React.FC = () => {
   const [reportsPage, setReportsPage] = useState(1);
   const [reportsTotalPages, setReportsTotalPages] = useState(1);
   const [reportsStatusFilter, setReportsStatusFilter] = useState<string>('ALL');
+
+  // Moderación de Opiniones y Reseñas
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsTotalPages, setReviewsTotalPages] = useState(1);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
+  const [reviewsRatingFilter, setReviewsRatingFilter] = useState<number | 'ALL'>('ALL');
+  const [reviewsSearch, setReviewsSearch] = useState('');
+  const [reviewToDelete, setReviewToDelete] = useState<any | null>(null);
+  const [deletingReview, setDeletingReview] = useState(false);
 
   // Estados de carga y feedback
   const [loadingTab, setLoadingTab] = useState(true);
@@ -241,6 +255,15 @@ export const SystemAdmin: React.FC = () => {
         setReportsTotalPages(res.meta?.totalPages || 1);
         if (res.counts) setReportsCounts(res.counts);
       }
+      if (activeTab === 'reviews') {
+        const params: any = { page: reviewsPage, limit: 15 };
+        if (reviewsRatingFilter !== 'ALL') params.rating = reviewsRatingFilter;
+        if (reviewsSearch.trim()) params.search = reviewsSearch.trim();
+        const res = await api.get('/admin/reviews', { params });
+        setReviews(res.data.data ?? []);
+        setReviewsTotal(res.data.meta?.total || 0);
+        setReviewsTotalPages(res.data.meta?.totalPages || 1);
+      }
     } catch (err) {
       console.error('Error al cargar datos de pestaña', err);
     } finally {
@@ -250,7 +273,7 @@ export const SystemAdmin: React.FC = () => {
 
   useEffect(() => {
     fetchTabData();
-  }, [activeTab, reportsPage, reportsStatusFilter]);
+  }, [activeTab, reportsPage, reportsStatusFilter, reviewsPage, reviewsRatingFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -298,6 +321,62 @@ export const SystemAdmin: React.FC = () => {
       showToast(err.response?.data?.message || 'Error al rechazar comercio');
     } finally {
       setProcessingBizAction(false);
+    }
+  };
+
+  const handleSuspendBusiness = async () => {
+    if (!businessToSuspend || suspendReasonInput.trim().length < 5) return;
+    setProcessingBizAction(true);
+    try {
+      await api.patch(`/admin/businesses/${businessToSuspend.id}/suspend`, {
+        reason: suspendReasonInput.trim()
+      });
+      showToast(`Comercio "${businessToSuspend.name}" suspendido temporalmente.`);
+      setBusinesses((prev) =>
+        prev.map((b) => (b.id === businessToSuspend.id ? { ...b, status: 'suspended', rejectionReason: suspendReasonInput.trim() } : b))
+      );
+      setBusinessToSuspend(null);
+      setSuspendReasonInput('');
+      await Promise.all([fetchTabData(), loadStatsAndReports()]);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al suspender comercio');
+    } finally {
+      setProcessingBizAction(false);
+    }
+  };
+
+  const handleReactivateBusiness = async () => {
+    if (!businessToReactivate) return;
+    setProcessingBizAction(true);
+    try {
+      await api.patch(`/admin/businesses/${businessToReactivate.id}/reactivate`);
+      showToast(`¡Comercio "${businessToReactivate.name}" reactivado exitosamente!`);
+      setBusinesses((prev) =>
+        prev.map((b) => (b.id === businessToReactivate.id ? { ...b, status: 'approved', rejectionReason: null } : b))
+      );
+      setBusinessToReactivate(null);
+      await Promise.all([fetchTabData(), loadStatsAndReports()]);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al reactivar comercio');
+    } finally {
+      setProcessingBizAction(false);
+    }
+  };
+
+  // Moderación de Reseñas
+  const handleDeleteReview = async () => {
+    if (!reviewToDelete) return;
+    setDeletingReview(true);
+    try {
+      await api.delete(`/admin/reviews/${reviewToDelete.id}`);
+      showToast('✓ Reseña eliminada / moderada exitosamente');
+      setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
+      setReviewsTotal((prev) => Math.max(0, prev - 1));
+      setReviewToDelete(null);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al eliminar reseña');
+    } finally {
+      setDeletingReview(false);
     }
   };
 
@@ -380,6 +459,7 @@ export const SystemAdmin: React.FC = () => {
   const pendingBizCount = businesses.filter((b) => b.status === 'pending_approval').length;
   const approvedBizCount = businesses.filter((b) => (b.status || 'approved') === 'approved').length;
   const rejectedBizCount = businesses.filter((b) => b.status === 'rejected').length;
+  const suspendedBizCount = businesses.filter((b) => (b.status as any) === 'suspended').length;
 
   // Filtrado reactivo de Comercios
   const filteredBusinesses = businesses.filter((b) => {
@@ -579,6 +659,16 @@ export const SystemAdmin: React.FC = () => {
           <span className={`admin-nav-badge ${reportsCounts.pending > 0 ? 'danger' : ''}`}>
             {reportsCounts.pending > 0 ? reportsCounts.pending : reportsCounts.total}
           </span>
+        </button>
+
+        <button
+          type="button"
+          className={`admin-nav-item ${activeTab === 'reviews' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reviews')}
+        >
+          <Star size={16} />
+          <span>Opiniones y Reseñas</span>
+          <span className="admin-nav-badge">{reviewsTotal}</span>
         </button>
       </nav>
 
@@ -1234,6 +1324,17 @@ export const SystemAdmin: React.FC = () => {
             >
               ✕ Observados ({rejectedBizCount})
             </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${bizStatusFilter === 'suspended' ? 'active' : ''}`}
+              onClick={() => {
+                setBizStatusFilter('suspended');
+                setBizPage(1);
+              }}
+              style={suspendedBizCount > 0 ? { borderColor: '#ea580c', color: '#c2410c', fontWeight: 700 } : {}}
+            >
+              ⏸ Suspendidos ({suspendedBizCount})
+            </button>
           </div>
 
           {/* Chips de filtro por categoría */}
@@ -1353,6 +1454,11 @@ export const SystemAdmin: React.FC = () => {
                               {bStatus === 'approved' && (
                                 <span className="badge badge-confirmed" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px' }}>
                                   ✓ Activo
+                                </span>
+                              )}
+                              {bStatus === 'suspended' && (
+                                <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '4px 8px', background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' }} title={b.rejectionReason || 'Suspendido temporalmente'}>
+                                  ⏸ Suspendido
                                 </span>
                               )}
                               {bStatus === 'rejected' && (
@@ -1501,16 +1607,42 @@ export const SystemAdmin: React.FC = () => {
                                 )}
 
                                 {bStatus === 'approved' && (
-                                  <a
-                                    href={`/businesses/${b.id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-sm btn-outline-primary"
-                                    style={{ padding: '5px 9px', fontSize: '0.8rem' }}
-                                    title="Abrir página pública del comercio"
+                                  <>
+                                    <a
+                                      href={`/businesses/${b.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn-sm btn-outline-primary"
+                                      style={{ padding: '5px 9px', fontSize: '0.8rem' }}
+                                      title="Abrir página pública del comercio"
+                                    >
+                                      <ExternalLink size={13} />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm"
+                                      onClick={() => {
+                                        setBusinessToSuspend(b);
+                                        setSuspendReasonInput('');
+                                      }}
+                                      style={{ background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', padding: '5px 8px', fontSize: '0.76rem', fontWeight: 700, borderRadius: '6px' }}
+                                      title="Suspender comercio temporalmente"
+                                    >
+                                      ⏸ Suspender
+                                    </button>
+                                  </>
+                                )}
+
+                                {bStatus === 'suspended' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={() => setBusinessToReactivate(b)}
+                                    style={{ background: '#10b981', color: 'white', border: 'none', padding: '5px 10px', fontSize: '0.78rem', fontWeight: 700, borderRadius: '6px' }}
+                                    title="Reactivar comercio y habilitar en catálogo"
                                   >
-                                    <ExternalLink size={13} />
-                                  </a>
+                                    ▶ Reactivar
+                                  </button>
                                 )}
 
                                 {bStatus === 'rejected' && (
@@ -1962,6 +2094,207 @@ export const SystemAdmin: React.FC = () => {
                 itemsPerPage={PER_PAGE}
                 onPageChange={setReportsPage}
                 itemLabel="reportes"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* PESTAÑA 6: MODERACIÓN DE OPINIONES Y RESEÑAS */}
+      {/* ======================================================================= */}
+      {activeTab === 'reviews' && (
+        <div className="ml-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-title)' }}>
+                Moderación de Opiniones y Reseñas
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                Auditoría de valoraciones públicas, detección de contenido difamatorio y remoción de opiniones maliciosas.
+              </p>
+            </div>
+
+            {/* Buscador de reseñas */}
+            <div style={{ position: 'relative', minWidth: '280px' }}>
+              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Buscar por cliente, comercio o texto..."
+                value={reviewsSearch}
+                onChange={(e) => setReviewsSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setReviewsPage(1);
+                    fetchTabData();
+                  }
+                }}
+                style={{ paddingLeft: '36px', height: '42px', borderRadius: '10px', fontSize: '0.88rem' }}
+              />
+            </div>
+          </div>
+
+          {/* Filtros por Calificación de Estrellas */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>
+              Filtrar por Estrellas:
+            </span>
+            <button
+              type="button"
+              className={`admin-filter-chip ${reviewsRatingFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => {
+                setReviewsRatingFilter('ALL');
+                setReviewsPage(1);
+              }}
+            >
+              Todas ({reviewsTotal})
+            </button>
+            {[5, 4, 3, 2, 1].map((stars) => (
+              <button
+                key={stars}
+                type="button"
+                className={`admin-filter-chip ${reviewsRatingFilter === stars ? 'active' : ''}`}
+                onClick={() => {
+                  setReviewsRatingFilter(stars);
+                  setReviewsPage(1);
+                }}
+                style={stars <= 2 ? { borderColor: '#fecaca', color: '#dc2626' } : {}}
+              >
+                {stars} ⭐
+              </button>
+            ))}
+          </div>
+
+          {reviews.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <Star size={28} />
+              </div>
+              <h4 style={{ margin: '0 0 6px', fontWeight: 800, color: 'var(--text-title)' }}>
+                No se encontraron opiniones
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b' }}>
+                No hay reseñas emitidas con los filtros actuales o la búsqueda no arrojó resultados.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '130px' }}>Fecha</th>
+                      <th>Comercio</th>
+                      <th>Cliente</th>
+                      <th>Servicio</th>
+                      <th style={{ width: '140px' }}>Calificación</th>
+                      <th>Comentario del Cliente</th>
+                      <th style={{ textAlign: 'right', width: '110px' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviews.map((rev: any) => {
+                      const isLowRating = rev.rating <= 2;
+                      return (
+                        <tr key={rev.id} style={isLowRating ? { background: '#fffcfc' } : {}}>
+                          <td style={{ padding: '12px 14px', fontSize: '0.78rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {format(new Date(rev.createdAt), "d 'de' MMM, HH:mm", { locale: es })}
+                          </td>
+
+                          <td style={{ padding: '12px 14px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-title)' }}>
+                              {rev.appointment?.business?.name || `Comercio #${rev.appointment?.businessId}`}
+                            </div>
+                            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>ID #{rev.appointment?.businessId}</span>
+                          </td>
+
+                          <td style={{ padding: '12px 14px' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-title)' }}>
+                              {rev.appointment?.user?.name || 'Cliente'}
+                            </div>
+                            <div style={{ fontSize: '0.76rem', color: '#64748b' }}>{rev.appointment?.user?.email}</div>
+                          </td>
+
+                          <td style={{ padding: '12px 14px', fontSize: '0.84rem', color: '#334155' }}>
+                            {rev.appointment?.service?.name || 'Servicio'}
+                          </td>
+
+                          <td style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  size={13}
+                                  fill={star <= rev.rating ? (isLowRating ? '#ef4444' : '#f59e0b') : '#e2e8f0'}
+                                  color={star <= rev.rating ? (isLowRating ? '#ef4444' : '#f59e0b') : '#cbd5e1'}
+                                />
+                              ))}
+                            </div>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isLowRating ? '#dc2626' : '#b45309' }}>
+                              {rev.rating} de 5 estrellas
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '12px 14px', maxWidth: '320px' }}>
+                            {rev.comment ? (
+                              <div
+                                style={{
+                                  fontSize: '0.84rem',
+                                  color: '#334155',
+                                  background: isLowRating ? '#fef2f2' : '#f8fafc',
+                                  border: `1px solid ${isLowRating ? '#fecaca' : '#e2e8f0'}`,
+                                  borderRadius: '8px',
+                                  padding: '8px 12px',
+                                  lineHeight: 1.4,
+                                }}
+                              >
+                                "{rev.comment}"
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>
+                                Sin comentario escrito
+                              </span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-light"
+                              onClick={() => setReviewToDelete(rev)}
+                              style={{
+                                color: '#dc2626',
+                                background: '#fef2f2',
+                                borderColor: '#fecaca',
+                                fontSize: '0.78rem',
+                                padding: '5px 9px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 700,
+                                borderRadius: '6px'
+                              }}
+                              title="Moderar o eliminar reseña inapropiada"
+                            >
+                              <Trash2 size={13} />
+                              <span>Moderar</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                currentPage={reviewsPage}
+                totalPages={reviewsTotalPages}
+                totalItems={reviewsTotal}
+                itemsPerPage={15}
+                onPageChange={setReviewsPage}
+                itemLabel="opiniones"
               />
             </>
           )}
@@ -2494,15 +2827,45 @@ export const SystemAdmin: React.FC = () => {
                 )}
 
                 {inspectedBusiness.status === 'approved' && (
-                  <a
-                    href={`/businesses/${inspectedBusiness.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-primary"
-                    style={{ fontSize: '0.84rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  <>
+                    <a
+                      href={`/businesses/${inspectedBusiness.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.84rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <ExternalLink size={14} /> Ver en sitio público
+                    </a>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        const b = inspectedBusiness;
+                        setInspectedBusiness(null);
+                        setBusinessToSuspend(b);
+                        setSuspendReasonInput('');
+                      }}
+                      style={{ background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', padding: '8px 14px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                      ⏸ Suspender Comercio
+                    </button>
+                  </>
+                )}
+
+                {inspectedBusiness.status === 'suspended' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      const b = inspectedBusiness;
+                      setInspectedBusiness(null);
+                      setBusinessToReactivate(b);
+                    }}
+                    style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', cursor: 'pointer' }}
                   >
-                    <ExternalLink size={14} /> Ver en sitio público
-                  </a>
+                    ▶ Reactivar Comercio
+                  </button>
                 )}
 
                 {inspectedBusiness.status === 'rejected' && (
@@ -3096,6 +3459,159 @@ export const SystemAdmin: React.FC = () => {
                 style={{ fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
               >
                 {processingBizAction ? 'Enviando...' : '✕ Confirmar Observación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Suspensión de Comercio */}
+      {businessToSuspend && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToSuspend(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertCircle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.15rem', color: '#c2410c' }}>
+                    Suspender Comercio
+                  </h3>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b' }}>{businessToSuspend.name}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBusinessToSuspend(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Al suspender este comercio, <strong>dejará de figurar en el catálogo público</strong> y no podrá recibir nuevas reservas de turnos. Se notificará inmediatamente al dueño por correo electrónico e in-app.
+            </p>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-title)' }}>
+                Motivo formal de la suspensión <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <textarea
+                className="form-control"
+                rows={3}
+                placeholder="Describe claramente el motivo (ej. 'Denuncias reiteradas de inasistencia del local', 'Irregularidades en documentación comercial')..."
+                value={suspendReasonInput}
+                onChange={(e) => setSuspendReasonInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={processingBizAction}
+                onClick={() => setBusinessToSuspend(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={processingBizAction || suspendReasonInput.trim().length < 5}
+                onClick={handleSuspendBusiness}
+                style={{ background: '#ea580c', borderColor: '#ea580c', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                {processingBizAction ? 'Suspendiendo...' : '⏸ Confirmar Suspensión'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reactivación de Comercio */}
+      {businessToReactivate && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToReactivate(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ textAlign: 'center', padding: '0.5rem 0 1rem' }}>
+              <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#ecfdf5', color: '#10b981', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <CheckCircle2 size={26} />
+              </div>
+              <h3 style={{ margin: '0 0 8px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                ¿Reactivar este comercio?
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+                Estás por levantar la suspensión de <strong>{businessToReactivate.name}</strong>. Volverá a publicarse de forma inmediata en el catálogo y podrá recibir reservas normalmente.
+              </p>
+            </div>
+
+            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={processingBizAction}
+                onClick={() => setBusinessToReactivate(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-success"
+                disabled={processingBizAction}
+                onClick={handleReactivateBusiness}
+                style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                {processingBizAction ? 'Reactivando...' : '▶ Sí, Reactivar Comercio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Moderación / Eliminación de Reseña */}
+      {reviewToDelete && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !deletingReview && setReviewToDelete(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ textAlign: 'center', padding: '0.5rem 0 1rem' }}>
+              <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <Trash2 size={24} />
+              </div>
+              <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                ¿Moderar / Eliminar Reseña?
+              </h3>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+                Esta acción eliminará de forma permanente esta reseña del comercio <strong>{reviewToDelete.appointment?.business?.name}</strong> y reajustará el promedio de calificación.
+              </p>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', textAlign: 'left', fontSize: '0.84rem', color: '#334155', fontStyle: 'italic' }}>
+                "{reviewToDelete.comment || 'Calificación sin texto escrito'}"
+                <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#64748b', fontStyle: 'normal' }}>
+                  — Por <strong>{reviewToDelete.appointment?.user?.name}</strong> ({reviewToDelete.rating} ⭐)
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={deletingReview}
+                onClick={() => setReviewToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={deletingReview}
+                onClick={handleDeleteReview}
+                style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                {deletingReview ? 'Eliminando...' : '🗑 Confirmar Eliminación'}
               </button>
             </div>
           </div>
