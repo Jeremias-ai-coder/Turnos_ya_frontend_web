@@ -1,30 +1,30 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  phone?: string;
-  emailNotifications?: boolean;
-  whatsappNotifications?: boolean;
-}
+import { type User } from '../types';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (token: string, user: User) => void;
   logout: () => void;
+  updateUser: (updatedUser: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => !localStorage.getItem('user') && !!localStorage.getItem('token'));
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
@@ -63,10 +63,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+    try {
+      (window as any).google?.accounts?.id?.disableAutoSelect?.();
+    } catch (e) {
+      // Ignorar si no está cargado el SDK de Google
+    }
+  };
+
+  const updateUser = (updatedUser: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const merged = { ...prev, ...updatedUser };
+      localStorage.setItem('user', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
+  const refreshUser = async () => {
+    try {
+      const res = await api.get('/users/me');
+      const freshUser = res.data;
+      localStorage.setItem('user', JSON.stringify(freshUser));
+      setUser(freshUser);
+    } catch (e) {
+      console.error('Error refreshing user:', e);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateUser, refreshUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

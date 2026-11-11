@@ -2,6 +2,9 @@
   /* Colors */
   --primary-color: #009ee3;
   --primary-hover: #0081bb;
+  --primary-text: #007bb5; /* WCAG 2.1 AA compliant (4.6:1 contrast on white) */
+  --accent-meli-yellow: #ffe600; /* Signature Mercado Libre yellow */
+  --accent-meli-yellow-hover: #edd600;
   --background-app: #f5f8fa;
   --white: #ffffff;
 
@@ -35,4 +38,27 @@
 
   /* Typography */
   --font-family-base: 'Plus Jakarta Sans', sans-serif;
+
+  /* Transitions & Animation Easing */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.16s var(--ease-spring);
+  --transition-normal: 0.24s var(--ease-spring);
+  --transition-smooth: 0.32s var(--ease-spring);
+  --transition-slow: 0.45s var(--ease-smooth);
+
+  /* Motion System Standards (UI/UX Motion Benchmark) */
+  --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-return: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-duration-forward: 0.44s;
+  --motion-duration-return: 0.40s;
+  --motion-duration-panel: 0.42s;
+  --motion-distance-nav: 64px;
+
+  /* Elevation Shadows with Smooth Bloom */
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-hover: 0 14px 28px -4px rgba(0, 158, 227, 0.14), 0 6px 12px -2px rgba(15, 23, 42, 0.05);
+  --shadow-active: 0 2px 6px rgba(0, 158, 227, 0.2);
 }

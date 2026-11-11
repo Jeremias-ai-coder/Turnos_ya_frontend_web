@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
+import api, { cachedGet, clientCache } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   Clock,
   DollarSign,
@@ -11,37 +13,28 @@ import {
   Star,
   MessageSquare,
   User,
-  ChevronDown
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Trash2,
+  Flag,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SkeletonDetail } from '../components/common/SkeletonLoaders';
-
-
-interface Business {
-  id: number;
-  name: string;
-  address: string;
-  phone: string;
-  description: string;
-  category: string;
-  rating?: number | null;
-  reviewCount?: number;
-}
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  durationMinutes: number;
-  price: number;
-}
+import { DefaultBusinessCover } from '../components/common/DefaultBusinessCover';
+import { formatTimeToHHMM } from '../utils/timeHelper';
+import { type Business, type BusinessService as Service } from '../types';
 
 interface Review {
   id: number;
   rating: number;
   comment?: string | null;
   createdAt: string;
+  isHidden?: boolean;
+  hiddenReason?: string | null;
   appointment?: {
     user?: { id: number; name: string };
     service?: { id: number; name: string };
@@ -49,29 +42,152 @@ interface Review {
 }
 
 const INITIAL_REVIEWS_COUNT = 3;
+const DAY_NAMES = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 const BusinessDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [business, setBusiness] = useState<Business | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
+  const location = useLocation();
+
+  const previewBusiness: Business | null = location.state?.business || null;
+  const cachedSvc = id ? clientCache.get<any>(`/businesses/${id}/services?{}`) : null;
+  const initialServices: Service[] = Array.isArray(cachedSvc)
+    ? cachedSvc
+    : (Array.isArray(cachedSvc?.data) ? cachedSvc.data : (previewBusiness?.services || []));
+
+  const cachedSch = id ? clientCache.get<any>(`/businesses/${id}/schedules?{}`) : null;
+  const initialSchedules = Array.isArray(cachedSch) ? cachedSch : (Array.isArray(cachedSch?.data) ? cachedSch.data : []);
+
+  const [business, setBusiness] = useState<Business | null>(previewBusiness);
+  const [services, setServices] = useState<Service[]>(initialServices);
+  const [schedules, setSchedules] = useState<any[]>(initialSchedules);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsStats, setReviewsStats] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
   const [visibleReviewsCount, setVisibleReviewsCount] = useState(INITIAL_REVIEWS_COUNT);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(!previewBusiness);
+
+  const { user } = useAuth();
+
+  // Estados de Moderación In-Situ y Reportes
+  const [reviewToReport, setReviewToReport] = useState<Review | null>(null);
+  const [reportReason, setReportReason] = useState('Lenguaje ofensivo o difamatorio');
+  const [reportDetails, setReportDetails] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+
+  const [reviewToHide, setReviewToHide] = useState<Review | null>(null);
+  const [hideReason, setHideReason] = useState('Incumple las normas de la comunidad');
+  const [processingHide, setProcessingHide] = useState(false);
+
+  const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
+  const [deletingReview, setDeletingReview] = useState(false);
+
+  const [toast, setToast] = useState('');
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3500);
+  };
+
+  const handleUnhideReview = async (rev: Review) => {
+    try {
+      await api.patch(`/admin/reviews/${rev.id}/unhide`);
+      setReviews((prev) => prev.map((r) => (r.id === rev.id ? { ...r, isHidden: false, hiddenReason: null } : r)));
+      clientCache.clear();
+      showToast('✓ Reseña restaurada a visibilidad pública');
+    } catch {
+      showToast('Error al desocultar reseña');
+    }
+  };
+
+  const handleConfirmHideReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewToHide) return;
+    setProcessingHide(true);
+    try {
+      await api.patch(`/admin/reviews/${reviewToHide.id}/hide`, { reason: hideReason });
+      setReviews((prev) => prev.map((r) => (r.id === reviewToHide.id ? { ...r, isHidden: true, hiddenReason: hideReason } : r)));
+      clientCache.clear();
+      showToast('✓ Reseña ocultada de la vista pública');
+      setReviewToHide(null);
+    } catch {
+      showToast('Error al ocultar reseña');
+    } finally {
+      setProcessingHide(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!reviewToDelete) return;
+    setDeletingReview(true);
+    try {
+      await api.delete(`/admin/reviews/${reviewToDelete.id}`);
+      setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
+      clientCache.clear();
+      showToast('✓ Reseña eliminada permanentemente');
+      setReviewToDelete(null);
+    } catch {
+      showToast('Error al eliminar reseña');
+    } finally {
+      setDeletingReview(false);
+    }
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewToReport) return;
+    setSubmittingReport(true);
+    try {
+      await api.post('/reports', {
+        section: 'MODERACION_RESENA',
+        summary: `Reporte de reseña en ${business?.name || 'Comercio'} (ID #${reviewToReport.id})`,
+        steps: `Motivo: ${reportReason}\nDetalles adicionales: ${reportDetails || 'Sin detalles adicionales'}\nComentario reportado: "${reviewToReport.comment || 'Calificación sin texto'}"\nCalificación: ${reviewToReport.rating} ⭐\nAutor: ${reviewToReport.appointment?.user?.name || 'Cliente'}`,
+        pageUrl: window.location.pathname,
+      });
+      showToast('✓ Reporte enviado a moderación exitosamente');
+      setReviewToReport(null);
+      setReportDetails('');
+    } catch {
+      showToast('Error al enviar reporte');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bRes, sRes, rRes] = await Promise.all([
-          api.get(`/businesses/${id}`),
-          api.get(`/businesses/${id}/services`),
-          api.get(`/businesses/${id}/reviews`)
+        const [bRes, sRes, rRes, schRes] = await Promise.all([
+          cachedGet(`/businesses/${id}`, undefined, 180),
+          cachedGet(`/businesses/${id}/services`, undefined, 180),
+          cachedGet(`/businesses/${id}/reviews`, undefined, 60),
+          cachedGet(`/businesses/${id}/schedules`, undefined, 180)
         ]);
-        setBusiness(bRes.data);
-        setServices(sRes.data.data ?? sRes.data ?? []);
-        setReviews(rRes.data.data ?? []);
-        setReviewsStats(rRes.data.stats ?? { average: 0, count: 0 });
+
+        const loadedSchedules = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
+        setSchedules(loadedSchedules);
+
+        const bData = bRes?.data ?? bRes;
+        if (bData && typeof bData === 'object') {
+          setBusiness(bData);
+        }
+
+        // Parsear servicios de forma robusta soportando array directo o envoltorio { data: [] }
+        const sList: Service[] = Array.isArray(sRes)
+          ? sRes
+          : (Array.isArray(sRes?.data)
+            ? sRes.data
+            : (Array.isArray(bData?.services) ? bData.services : []));
+        if (sList.length > 0 || !previewBusiness?.services?.length) {
+          setServices(sList);
+        }
+
+        // Parsear reviews de forma robusta
+        const rList: Review[] = Array.isArray(rRes)
+          ? rRes
+          : (Array.isArray(rRes?.data) ? rRes.data : []);
+        setReviews(rList);
+
+        const stats = rRes?.stats || (bData?.rating ? { average: Number(bData.rating), count: Number(bData.reviewCount || 0) } : { average: 0, count: 0 });
+        setReviewsStats(stats);
       } catch {
         /* ignore */
       } finally {
@@ -81,7 +197,7 @@ const BusinessDetail: React.FC = () => {
     if (id) fetchData();
   }, [id]);
 
-  if (loading) return <SkeletonDetail />;
+  if (loading && !business) return <SkeletonDetail />;
   if (!business) return <div>Negocio no encontrado.</div>;
 
 
@@ -100,32 +216,43 @@ const BusinessDetail: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      <button onClick={() => navigate(-1)} className="btn btn-light" style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}>
+      <button
+        type="button"
+        onClick={() => {
+          const returnUrl = (location.state as any)?.from || '/';
+          startSmoothNavigation(navigate, returnUrl, { direction: 'backward' });
+        }}
+        className="btn btn-light"
+        style={{ marginBottom: '1.25rem', fontSize: '0.88rem' }}
+      >
         <ArrowLeft size={16} /> Volver al catálogo
       </button>
 
-      {/* Header del negocio */}
+      {/* Header del negocio con fondo de negocio por defecto */}
       <div className="ml-card" style={{ marginBottom: '2rem', overflow: 'hidden' }}>
-        <div style={{ background: 'linear-gradient(135deg, #009ee3, #0081bb)', height: '100px' }} />
-        <div style={{ padding: '0 2rem 2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1.25rem', marginTop: '-2.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <DefaultBusinessCover size="banner" style={{ height: '130px' }} />
+        <div style={{ padding: '0 clamp(1rem, 3.5vw, 2rem) 1.75rem', position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             <div style={{
-              width: '80px', height: '80px', borderRadius: '16px',
-              background: 'white', border: '3px solid white',
+              width: '84px', height: '84px', borderRadius: '18px',
+              background: 'white', border: '3.5px solid white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: '1.5rem', color: 'var(--primary-color)',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+              fontWeight: 800, fontSize: '1.6rem', color: 'var(--primary-color)',
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
               flexShrink: 0,
+              marginTop: '-42px',
+              position: 'relative',
+              zIndex: 3,
             }}>
               {initials}
             </div>
-            <div style={{ paddingBottom: '4px' }}>
-              <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '2px' }}>{business.name}</h1>
+            <div style={{ paddingTop: '0.6rem' }}>
+              <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>{business.name}</h1>
               {business.category && <span className="badge badge-confirmed">{business.category}</span>}
             </div>
 
             {/* Valoración única en header */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '4px' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontWeight: 700, fontSize: '1.15rem' }}>
                 <Star size={20} fill="currentColor" /> {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : 'Nuevo'}
               </div>
@@ -162,7 +289,13 @@ const BusinessDetail: React.FC = () => {
           Servicios Disponibles
         </h2>
 
-        {services.length === 0 ? (
+        {loading && services.length === 0 ? (
+          <div className="services-grid">
+            {[1, 2, 3].map(n => (
+              <div key={n} className="skeleton-box" style={{ height: '140px', borderRadius: '12px' }} />
+            ))}
+          </div>
+        ) : services.length === 0 ? (
           <div className="empty-state">
             <p className="text-muted">Este local aún no tiene servicios publicados.</p>
           </div>
@@ -188,7 +321,7 @@ const BusinessDetail: React.FC = () => {
 
                 <button
                   className="btn btn-primary btn-full"
-                  onClick={() => navigate(`/businesses/${id}/book?serviceId=${svc.id}`)}
+                  onClick={() => startSmoothNavigation(navigate, `/businesses/${id}/book?serviceId=${svc.id}`, { state: { business: { ...business, services }, service: svc, schedules } })}
                 >
                   <CalendarCheck size={17} /> Reservar Turno
                 </button>
@@ -198,8 +331,117 @@ const BusinessDetail: React.FC = () => {
         )}
       </div>
 
+      
+      {/* Horarios de Atención del Comercio */}
+      {schedules.length > 0 && (() => {
+        const jsDay = new Date().getDay();
+        const todayDayOfWeek = jsDay === 0 ? 7 : jsDay;
+        const todaySchedules = schedules
+          .filter((s: any) => s.dayOfWeek === todayDayOfWeek)
+          .sort((a: any, b: any) => (a.startTime > b.startTime ? 1 : -1));
+
+        const todayHoursSummary = todaySchedules
+          .map((s: any) => `${formatTimeToHHMM(s.startTime)} a ${formatTimeToHHMM(s.endTime)}`)
+          .reduce((acc: string, curr: string, i: number, arr: string[]) => {
+            if (i === 0) return curr;
+            if (i === arr.length - 1) return `${acc} y ${curr}`;
+            return `${acc}, ${curr}`;
+          }, '');
+
+        return (
+          <div className="ml-card" style={{ padding: 'clamp(1.2rem, 3.5vw, 1.75rem)', marginBottom: '2.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'var(--status-pending-bg)',
+                  color: 'var(--primary-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Clock size={20} />
+                </div>
+                <div>
+                  <h3 style={{ color: 'var(--text-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+                    Horarios de Atención
+                  </h3>
+                  <p className="text-muted text-xs" style={{ margin: '2px 0 0 0' }}>
+                    Días y franjas horarias de atención presencial
+                  </p>
+                </div>
+              </div>
+
+              {todaySchedules.length > 0 ? (
+                <span className="badge badge-confirmed" style={{ fontSize: '0.82rem', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                  Abierto hoy ({todayHoursSummary} hs)
+                </span>
+              ) : (
+                <span className="badge badge-cancelled" style={{ fontSize: '0.82rem', padding: '5px 10px' }}>
+                  Cerrado hoy
+                </span>
+              )}
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+              gap: '10px',
+              background: 'var(--background-app)',
+              padding: '12px',
+              borderRadius: '12px'
+            }}>
+              {[1, 2, 3, 4, 5, 6, 7].map(d => {
+                const daySchedules = schedules
+                  .filter((s: any) => s.dayOfWeek === d)
+                  .sort((a: any, b: any) => (a.startTime > b.startTime ? 1 : -1));
+                const isTodayDay = d === todayDayOfWeek;
+                return (
+                  <div
+                    key={d}
+                    style={{
+                      background: isTodayDay ? '#ffffff' : 'transparent',
+                      border: isTodayDay ? '1.5px solid var(--primary-color)' : '1px solid transparent',
+                      boxShadow: isTodayDay ? 'var(--shadow-sm)' : 'none',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', fontWeight: isTodayDay ? 800 : 600, color: isTodayDay ? 'var(--primary-text)' : 'var(--text-secondary)', marginBottom: '4px' }}>
+                      {DAY_NAMES[d]} {isTodayDay && '•'}
+                    </div>
+                    {daySchedules.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {daySchedules.map((sch: any, idx: number) => (
+                          <div key={idx} style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-title)', whiteSpace: 'nowrap' }}>
+                            {formatTimeToHHMM(sch.startTime)} - {formatTimeToHHMM(sch.endTime)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-disabled)' }}>
+                        Cerrado
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Sección Permanente de Opiniones y Reseñas (Coincide con el ancho de arriba) */}
-      <div className="ml-card" style={{ padding: '2rem', marginBottom: '3rem' }}>
+      <div className="ml-card" style={{ padding: 'clamp(1.2rem, 3.5vw, 2rem)', marginBottom: '3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h2 style={{ color: 'var(--text-title)', fontSize: '1.3rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -327,6 +569,85 @@ const BusinessDetail: React.FC = () => {
                     El cliente calificó con {rev.rating} estrellas sin comentario escrito.
                   </p>
                 )}
+
+                {/* Barra de Moderación In-Situ para Administradores */}
+                {user?.role === 'administrator' && (
+                  <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        ⚙ Moderación:
+                      </span>
+                      {rev.isHidden ? (
+                        <span style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px', padding: '2px 8px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <EyeOff size={11} /> Oculta al público {rev.hiddenReason ? `(${rev.hiddenReason})` : ''}
+                        </span>
+                      ) : (
+                        <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '2px 8px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Eye size={11} /> Visible
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {rev.isHidden ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUnhideReview(rev)}
+                          className="btn btn-sm btn-light"
+                          style={{ padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669' }}
+                          title="Restaurar a la vista pública"
+                        >
+                          <Eye size={12} />
+                          <span>Desocultar</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReviewToHide(rev);
+                            setHideReason('Incumple las normas de la comunidad');
+                          }}
+                          className="btn btn-sm btn-light"
+                          style={{ padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          title="Ocultar opinión de la vista pública"
+                        >
+                          <EyeOff size={12} />
+                          <span>Ocultar</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setReviewToDelete(rev)}
+                        className="btn btn-sm btn-light"
+                        style={{ padding: '4px 10px', fontSize: '0.76rem', color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        title="Eliminar reseña definitivamente"
+                      >
+                        <Trash2 size={12} />
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Botón Reportar para Dueño del Local o Clientes (si no es admin) */}
+                {user && user.role !== 'administrator' && (
+                  <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReviewToReport(rev);
+                        setReportReason('Lenguaje ofensivo o difamatorio');
+                        setReportDetails('');
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.74rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 6px' }}
+                      title="Reportar reseña inapropiada o falsa"
+                    >
+                      <Flag size={11} />
+                      <span>Reportar opinión</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -352,6 +673,221 @@ const BusinessDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Feedback */}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: '#0f172a',
+            color: '#ffffff',
+            padding: '12px 20px',
+            borderRadius: '10px',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <CheckCircle2 size={18} color="#10b981" />
+          <span>{toast}</span>
+        </div>
+      )}
+
+      {/* Modal 1: Reportar Reseña (Dueño o Cliente) */}
+      {reviewToReport && (
+        <div className="modal-overlay" onClick={() => !submittingReport && setReviewToReport(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Flag size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Reportar Opinión
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Se enviará una solicitud de revisión al equipo de moderación
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewToReport(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Resumen de la reseña reportada */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', marginBottom: '1rem', fontSize: '0.84rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <strong style={{ color: 'var(--text-title)' }}>{reviewToReport.appointment?.user?.name || 'Cliente'}</strong>
+                <span style={{ color: '#d97706', fontWeight: 700 }}>{reviewToReport.rating} ⭐</span>
+              </div>
+              <p style={{ margin: 0, color: '#475569', fontStyle: 'italic' }}>
+                "{reviewToReport.comment || 'Calificación sin comentario escrito'}"
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmitReport}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Motivo principal del reclamo *
+                </label>
+                <select
+                  className="form-control"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  required
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                >
+                  <option value="Lenguaje ofensivo o difamatorio">Lenguaje ofensivo, insultos o difamación</option>
+                  <option value="Spam o publicidad no deseada">Spam, publicidad o contenido no relacionado</option>
+                  <option value="Reseña falsa o de la competencia">Reseña falsa (el usuario no fue cliente o es competidor)</option>
+                  <option value="Información privada o datos sensibles">Revela datos privados o contacto personal</option>
+                  <option value="Otro motivo">Otro motivo</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Detalles adicionales (opcional)
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder="Explica brevemente por qué consideras que esta opinión debe ser moderada u oculta..."
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  style={{ borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={submittingReport}
+                  onClick={() => setReviewToReport(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                  disabled={submittingReport}
+                  style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {submittingReport ? 'Enviando reporte...' : 'Enviar Reporte'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Ocultar Reseña con Motivo (Admin) */}
+      {reviewToHide && (
+        <div className="modal-overlay" onClick={() => !processingHide && setReviewToHide(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ textAlign: 'center', padding: '0.5rem 0 1rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fff7ed', color: '#ea580c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <EyeOff size={24} />
+              </div>
+              <h3 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                Ocultar Opinión del Público
+              </h3>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5 }}>
+                Esta opinión dejará de ser visible para los clientes y su puntuación se excluirá del promedio público del comercio. Podrás restaurarla en cualquier momento.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmHideReview}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Motivo de la moderación *
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  required
+                  value={hideReason}
+                  onChange={(e) => setHideReason(e.target.value)}
+                  placeholder="Ej: Incumple normas de respeto / En revisión"
+                  style={{ height: '40px', borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={processingHide}
+                  onClick={() => setReviewToHide(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-warning"
+                  disabled={processingHide || !hideReason.trim()}
+                  style={{ background: '#ea580c', color: 'white', border: 'none', fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {processingHide ? 'Ocultando...' : 'Confirmar y Ocultar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Eliminar Reseña Definitivamente (Admin) */}
+      {reviewToDelete && (
+        <div className="modal-overlay" onClick={() => !deletingReview && setReviewToDelete(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center', padding: '1.5rem' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+              <Trash2 size={24} />
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+              ¿Eliminar Opinión Permanentemente?
+            </h3>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5 }}>
+              Esta acción eliminará de forma irreversible el registro de esta reseña de la base de datos.
+            </p>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={deletingReview}
+                onClick={() => setReviewToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={deletingReview}
+                onClick={handleDeleteReview}
+                style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+              >
+                {deletingReview ? 'Eliminando...' : '🗑 Sí, Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

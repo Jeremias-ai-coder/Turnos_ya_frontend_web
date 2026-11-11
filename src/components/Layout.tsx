@@ -1,16 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { startSmoothNavigation } from '../utils/transitionNavigator';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Search, X } from 'lucide-react';
+import { LogOut, Search, X, Home, Calendar, Building2, User, AlertTriangle } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { Footer } from './Footer';
+import { CookieBanner } from './CookieBanner';
+import { LegalModals } from './LegalModals';
+import { BugReportModal } from './BugReportModal';
+import { FloatingReportButton } from './FloatingReportButton';
+import { BrandLogo } from './common/BrandLogo';
+import { GlobalAnnouncementBanner } from './common/GlobalAnnouncementBanner';
 
 
 export const Layout: React.FC = () => {
+  // Manejo de la dirección ante eventos de retroceso del navegador (Back button)
+  useEffect(() => {
+    const handlePopState = () => {
+      document.documentElement.dataset.transitionDir = 'backward';
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Reset scroll synchronously before paint to avoid awkward jump
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+  // Interceptar todos los clicks en enlaces internos para aplicar suavemente View Transitions en toda la app
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#') || anchor.target === '_blank') return;
+
+      e.preventDefault();
+      startSmoothNavigation(navigate, href);
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, [navigate]);
 
   // Keep input in sync if URL query parameter changes
   useEffect(() => {
@@ -71,9 +113,8 @@ export const Layout: React.FC = () => {
       <nav className="navbar-custom">
         <div className="container">
           <div className="navbar-inner">
-            <Link to="/" className="navbar-brand">
-              <div className="logo-nav">TY</div>
-              Turnos Ya
+            <Link to="/" className="navbar-brand" title="Turnos Ya - Inicio">
+              <BrandLogo variant="white" size="md" />
             </Link>
 
             <form className="search-group" onSubmit={handleSearchSubmit} role="search">
@@ -113,25 +154,25 @@ export const Layout: React.FC = () => {
             <div className="navbar-actions">
               {user ? (
                 <>
-                  <Link to="/my-appointments" className="navbar-link">Mis Turnos</Link>
-                  <Link to="/dashboard" className="navbar-link">
+                  <Link to="/my-appointments" className="navbar-link navbar-link-desktop">Mis Turnos</Link>
+                  <Link to="/dashboard" className="navbar-link navbar-link-desktop">
                     {user.role === 'client' ? 'Registrar Negocio' : 'Mi Panel'}
                   </Link>
                   {user.role === 'administrator' && (
-                    <Link to="/system" className="navbar-link" style={{ opacity: 0.8 }}>⚙ Sistema</Link>
+                    <Link to="/system" className="navbar-link navbar-link-desktop" style={{ opacity: 0.8 }}>⚙ Sistema</Link>
                   )}
                   <NotificationBell />
                   <div className="navbar-separator" />
                   <Link to="/profile" className="user-avatar-nav" title={user.name}>{initials}</Link>
-                  <span style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{user.name.split(' ')[0]}</span>
-                  <button className="btn-logout" onClick={handleLogout}>
-                    <LogOut size={14} /> Salir
+                  <span className="navbar-username-desktop" style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{user.name.split(' ')[0]}</span>
+                  <button className="btn-logout" onClick={handleLogout} title="Cerrar sesión" aria-label="Cerrar sesión">
+                    <LogOut size={14} /><span className="logout-text-desktop"> Salir</span>
                   </button>
                 </>
               ) : (
                 <>
-                  <Link to="/login" className="navbar-link">Iniciar Sesión</Link>
-                  <Link to="/register" className="btn btn-light" style={{ fontSize: '0.85rem', padding: '8px 16px' }}>
+                  <Link to="/login" className="navbar-link navbar-link-desktop">Iniciar Sesión</Link>
+                  <Link to="/register" className="btn btn-light navbar-link-desktop" style={{ fontSize: '0.85rem', padding: '8px 16px' }}>
                     Crear cuenta
                   </Link>
                 </>
@@ -140,10 +181,119 @@ export const Layout: React.FC = () => {
           </div>
         </div>
       </nav>
+ 
+      <GlobalAnnouncementBanner />
 
-      <main className="container page-main">
-        <Outlet />
-      </main>
+      {user && user.emailVerified === false && !bannerDismissed && (
+        <div
+          role="region"
+          aria-label="Aviso de verificación de correo"
+          className="global-email-banner"
+          style={{
+            background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
+            borderBottom: '1px solid #fde68a',
+            padding: '0.65rem 1rem',
+            color: '#92400e',
+            fontSize: '0.88rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
+            position: 'relative',
+            zIndex: 40,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+            <span>
+              Tu correo <strong>{user.email}</strong> aún no está verificado.
+            </span>
+            <Link
+              to="/profile"
+              style={{
+                color: '#b45309',
+                fontWeight: 700,
+                textDecoration: 'underline',
+                marginLeft: '4px',
+              }}
+            >
+              Verificar ahora →
+            </Link>
+          </div>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#b45309',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: '0.5rem',
+            }}
+            title="Cerrar aviso"
+            aria-label="Cerrar aviso de verificación"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      <div className="page-main-transition" style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <main className="container page-main" style={{ flex: 1 }}>
+          <Outlet />
+        </main>
+        {location.pathname === '/' && <Footer />}
+      </div>
+
+      {/* Cartel flotante de cookies */}
+      <CookieBanner />
+
+      {/* Modales legales (Términos, Privacidad, Cookies) */}
+      <LegalModals />
+
+      {/* Modal para reportar errores */}
+      <BugReportModal />
+
+      {/* Botón flotante discreto de reporte */}
+      <FloatingReportButton />
+
+      {/* Barra de Navegación Inferior Fija para Móviles (Estilo App Nativa) */}
+      <nav className="bottom-nav-mobile" aria-label="Navegación móvil inferior">
+        <Link
+          to="/"
+          className={`bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`}
+        >
+          <Home size={21} />
+          <span>Explorar</span>
+        </Link>
+
+        <Link
+          to={user ? '/my-appointments' : '/login'}
+          className={`bottom-nav-item ${location.pathname === '/my-appointments' ? 'active' : ''}`}
+        >
+          <Calendar size={21} />
+          <span>Mis Turnos</span>
+        </Link>
+
+        <Link
+          to={user ? '/dashboard' : '/login'}
+          className={`bottom-nav-item ${location.pathname.startsWith('/dashboard') ? 'active' : ''}`}
+        >
+          <Building2 size={21} />
+          <span>{user?.role === 'owner' ? 'Mi Negocio' : 'Registrar'}</span>
+        </Link>
+
+        <Link
+          to={user ? '/profile' : '/login'}
+          className={`bottom-nav-item ${location.pathname === '/profile' || location.pathname === '/login' ? 'active' : ''}`}
+        >
+          <User size={21} />
+          <span>{user ? 'Perfil' : 'Ingresar'}</span>
+        </Link>
+      </nav>
     </div>
   );
 };

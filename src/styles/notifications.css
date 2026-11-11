@@ -8,7 +8,7 @@
 
 .notification-bell-btn {
   background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: white;
   width: 38px;
   height: 38px;
@@ -18,17 +18,35 @@
   justify-content: center;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .notification-bell-btn:hover {
   background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.03);
+}
+
+.notification-bell-btn:active {
+  transform: scale(0.95);
+}
+
+.notification-bell-btn:hover .bell-icon,
+.notification-bell-btn.has-unread .bell-icon {
+  animation: bellSwing 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes bellSwing {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(14deg); }
+  40% { transform: rotate(-12deg); }
+  60% { transform: rotate(7deg); }
+  80% { transform: rotate(-4deg); }
+  100% { transform: rotate(0); }
 }
 
 .notification-bell-btn.active {
   background: white;
-  color: var(--primary-color, #aa3bff);
+  color: var(--primary-color);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -38,7 +56,7 @@
   right: -4px;
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: white;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   min-width: 19px;
   height: 19px;
@@ -48,14 +66,33 @@
   align-items: center;
   justify-content: center;
   border: 2px solid #ffffff;
-  box-shadow: 0 2px 5px rgba(220, 38, 38, 0.4);
-  animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.45);
+  animation: badgePop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+}
+
+/* Efecto radar / ping suave para avisos nuevos */
+.notification-badge::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 10px;
+  border: 2px solid #ef4444;
+  opacity: 0.8;
+  animation: badgeRadar 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes badgeRadar {
+  0% { transform: scale(1); opacity: 0.8; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
 
 @keyframes badgePop {
-  0% { transform: scale(0); }
-  80% { transform: scale(1.2); }
-  100% { transform: scale(1); }
+  0% { transform: scale(0.3); opacity: 0; }
+  70% { transform: scale(1.22); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .notification-dropdown {
@@ -63,26 +100,73 @@
   top: calc(100% + 10px);
   right: 0;
   width: 380px;
-  max-width: 90vw;
+  max-width: 92vw;
   background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.22),
+              0 0 0 1px rgba(15, 23, 42, 0.08);
   z-index: 1000;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: dropdownSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
   text-align: left;
+  backdrop-filter: blur(12px);
+  will-change: transform, opacity;
 }
 
-@keyframes dropdownSlide {
-  from {
+.notification-dropdown.is-entering {
+  animation: dropdownEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.notification-dropdown.is-closing {
+  animation: dropdownExit 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes dropdownEnter {
+  0% {
     opacity: 0;
-    transform: translateY(-8px) scale(0.98);
+    transform: translate3d(0, -18px, 0) scale(0.96);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes dropdownExit {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0) scale(0.97);
+  }
+}
+
+/* Cascada escalonada (Stagger) armónica al desplegar */
+.notification-dropdown.is-entering .notification-item {
+  animation: notifItemFade 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.notification-dropdown.is-entering .notification-item:nth-child(1) { animation-delay: 0.06s; }
+.notification-dropdown.is-entering .notification-item:nth-child(2) { animation-delay: 0.11s; }
+.notification-dropdown.is-entering .notification-item:nth-child(3) { animation-delay: 0.16s; }
+.notification-dropdown.is-entering .notification-item:nth-child(4) { animation-delay: 0.21s; }
+.notification-dropdown.is-entering .notification-item:nth-child(5) { animation-delay: 0.26s; }
+.notification-dropdown.is-entering .notification-item:nth-child(6) { animation-delay: 0.31s; }
+.notification-dropdown.is-entering .notification-item:nth-child(7) { animation-delay: 0.36s; }
+.notification-dropdown.is-entering .notification-item:nth-child(8) { animation-delay: 0.41s; }
+
+@keyframes notifItemFade {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -120,7 +204,7 @@
 .btn-mark-all-read {
   background: none;
   border: none;
-  color: var(--primary-color, #aa3bff);
+  color: var(--primary-color);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -133,7 +217,7 @@
 }
 
 .btn-mark-all-read:hover {
-  background: rgba(170, 59, 255, 0.08);
+  background: rgba(0, 158, 227, 0.08);
 }
 
 .notification-list {
@@ -156,17 +240,18 @@
   display: flex;
   gap: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.18s ease, transform 0.18s ease;
   position: relative;
   background: #ffffff;
 }
 
 .notification-item:hover {
   background: #f8fafc;
+  transform: translateX(3px);
 }
 
 .notification-item.unread {
-  background: #fdf8ff;
+  background: #f0f9ff;
 }
 
 .notification-item.unread::before {
@@ -176,7 +261,7 @@
   top: 0;
   bottom: 0;
   width: 3.5px;
-  background: var(--primary-color, #aa3bff);
+  background: var(--primary-color);
 }
 
 .notification-icon-wrapper {
@@ -247,7 +332,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--primary-color, #aa3bff);
+  background: var(--primary-color);
   flex-shrink: 0;
   align-self: center;
 }
@@ -285,3 +370,34 @@
   color: #94a3b8;
   margin: 0;
 }
+
+/* ====== NOTIFICATIONS RESPONSIVE (MÓVIL) ====== */
+@media (max-width: 768px) {
+  .notification-dropdown {
+    position: fixed;
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    z-index: 1200;
+    transform-origin: top center;
+  }
+
+  .notification-header {
+    padding: 12px 14px;
+  }
+
+  .notification-item {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .notification-list {
+    max-height: 65vh;
+  }
+}
+

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { BrandLogo } from '../components/common/BrandLogo';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { UserPlus } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 const Register: React.FC = () => {
   const [name, setName] = useState('');
@@ -42,6 +44,9 @@ const Register: React.FC = () => {
   return (
     <div style={{ maxWidth: '400px', margin: '4rem auto' }}>
       <div className="ml-card" style={{ padding: '2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+          <BrandLogo variant="color" size="lg" />
+        </div>
         <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--text-title)' }}>
           Crear Cuenta
         </h2>
@@ -91,7 +96,7 @@ const Register: React.FC = () => {
             </select>
           </div>
           
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={loading}>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem', fontWeight: 700 }} disabled={loading}>
             {loading ? (
               <LoadingSpinner size="sm" inline text="Registrando..." color="white" />
             ) : (
@@ -101,6 +106,17 @@ const Register: React.FC = () => {
             )}
           </button>
         </form>
+
+        <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', color: '#94a3b8' }}>
+          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+          <span style={{ padding: '0 10px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>O regístrate con</span>
+          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+        </div>
+
+        <GoogleSignInButton
+          buttonText="Registrarse con Google"
+          onError={err => setError(err)}
+        />
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.9rem' }}>
           ¿Ya tienes cuenta? <Link to="/login" style={{ color: 'var(--primary-color)', fontWeight: 600, textDecoration: 'none' }}>Ingresa aquí</Link>
