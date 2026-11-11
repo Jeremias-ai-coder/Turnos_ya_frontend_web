@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   Mail,
   KeyRound,
-  Sparkles,
   X,
   Eye,
   EyeOff,
@@ -23,8 +22,6 @@ import {
   ChevronRight,
   Smartphone,
   Laptop,
-  ScanFace,
-  QrCode,
   Info,
   MonitorSmartphone,
   ArrowLeft,
@@ -45,16 +42,6 @@ const CredentialCardIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
     <path d="M14 9h4" />
     <path d="M14 12h4" />
     <path d="M6 16h12" />
-  </svg>
-);
-
-const PasskeyIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="16" cy="8" r="4" />
-    <circle cx="16" cy="8" r="1.5" />
-    <path d="M13 11l-8.5 8.5" />
-    <path d="M7 17l2 2" />
-    <path d="M9.5 14.5l2 2" />
   </svg>
 );
 
@@ -198,14 +185,13 @@ const Profile: React.FC = () => {
   const [changeAuthToken, setChangeAuthToken] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [twoFactorPasswordCode, setTwoFactorPasswordCode] = useState('');
-  const [qaPasswordCode, setQaPasswordCode] = useState<string | null>(null);
   const [securityLoading, setSecurityLoading] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Modal de cancelación de cuenta
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
-  // Modal informativo de métodos de seguridad (Passkeys, Biometría, QR, 2FA)
+  // Modal informativo de métodos de seguridad
   const [infoModal, setInfoModal] = useState<{
     title: string;
     description: string;
@@ -218,9 +204,6 @@ const Profile: React.FC = () => {
     profileForm.phone && !profileForm.phone.includes('3435') ? profileForm.phone : ''
   );
   const [phoneSaving, setPhoneSaving] = useState(false);
-
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-  const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
 
   // Estados y lógica para Doble Factor de Autenticación Real (Google Authenticator)
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
@@ -354,10 +337,16 @@ const Profile: React.FC = () => {
   const [emailVerificationSent, setEmailVerificationSent] = useState(false);
   const [emailVerificationCode, setEmailVerificationCode] = useState('');
   const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
-  const [qaEmailCode, setQaEmailCode] = useState<string | null>(null);
   const [emailVerificationLoading, setEmailVerificationLoading] = useState(false);
 
-  const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
+  const [privacy, setPrivacy] = useState<PrivacySettings>(() => {
+    try {
+      const saved = localStorage.getItem('turnos_ya_privacy_prefs');
+      return saved ? { ...defaultPrivacy, ...JSON.parse(saved) } : defaultPrivacy;
+    } catch {
+      return defaultPrivacy;
+    }
+  });
 
   const [loading, setLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -504,7 +493,6 @@ const Profile: React.FC = () => {
     try {
       const res = await api.post('/auth/request-password-change-code');
       setChangeToken(res.data.confirmationToken);
-      setQaPasswordCode(res.data.qaCode || null);
       setPasswordModalStep('verify_email');
       setIsPasswordModalOpen(true);
     } catch (err: any) {
@@ -523,7 +511,6 @@ const Profile: React.FC = () => {
     try {
       const res = await api.post('/auth/request-password-change-code');
       setChangeToken(res.data.confirmationToken);
-      setQaPasswordCode(res.data.qaCode || null);
       setPasswordModalStep('verify_email');
     } catch (err: any) {
       setModalMessage({
@@ -619,7 +606,6 @@ const Profile: React.FC = () => {
     try {
       const res = await api.post('/auth/request-password-change-code');
       setChangeToken(res.data.confirmationToken);
-      setQaPasswordCode(res.data.qaCode || null);
       setModalMessage({
         type: 'success',
         text: 'Hemos reenviado un nuevo código de 6 dígitos a tu correo.',
@@ -679,7 +665,6 @@ const Profile: React.FC = () => {
       setVerificationCode('');
       setChangeToken(null);
       setChangeAuthToken(null);
-      setQaPasswordCode(null);
       setForgotPasswordActive(false);
     } catch (err: any) {
       setModalMessage({
@@ -699,7 +684,6 @@ const Profile: React.FC = () => {
     setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     setChangeToken(null);
     setChangeAuthToken(null);
-    setQaPasswordCode(null);
     setForgotPasswordActive(false);
   };
 
@@ -738,7 +722,6 @@ const Profile: React.FC = () => {
       const res = await api.post('/auth/send-verification-email');
       setEmailVerificationSent(true);
       setEmailVerificationToken(res.data.verificationToken || null);
-      setQaEmailCode(res.data.qaCode || null);
       setProfileMessage({
         type: 'success',
         text: res.data.message || 'Código de verificación enviado a tu correo.',
@@ -766,7 +749,6 @@ const Profile: React.FC = () => {
       updateUser({ emailVerified: true });
       setEmailVerificationSent(false);
       setEmailVerificationCode('');
-      setQaEmailCode(null);
       setProfileMessage({
         type: 'success',
         text: res.data.message || '¡Tu correo electrónico ha sido verificado con éxito!',
@@ -1124,82 +1106,6 @@ const Profile: React.FC = () => {
                 <ChevronRight size={18} color="#94a3b8" />
               </div>
             </button>
-
-            {/* 5. Llaves de acceso (FIDO2 / WebAuthn - Roadmap Fase 6) */}
-            <button
-              type="button"
-              className="security-list-item is-dimmed"
-              onClick={() => setIsPasskeyModalOpen(true)}
-            >
-              <div className="security-item-left">
-                <div className="security-item-icon">
-                  <PasskeyIcon size={22} />
-                </div>
-                <div>
-                  <h3 className="security-item-title">Llaves de acceso (Passkeys)</h3>
-                  <p className="security-item-desc">Inicio de sesión biométrico (Windows Hello, Touch ID o Face ID)</p>
-                </div>
-              </div>
-              <div className="security-item-right">
-                <span className="security-badge-pill roadmap">
-                  Próximamente
-                </span>
-                <ChevronRight size={18} color="#94a3b8" />
-              </div>
-            </button>
-
-            {/* 6. Reconocimiento facial (Biometría - Roadmap Fase 6) */}
-            <button
-              type="button"
-              className="security-list-item is-dimmed"
-              onClick={() =>
-                setInfoModal({
-                  title: 'Reconocimiento facial (Biometría)',
-                  description:
-                    'La autenticación biométrica facial utiliza el sensor de tu dispositivo a través del estándar WebAuthn (FIDO2). Requiere soporte de hardware local y registro de llave pública criptográfica en la base de datos.',
-                  badge: 'Hoja de ruta · Fase 6',
-                })
-              }
-            >
-              <div className="security-item-left">
-                <div className="security-item-icon">
-                  <ScanFace size={22} strokeWidth={1.8} />
-                </div>
-                <div>
-                  <h3 className="security-item-title">Reconocimiento facial</h3>
-                  <p className="security-item-desc">Validación biométrica en tu dispositivo compatible</p>
-                </div>
-              </div>
-              <div className="security-item-right">
-                <span className="security-badge-pill roadmap">
-                  Próximamente
-                </span>
-                <ChevronRight size={18} color="#94a3b8" />
-              </div>
-            </button>
-
-            {/* 7. Código QR (Roadmap Fase 7) */}
-            <button
-              type="button"
-              className="security-list-item is-dimmed"
-              onClick={() => setIsQrModalOpen(true)}
-            >
-              <div className="security-item-left">
-                <div className="security-item-icon">
-                  <QrCode size={22} strokeWidth={1.8} />
-                </div>
-                <div>
-                  <h3 className="security-item-title">Código QR de check-in</h3>
-                  <p className="security-item-desc">Acreditación presencial rápida para tus turnos agendados</p>
-                </div>
-              </div>
-              <div className="security-item-right">
-                <span className="security-badge-pill roadmap">
-                  Próximamente
-                </span>
-                <ChevronRight size={18} color="#94a3b8" />
-              </div>
-            </button>
           </div>
         </div>
       );
@@ -1350,7 +1256,7 @@ const Profile: React.FC = () => {
       },
       notifications: {
         title: 'Comunicaciones',
-        subtitle: 'Elegí qué tipo de avisos querés recibir por email o WhatsApp.',
+        subtitle: 'Elegí qué tipo de avisos querés recibir en la plataforma o por correo electrónico.',
       },
       privacy: {
         title: 'Privacidad',
@@ -1497,21 +1403,6 @@ const Profile: React.FC = () => {
                             Hemos enviado un código a <strong>{profileForm.email}</strong>. Revisa tu bandeja de entrada o spam.
                           </p>
 
-                          {qaEmailCode && (
-                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#166534', fontWeight: 600 }}>
-                                <Sparkles size={14} color="#16a34a" /> Modo QA / Pruebas: Código <code>{qaEmailCode}</code>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setEmailVerificationCode(qaEmailCode)}
-                                style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                              >
-                                Autocompletar
-                              </button>
-                            </div>
-                          )}
-
                           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <input
                               type="text"
@@ -1579,18 +1470,15 @@ const Profile: React.FC = () => {
                     />
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.2rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: 'var(--background-app)', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.2rem', border: '1px solid var(--border-default)', borderRadius: '12px', background: '#f8fafc' }}>
                     <div>
-                      <div style={{ fontWeight: 700, color: 'var(--text-title)', fontSize: '0.95rem' }}>Avisos por WhatsApp</div>
-                      <small className="text-muted">Recibir recordatorios automáticos por WhatsApp antes de tu turno.</small>
+                      <div style={{ fontWeight: 700, color: 'var(--text-title)', fontSize: '0.95rem' }}>Notificaciones en la plataforma (Campanita)</div>
+                      <small className="text-muted">Avisos instantáneos dentro de Turnos Ya sobre el estado de tus reservas, tickets y comercios.</small>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={profileForm.whatsappNotifications}
-                      onChange={(e) => setProfileForm((prev) => ({ ...prev, whatsappNotifications: e.target.checked }))}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                    />
-                  </label>
+                    <span className="badge badge-confirmed" style={{ fontSize: '0.75rem', padding: '4px 10px', whiteSpace: 'nowrap' }}>
+                      Siempre activas
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'flex-end' }}>
@@ -1605,6 +1493,12 @@ const Profile: React.FC = () => {
           {/* ====== PESTAÑA: PRIVACIDAD ====== */}
           {currentTab === 'privacy' && (
             <div>
+              {profileMessage && (
+                <div className={profileMessage.type === 'success' ? 'alert-success' : 'alert-danger'} style={{ marginBottom: '1.25rem' }}>
+                  {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {profileMessage.text}
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
                 {[
                   ['Compartir mi número de teléfono con los negocios donde reservo', privacy.sharePhone, () => setPrivacy((prev) => ({ ...prev, sharePhone: !prev.sharePhone }))],
@@ -1622,7 +1516,13 @@ const Profile: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => alert('Preferencias de privacidad guardadas localmente.')}
+                  onClick={() => {
+                    localStorage.setItem('turnos_ya_privacy_prefs', JSON.stringify(privacy));
+                    setProfileMessage({
+                      type: 'success',
+                      text: 'Tus preferencias de privacidad han sido guardadas.',
+                    });
+                  }}
                   style={{ padding: '0.75rem 1.75rem' }}
                 >
                   <Save size={16} /> Guardar preferencias
@@ -2226,34 +2126,6 @@ const Profile: React.FC = () => {
                   </p>
                 </div>
 
-                {qaPasswordCode && (
-                  <div
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      marginBottom: '1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '8px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#334155', fontWeight: 600 }}>
-                      <Sparkles size={14} color="#009ee3" /> Modo pruebas (QA): <code>{qaPasswordCode}</code>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setVerificationCode(qaPasswordCode)}
-                      className="btn btn-primary"
-                      style={{ padding: '3px 8px', fontSize: '0.74rem' }}
-                    >
-                      Autocompletar
-                    </button>
-                  </div>
-                )}
-
                 <div className="form-group" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
                   <label className="form-label" style={{ fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>
                     Código de verificación (6 dígitos)
@@ -2614,110 +2486,6 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* Modal para Llaves de Acceso (Passkeys) */}
-      {isPasskeyModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsPasskeyModalOpen(false)}>
-          <div
-            className="modal-box"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '460px', width: '100%' }}
-          >
-            <div className="modal-drag-handle" />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <PasskeyIcon size={22} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                    Llaves de acceso (Passkeys)
-                  </h3>
-                  <span className="security-badge-pill roadmap" style={{ marginTop: '3px' }}>
-                    Fase 6 · En hoja de ruta
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPasskeyModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5, margin: '0 0 1.25rem' }}>
-              Las llaves de acceso permiten iniciar sesión de forma instantánea usando el sensor biométrico del equipo (Windows Hello, Touch ID o Face ID) mediante el estándar FIDO2 / WebAuthn.
-            </p>
-
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.5rem' }}>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5 }}>
-                ⚙️ <strong>Próxima integración:</strong> Se requerirá registrar la clave pública generada por el navegador en la base de datos para autenticar sin contraseñas.
-              </p>
-            </div>
-
-            <div className="modal-footer-responsive">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setIsPasskeyModalOpen(false)}
-                style={{ padding: '7px 18px' }}
-              >
-                Entendido
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal para Código QR */}
-      {isQrModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsQrModalOpen(false)}>
-          <div
-            className="modal-box"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px', width: '100%', textAlign: 'center' }}
-          >
-            <div className="modal-drag-handle" />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={() => setIsQrModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(0, 158, 227, 0.1)', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-              <QrCode size={26} />
-            </div>
-
-            <h3 style={{ margin: '0 0 0.35rem', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
-              Código QR de Check-in
-            </h3>
-            <span className="security-badge-pill roadmap" style={{ marginBottom: '1rem', display: 'inline-block' }}>
-              Fase 7 · En hoja de ruta
-            </span>
-
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0.5rem 0 1.5rem' }}>
-              Esta función generará un código QR dinámico firmado para que el recepcionista del local comercial pueda escanear tu llegada y registrar tu asistencia en tiempo real.
-            </p>
-
-            <div className="modal-footer-responsive">
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ width: '100%', padding: '0.75rem' }}
-                onClick={() => setIsQrModalOpen(false)}
-              >
-                Entendido
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal Real para Google Authenticator (2FA) */}
       {isTwoFactorModalOpen && (
         <div className="modal-overlay" onClick={() => setIsTwoFactorModalOpen(false)}>
@@ -2994,7 +2762,12 @@ const Profile: React.FC = () => {
                 type="button"
                 className="btn btn-light"
                 style={{ color: 'var(--status-danger-text)', borderColor: '#fca5a5' }}
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    await api.delete('/auth/account');
+                  } catch {
+                    // Proceed with logout even if request fails
+                  }
                   setIsCancelModalOpen(false);
                   logout();
                   navigate('/');

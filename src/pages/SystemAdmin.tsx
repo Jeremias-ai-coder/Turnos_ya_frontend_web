@@ -29,7 +29,6 @@ import {
   FileText,
   CheckCheck,
   AlertCircle,
-  Star,
   Tags,
   Megaphone,
   History,
@@ -77,7 +76,7 @@ export const SystemAdmin: React.FC = () => {
 
   // Navegación principal de pestañas
   const [activeTab, setActiveTab] = useState<
-    'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports' | 'reviews' | 'categories' | 'announcements' | 'audit'
+    'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports' | 'categories' | 'announcements' | 'audit'
   >('cockpit');
 
   // Estadísticas avanzadas del Centro de Control Ejecutivo
@@ -126,16 +125,6 @@ export const SystemAdmin: React.FC = () => {
   const [reportsPage, setReportsPage] = useState(1);
   const [reportsTotalPages, setReportsTotalPages] = useState(1);
   const [reportsStatusFilter, setReportsStatusFilter] = useState<string>('ALL');
-
-  // Moderación de Opiniones y Reseñas
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [reviewsPage, setReviewsPage] = useState(1);
-  const [reviewsTotalPages, setReviewsTotalPages] = useState(1);
-  const [reviewsTotal, setReviewsTotal] = useState(0);
-  const [reviewsRatingFilter, setReviewsRatingFilter] = useState<number | 'ALL'>('ALL');
-  const [reviewsSearch, setReviewsSearch] = useState('');
-  const [reviewToDelete, setReviewToDelete] = useState<any | null>(null);
-  const [deletingReview, setDeletingReview] = useState(false);
 
   // Gestión de Categorías y Rubros (Módulo 2)
   const [categories, setCategories] = useState<any[]>([]);
@@ -301,15 +290,15 @@ export const SystemAdmin: React.FC = () => {
   const fetchTabData = async () => {
     setLoadingTab(true);
     try {
-      if (activeTab === 'users' || activeTab === 'cockpit') {
+      if (activeTab === 'users') {
         const res = await api.get('/admin/users');
         setUsers(res.data.data ?? []);
       }
-      if (activeTab === 'businesses' || activeTab === 'cockpit') {
+      if (activeTab === 'businesses') {
         const res = await api.get('/admin/businesses?status=ALL&limit=250');
         setBusinesses(res.data.data ?? []);
       }
-      if (activeTab === 'appointments' || activeTab === 'cockpit') {
+      if (activeTab === 'appointments') {
         const res = await api.get('/admin/appointments');
         setAppointments(res.data.data ?? []);
       }
@@ -322,15 +311,6 @@ export const SystemAdmin: React.FC = () => {
         setReports(res.data ?? []);
         setReportsTotalPages(res.meta?.totalPages || 1);
         if (res.counts) setReportsCounts(res.counts);
-      }
-      if (activeTab === 'reviews') {
-        const params: any = { page: reviewsPage, limit: 15 };
-        if (reviewsRatingFilter !== 'ALL') params.rating = reviewsRatingFilter;
-        if (reviewsSearch.trim()) params.search = reviewsSearch.trim();
-        const res = await api.get('/admin/reviews', { params });
-        setReviews(res.data.data ?? []);
-        setReviewsTotal(res.data.meta?.total || 0);
-        setReviewsTotalPages(res.data.meta?.totalPages || 1);
       }
       if (activeTab === 'categories') {
         const res = await api.get('/admin/categories');
@@ -362,8 +342,6 @@ export const SystemAdmin: React.FC = () => {
     activeTab,
     reportsPage,
     reportsStatusFilter,
-    reviewsPage,
-    reviewsRatingFilter,
     auditPage,
     auditActionFilter
   ]);
@@ -453,43 +431,6 @@ export const SystemAdmin: React.FC = () => {
       showToast(err.response?.data?.message || 'Error al reactivar comercio');
     } finally {
       setProcessingBizAction(false);
-    }
-  };
-
-  // Moderación de Reseñas
-  const handleDeleteReview = async () => {
-    if (!reviewToDelete) return;
-    setDeletingReview(true);
-    try {
-      await api.delete(`/admin/reviews/${reviewToDelete.id}`);
-      showToast('✓ Reseña eliminada permanentemente');
-      setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
-      setReviewsTotal((prev) => Math.max(0, prev - 1));
-      setReviewToDelete(null);
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Error al eliminar reseña');
-    } finally {
-      setDeletingReview(false);
-    }
-  };
-
-  const handleHideReviewAdmin = async (rev: any) => {
-    try {
-      await api.patch(`/admin/reviews/${rev.id}/hide`, { reason: 'Ocultada por moderación administrativa' });
-      setReviews((prev) => prev.map((r) => (r.id === rev.id ? { ...r, isHidden: true, hiddenReason: 'Ocultada por moderación administrativa' } : r)));
-      showToast('✓ Reseña ocultada de la vista pública');
-    } catch {
-      showToast('Error al ocultar reseña');
-    }
-  };
-
-  const handleUnhideReviewAdmin = async (rev: any) => {
-    try {
-      await api.patch(`/admin/reviews/${rev.id}/unhide`);
-      setReviews((prev) => prev.map((r) => (r.id === rev.id ? { ...r, isHidden: false, hiddenReason: null } : r)));
-      showToast('✓ Reseña restaurada a visibilidad pública');
-    } catch {
-      showToast('Error al desocultar reseña');
     }
   };
 
@@ -942,16 +883,6 @@ export const SystemAdmin: React.FC = () => {
 
         <button
           type="button"
-          className={`admin-nav-item ${activeTab === 'reviews' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reviews')}
-        >
-          <Star size={16} />
-          <span>Opiniones y Reseñas</span>
-          <span className="admin-nav-badge">{reviewsTotal}</span>
-        </button>
-
-        <button
-          type="button"
           className={`admin-nav-item ${activeTab === 'categories' ? 'active' : ''}`}
           onClick={() => setActiveTab('categories')}
         >
@@ -1148,13 +1079,13 @@ export const SystemAdmin: React.FC = () => {
                 </button>
               </div>
 
-              {appointments.slice(0, 5).length === 0 ? (
+              {(stats.recentAppointments?.length ? stats.recentAppointments : appointments.slice(0, 5)).length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.86rem' }}>
                   Aún no se han reservado turnos en el sistema.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {appointments.slice(0, 5).map((apt) => (
+                  {(stats.recentAppointments?.length ? stats.recentAppointments : appointments.slice(0, 5)).map((apt) => (
                     <div
                       key={apt.id}
                       style={{
@@ -1243,13 +1174,13 @@ export const SystemAdmin: React.FC = () => {
                 </button>
               </div>
 
-              {users.slice(0, 5).length === 0 ? (
+              {(stats.recentUsers?.length ? stats.recentUsers : users.slice(0, 5)).length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.86rem' }}>
                   No hay usuarios cargados.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {users.slice(0, 5).map((u) => {
+                  {(stats.recentUsers?.length ? stats.recentUsers : users.slice(0, 5)).map((u) => {
                     const initials = (u.name || u.email || 'U')
                       .split(' ')
                       .map((n: string) => n[0])
@@ -2439,243 +2370,6 @@ export const SystemAdmin: React.FC = () => {
                 itemsPerPage={PER_PAGE}
                 onPageChange={setReportsPage}
                 itemLabel="reportes"
-              />
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ======================================================================= */}
-      {/* PESTAÑA 6: MODERACIÓN DE OPINIONES Y RESEÑAS */}
-      {/* ======================================================================= */}
-      {activeTab === 'reviews' && (
-        <div className="ml-card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-title)' }}>
-                Moderación de Opiniones y Reseñas
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
-                Auditoría de valoraciones públicas, detección de contenido difamatorio y remoción de opiniones maliciosas.
-              </p>
-            </div>
-
-            {/* Buscador de reseñas */}
-            <div style={{ position: 'relative', minWidth: '280px' }}>
-              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Buscar por cliente, comercio o texto..."
-                value={reviewsSearch}
-                onChange={(e) => setReviewsSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setReviewsPage(1);
-                    fetchTabData();
-                  }
-                }}
-                style={{ paddingLeft: '36px', height: '42px', borderRadius: '10px', fontSize: '0.88rem' }}
-              />
-            </div>
-          </div>
-
-          {/* Filtros por Calificación de Estrellas */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>
-              Filtrar por Estrellas:
-            </span>
-            <button
-              type="button"
-              className={`admin-filter-chip ${reviewsRatingFilter === 'ALL' ? 'active' : ''}`}
-              onClick={() => {
-                setReviewsRatingFilter('ALL');
-                setReviewsPage(1);
-              }}
-            >
-              Todas ({reviewsTotal})
-            </button>
-            {[5, 4, 3, 2, 1].map((stars) => (
-              <button
-                key={stars}
-                type="button"
-                className={`admin-filter-chip ${reviewsRatingFilter === stars ? 'active' : ''}`}
-                onClick={() => {
-                  setReviewsRatingFilter(stars);
-                  setReviewsPage(1);
-                }}
-                style={stars <= 2 ? { borderColor: '#fecaca', color: '#dc2626' } : {}}
-              >
-                {stars} ⭐
-              </button>
-            ))}
-          </div>
-
-          {reviews.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                <Star size={28} />
-              </div>
-              <h4 style={{ margin: '0 0 6px', fontWeight: 800, color: 'var(--text-title)' }}>
-                No se encontraron opiniones
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b' }}>
-                No hay reseñas emitidas con los filtros actuales o la búsqueda no arrojó resultados.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '130px' }}>Fecha</th>
-                      <th>Comercio</th>
-                      <th>Cliente</th>
-                      <th>Servicio</th>
-                      <th style={{ width: '130px' }}>Calificación</th>
-                      <th>Comentario del Cliente</th>
-                      <th style={{ width: '90px', textAlign: 'center' }}>Estado</th>
-                      <th style={{ textAlign: 'right', width: '150px' }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reviews.map((rev: any) => {
-                      const isLowRating = rev.rating <= 2;
-                      return (
-                        <tr key={rev.id} style={isLowRating ? { background: '#fffcfc' } : {}}>
-                          <td style={{ padding: '12px 14px', fontSize: '0.78rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                            {format(new Date(rev.createdAt), "d 'de' MMM, HH:mm", { locale: es })}
-                          </td>
-
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-title)' }}>
-                              {rev.appointment?.business?.name || `Comercio #${rev.appointment?.businessId}`}
-                            </div>
-                            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>ID #{rev.appointment?.businessId}</span>
-                          </td>
-
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-title)' }}>
-                              {rev.appointment?.user?.name || 'Cliente'}
-                            </div>
-                            <div style={{ fontSize: '0.76rem', color: '#64748b' }}>{rev.appointment?.user?.email}</div>
-                          </td>
-
-                          <td style={{ padding: '12px 14px', fontSize: '0.84rem', color: '#334155' }}>
-                            {rev.appointment?.service?.name || 'Servicio'}
-                          </td>
-
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  size={13}
-                                  fill={star <= rev.rating ? (isLowRating ? '#ef4444' : '#f59e0b') : '#e2e8f0'}
-                                  color={star <= rev.rating ? (isLowRating ? '#ef4444' : '#f59e0b') : '#cbd5e1'}
-                                />
-                              ))}
-                            </div>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isLowRating ? '#dc2626' : '#b45309' }}>
-                              {rev.rating} de 5 estrellas
-                            </span>
-                          </td>
-
-                          <td style={{ padding: '12px 14px', maxWidth: '300px' }}>
-                            {rev.comment ? (
-                              <div
-                                style={{
-                                  fontSize: '0.84rem',
-                                  color: '#334155',
-                                  background: isLowRating ? '#fef2f2' : '#f8fafc',
-                                  border: `1px solid ${isLowRating ? '#fecaca' : '#e2e8f0'}`,
-                                  borderRadius: '8px',
-                                  padding: '8px 12px',
-                                  lineHeight: 1.4,
-                                }}
-                              >
-                                "{rev.comment}"
-                              </div>
-                            ) : (
-                              <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>
-                                Sin comentario escrito
-                              </span>
-                            )}
-                          </td>
-
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            {rev.isHidden ? (
-                              <span style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <EyeOff size={11} /> Oculta
-                              </span>
-                            ) : (
-                              <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Eye size={11} /> Visible
-                              </span>
-                            )}
-                          </td>
-
-                          <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
-                              <a
-                                href={`/businesses/${rev.appointment?.businessId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-sm btn-light"
-                                style={{ padding: '5px 8px', fontSize: '0.76rem' }}
-                                title="Ver en el local público"
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-
-                              {rev.isHidden ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-light"
-                                  onClick={() => handleUnhideReviewAdmin(rev)}
-                                  style={{ padding: '5px 8px', fontSize: '0.76rem', color: '#059669', fontWeight: 700 }}
-                                  title="Restaurar a la vista pública"
-                                >
-                                  <Eye size={12} /> Mostrar
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-light"
-                                  onClick={() => handleHideReviewAdmin(rev)}
-                                  style={{ padding: '5px 8px', fontSize: '0.76rem', color: '#ea580c', fontWeight: 700 }}
-                                  title="Ocultar de la vista pública"
-                                >
-                                  <EyeOff size={12} /> Ocultar
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-light"
-                                onClick={() => setReviewToDelete(rev)}
-                                style={{ color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca', padding: '5px 8px', fontSize: '0.76rem' }}
-                                title="Eliminar permanentemente"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <Pagination
-                currentPage={reviewsPage}
-                totalPages={reviewsTotalPages}
-                totalItems={reviewsTotal}
-                itemsPerPage={15}
-                onPageChange={setReviewsPage}
-                itemLabel="opiniones"
               />
             </>
           )}
@@ -5264,52 +4958,6 @@ export const SystemAdmin: React.FC = () => {
                 onClick={() => setSelectedAuditLog(null)}
               >
                 Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Moderación / Eliminación de Reseña */}
-      {reviewToDelete && (
-        <div className="modal-overlay admin-modal-overlay" onClick={() => !deletingReview && setReviewToDelete(null)}>
-          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-            <div className="modal-drag-handle" />
-            <div style={{ textAlign: 'center', padding: '0.5rem 0 1rem' }}>
-              <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                <Trash2 size={24} />
-              </div>
-              <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                ¿Moderar / Eliminar Reseña?
-              </h3>
-              <p style={{ margin: '0 0 1rem', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
-                Esta acción eliminará de forma permanente esta reseña del comercio <strong>{reviewToDelete.appointment?.business?.name}</strong> y reajustará el promedio de calificación.
-              </p>
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', textAlign: 'left', fontSize: '0.84rem', color: '#334155', fontStyle: 'italic' }}>
-                "{reviewToDelete.comment || 'Calificación sin texto escrito'}"
-                <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#64748b', fontStyle: 'normal' }}>
-                  — Por <strong>{reviewToDelete.appointment?.user?.name}</strong> ({reviewToDelete.rating} ⭐)
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
-              <button
-                type="button"
-                className="btn btn-light"
-                disabled={deletingReview}
-                onClick={() => setReviewToDelete(null)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                disabled={deletingReview}
-                onClick={handleDeleteReview}
-                style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                {deletingReview ? 'Eliminando...' : '🗑 Confirmar Eliminación'}
               </button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { Mail, ArrowLeft, CheckCircle2, Sparkles, KeyRound } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { BrandLogo } from '../components/common/BrandLogo';
 
@@ -10,8 +10,6 @@ export const RecoverPassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
-  const [qaResetToken, setQaResetToken] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,11 +17,8 @@ export const RecoverPassword: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/forgot-password', { email });
+      await api.post('/auth/forgot-password', { email });
       setSubmitted(true);
-      if (response.data?.resetToken) {
-        setQaResetToken(response.data.resetToken);
-      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al procesar la solicitud.');
     } finally {
@@ -112,34 +107,6 @@ export const RecoverPassword: React.FC = () => {
                   Si <strong>{email}</strong> está registrado en Turnos Ya, recibirás un correo con el enlace para restablecer tu contraseña. El enlace tiene 1 hora de validez.
                 </p>
               </div>
-
-              {/* Banner de acceso directo para QA y pruebas rápidas */}
-              {qaResetToken && (
-                <div
-                  style={{
-                    background: '#f0f9ff',
-                    border: '1px solid #bae6fd',
-                    borderRadius: '10px',
-                    padding: '14px',
-                    marginBottom: '1.25rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0369a1', fontWeight: 700, fontSize: '0.85rem', marginBottom: '6px' }}>
-                    <Sparkles size={16} color="#0284c7" /> Acceso directo para pruebas (QA)
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: '#0c4a6e', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-                    Puedes continuar la prueba de inmediato sin esperar el envío de correo SMTP:
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/reset-password?token=${qaResetToken}`)}
-                    className="btn btn-primary btn-full"
-                    style={{ fontSize: '0.85rem', padding: '8px 12px' }}
-                  >
-                    Restablecer contraseña ahora
-                  </button>
-                </div>
-              )}
 
               <button
                 type="button"
