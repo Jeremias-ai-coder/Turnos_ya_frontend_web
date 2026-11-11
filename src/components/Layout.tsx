@@ -10,6 +10,7 @@ import { LegalModals } from './LegalModals';
 import { BugReportModal } from './BugReportModal';
 import { FloatingReportButton } from './FloatingReportButton';
 import { BrandLogo } from './common/BrandLogo';
+import { GlobalAnnouncementBanner } from './common/GlobalAnnouncementBanner';
 
 
 export const Layout: React.FC = () => {
@@ -181,6 +182,8 @@ export const Layout: React.FC = () => {
         </div>
       </nav>
  
+      <GlobalAnnouncementBanner />
+
       {user && user.emailVerified === false && !bannerDismissed && (
         <div
           role="region"
