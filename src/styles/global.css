@@ -1111,11 +1111,13 @@ a:hover {
   }
 }
 
-.modal-overlay {
+.modal-overlay,
+.admin-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1124,7 +1126,8 @@ a:hover {
   animation: modalOverlayFade 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.modal-box {
+.modal-box,
+.admin-modal-card {
   background: #ffffff !important;
   border-radius: 16px;
   padding: 2rem;
@@ -2357,7 +2360,8 @@ a:hover {
   }
 
   /* Modales estilo Bottom Sheet táctil y ergonómico */
-  .modal-overlay {
+  .modal-overlay,
+  .admin-modal-overlay {
     align-items: flex-end !important;
     padding: 0 !important;
     background: rgba(15, 23, 42, 0.65) !important;
@@ -2365,7 +2369,8 @@ a:hover {
     -webkit-backdrop-filter: blur(4px) !important;
   }
 
-  .modal-box {
+  .modal-box,
+  .admin-modal-card {
     border-radius: 22px 22px 0 0 !important;
     max-height: 88vh !important;
     overflow-y: auto !important;
