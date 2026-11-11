@@ -29,7 +29,13 @@ import {
   FileText,
   CheckCheck,
   AlertCircle,
-  Star
+  Star,
+  Tags,
+  Megaphone,
+  History,
+  Plus,
+  Edit2,
+  Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
@@ -68,7 +74,9 @@ export const SystemAdmin: React.FC = () => {
   const navigate = useNavigate();
 
   // Navegación principal de pestañas
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports' | 'reviews'>('cockpit');
+  const [activeTab, setActiveTab] = useState<
+    'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports' | 'reviews' | 'categories' | 'announcements' | 'audit'
+  >('cockpit');
 
   // Estadísticas avanzadas del Centro de Control Ejecutivo
   const [stats, setStats] = useState<{
@@ -126,6 +134,64 @@ export const SystemAdmin: React.FC = () => {
   const [reviewsSearch, setReviewsSearch] = useState('');
   const [reviewToDelete, setReviewToDelete] = useState<any | null>(null);
   const [deletingReview, setDeletingReview] = useState(false);
+
+  // Gestión de Categorías y Rubros (Módulo 2)
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoriesSearch, setCategoriesSearch] = useState('');
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any | null>(null);
+  const [categoryForm, setCategoryForm] = useState<{
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+    isActive: boolean;
+  }>({
+    name: '',
+    slug: '',
+    description: '',
+    icon: '🏢',
+    isActive: true,
+  });
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<any | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState(false);
+
+  // Avisos del Sistema y Banners Globales (Módulo 3)
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState<{
+    message: string;
+    type: 'info' | 'warning' | 'danger' | 'success';
+    linkUrl: string;
+    linkText: string;
+    expiresAt: string;
+  }>({
+    message: '',
+    type: 'info',
+    linkUrl: '',
+    linkText: '',
+    expiresAt: '',
+  });
+  const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] = useState<any | null>(null);
+  const [deletingAnnouncement, setDeletingAnnouncement] = useState(false);
+
+  // Registro de Auditoría del Sistema (Módulo 4)
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotalPages, setAuditTotalPages] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditActionFilter, setAuditActionFilter] = useState('ALL');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [selectedAuditLog, setSelectedAuditLog] = useState<any | null>(null);
+
+  // Cancelación de Emergencia por Fuerza Mayor (Módulo 4)
+  const [emergencyCancelBiz, setEmergencyCancelBiz] = useState<any | null>(null);
+  const [emergencyCancelDate, setEmergencyCancelDate] = useState(new Date().toISOString().split('T')[0]);
+  const [emergencyCancelReason, setEmergencyCancelReason] = useState('');
+  const [processingEmergencyCancel, setProcessingEmergencyCancel] = useState(false);
+  const [emergencyCancelResult, setEmergencyCancelResult] = useState<{ cancelledCount: number; message: string } | null>(null);
 
   // Estados de carga y feedback
   const [loadingTab, setLoadingTab] = useState(true);
@@ -264,6 +330,23 @@ export const SystemAdmin: React.FC = () => {
         setReviewsTotal(res.data.meta?.total || 0);
         setReviewsTotalPages(res.data.meta?.totalPages || 1);
       }
+      if (activeTab === 'categories') {
+        const res = await api.get('/admin/categories');
+        setCategories(res.data.data ?? []);
+      }
+      if (activeTab === 'announcements') {
+        const res = await api.get('/admin/announcements');
+        setAnnouncements(res.data.data ?? []);
+      }
+      if (activeTab === 'audit') {
+        const params: any = { page: auditPage, limit: 20 };
+        if (auditActionFilter !== 'ALL') params.action = auditActionFilter;
+        if (auditSearch.trim()) params.search = auditSearch.trim();
+        const res = await api.get('/admin/audit-logs', { params });
+        setAuditLogs(res.data.data ?? []);
+        setAuditTotal(res.data.meta?.total || 0);
+        setAuditTotalPages(res.data.meta?.totalPages || 1);
+      }
     } catch (err) {
       console.error('Error al cargar datos de pestaña', err);
     } finally {
@@ -273,7 +356,15 @@ export const SystemAdmin: React.FC = () => {
 
   useEffect(() => {
     fetchTabData();
-  }, [activeTab, reportsPage, reportsStatusFilter, reviewsPage, reviewsRatingFilter]);
+  }, [
+    activeTab,
+    reportsPage,
+    reportsStatusFilter,
+    reviewsPage,
+    reviewsRatingFilter,
+    auditPage,
+    auditActionFilter
+  ]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -377,6 +468,172 @@ export const SystemAdmin: React.FC = () => {
       showToast(err.response?.data?.message || 'Error al eliminar reseña');
     } finally {
       setDeletingReview(false);
+    }
+  };
+
+  // Manejadores de Categorías (Módulo 2)
+  const handleOpenCategoryModal = (cat?: any) => {
+    if (cat) {
+      setEditingCategory(cat);
+      setCategoryForm({
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description || '',
+        icon: cat.icon || '🏢',
+        isActive: cat.isActive !== false,
+      });
+    } else {
+      setEditingCategory(null);
+      setCategoryForm({
+        name: '',
+        slug: '',
+        description: '',
+        icon: '🏢',
+        isActive: true,
+      });
+    }
+    setCategoryModalOpen(true);
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim() || categoryForm.name.trim().length < 2) {
+      showToast('El nombre de la categoría debe tener al menos 2 caracteres');
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      if (editingCategory) {
+        await api.put(`/admin/categories/${editingCategory.id}`, categoryForm);
+        showToast(`✓ Categoría "${categoryForm.name}" actualizada con éxito`);
+      } else {
+        await api.post('/admin/categories', categoryForm);
+        showToast(`✓ Categoría "${categoryForm.name}" creada con éxito`);
+      }
+      setCategoryModalOpen(false);
+      setEditingCategory(null);
+      await fetchTabData();
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al guardar categoría');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleToggleCategory = async (cat: any) => {
+    try {
+      const res = await api.patch(`/admin/categories/${cat.id}/toggle`);
+      const updated = res.data;
+      setCategories((prev) => prev.map((c) => (c.id === cat.id ? { ...c, isActive: updated.isActive } : c)));
+      showToast(`✓ Categoría ${updated.isActive ? 'activada' : 'desactivada'} correctamente`);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al cambiar estado de categoría');
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setDeletingCategory(true);
+    try {
+      await api.delete(`/admin/categories/${categoryToDelete.id}`);
+      showToast(`✓ Categoría "${categoryToDelete.name}" eliminada exitosamente`);
+      setCategories((prev) => prev.filter((c) => c.id !== categoryToDelete.id));
+      setCategoryToDelete(null);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al eliminar categoría');
+    } finally {
+      setDeletingCategory(false);
+    }
+  };
+
+  // Manejadores de Avisos del Sistema (Módulo 3)
+  const handleSaveAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementForm.message.trim() || announcementForm.message.trim().length < 5) {
+      showToast('El comunicado debe contener al menos 5 caracteres');
+      return;
+    }
+    setSavingAnnouncement(true);
+    try {
+      await api.post('/admin/announcements', {
+        message: announcementForm.message.trim(),
+        type: announcementForm.type,
+        linkUrl: announcementForm.linkUrl.trim() || undefined,
+        linkText: announcementForm.linkText.trim() || undefined,
+        expiresAt: announcementForm.expiresAt || undefined,
+      });
+      showToast('✓ Comunicado publicado en el banner global');
+      setAnnouncementModalOpen(false);
+      setAnnouncementForm({
+        message: '',
+        type: 'info',
+        linkUrl: '',
+        linkText: '',
+        expiresAt: '',
+      });
+      await fetchTabData();
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al publicar comunicado');
+    } finally {
+      setSavingAnnouncement(false);
+    }
+  };
+
+  const handleToggleAnnouncement = async (ann: any) => {
+    try {
+      const res = await api.patch(`/admin/announcements/${ann.id}/toggle`);
+      const updated = res.data;
+      setAnnouncements((prev) => prev.map((a) => (a.id === ann.id ? { ...a, isActive: updated.isActive } : a)));
+      showToast(`✓ Aviso ${updated.isActive ? 'activado' : 'pausado'} correctamente`);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al alternar aviso');
+    }
+  };
+
+  const handleDeleteAnnouncement = async () => {
+    if (!announcementToDelete) return;
+    setDeletingAnnouncement(true);
+    try {
+      await api.delete(`/admin/announcements/${announcementToDelete.id}`);
+      showToast('✓ Aviso eliminado exitosamente');
+      setAnnouncements((prev) => prev.filter((a) => a.id !== announcementToDelete.id));
+      setAnnouncementToDelete(null);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al eliminar aviso');
+    } finally {
+      setDeletingAnnouncement(false);
+    }
+  };
+
+  // Manejador de Cancelación de Emergencia por Fuerza Mayor (Módulo 4)
+  const handleEmergencyCancel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emergencyCancelBiz || !emergencyCancelDate || !emergencyCancelReason.trim()) {
+      showToast('Debe ingresar la fecha y el motivo de fuerza mayor');
+      return;
+    }
+    if (emergencyCancelReason.trim().length < 5) {
+      showToast('El motivo debe tener al menos 5 caracteres descriptivos');
+      return;
+    }
+    setProcessingEmergencyCancel(true);
+    try {
+      const res = await api.post(`/admin/businesses/${emergencyCancelBiz.id}/emergency-cancel`, {
+        date: emergencyCancelDate,
+        reason: emergencyCancelReason.trim(),
+      });
+      setEmergencyCancelResult({
+        cancelledCount: res.data.cancelledCount ?? 0,
+        message: res.data.message || 'Cancelación de emergencia ejecutada exitosamente',
+      });
+      showToast(`✓ Se cancelaron ${res.data.cancelledCount ?? 0} turnos por fuerza mayor`);
+      setEmergencyCancelBiz(null);
+      setEmergencyCancelReason('');
+      await Promise.all([loadStatsAndReports(), fetchTabData()]);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al procesar cancelación de emergencia');
+    } finally {
+      setProcessingEmergencyCancel(false);
     }
   };
 
@@ -669,6 +926,36 @@ export const SystemAdmin: React.FC = () => {
           <Star size={16} />
           <span>Opiniones y Reseñas</span>
           <span className="admin-nav-badge">{reviewsTotal}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`admin-nav-item ${activeTab === 'categories' ? 'active' : ''}`}
+          onClick={() => setActiveTab('categories')}
+        >
+          <Tags size={16} />
+          <span>Categorías</span>
+          <span className="admin-nav-badge">{categories.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`admin-nav-item ${activeTab === 'announcements' ? 'active' : ''}`}
+          onClick={() => setActiveTab('announcements')}
+        >
+          <Megaphone size={16} />
+          <span>Avisos</span>
+          <span className="admin-nav-badge">{announcements.filter((a) => a.isActive).length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`admin-nav-item ${activeTab === 'audit' ? 'active' : ''}`}
+          onClick={() => setActiveTab('audit')}
+        >
+          <History size={16} />
+          <span>Auditoría</span>
+          <span className="admin-nav-badge">{auditTotal}</span>
         </button>
       </nav>
 
@@ -2302,6 +2589,613 @@ export const SystemAdmin: React.FC = () => {
       )}
 
       {/* ======================================================================= */}
+      {/* PESTAÑA 7: GESTIÓN DE RUBROS Y CATEGORÍAS */}
+      {/* ======================================================================= */}
+      {activeTab === 'categories' && (
+        <div className="ml-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-title)' }}>
+                Gestor Dinámico de Rubros y Categorías
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                Administra los rubros comerciales disponibles para el alta de negocios y la búsqueda por categoría en TurnosYa.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', minWidth: '220px' }}>
+                <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Buscar categoría..."
+                  value={categoriesSearch}
+                  onChange={(e) => setCategoriesSearch(e.target.value)}
+                  style={{ paddingLeft: '36px', height: '42px', borderRadius: '10px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => handleOpenCategoryModal()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  boxShadow: '0 2px 4px rgba(0, 158, 227, 0.25)'
+                }}
+              >
+                <Plus size={16} />
+                <span>Nueva Categoría</span>
+              </button>
+            </div>
+          </div>
+
+          {loadingTab ? (
+            <SkeletonTable rows={6} columns={6} />
+          ) : (() => {
+            const filteredCategories = categories.filter((cat) => {
+              if (!categoriesSearch.trim()) return true;
+              const term = categoriesSearch.toLowerCase();
+              return (
+                cat.name?.toLowerCase().includes(term) ||
+                cat.slug?.toLowerCase().includes(term) ||
+                cat.description?.toLowerCase().includes(term)
+              );
+            });
+
+            if (filteredCategories.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                    <Tags size={28} />
+                  </div>
+                  <h4 style={{ margin: '0 0 6px', fontWeight: 800, color: 'var(--text-title)' }}>
+                    No se encontraron categorías
+                  </h4>
+                  <p style={{ margin: '0 0 1rem', fontSize: '0.86rem', color: '#64748b' }}>
+                    {categoriesSearch ? 'No hay categorías que coincidan con la búsqueda.' : 'Aún no se han configurado categorías comerciales.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => handleOpenCategoryModal()}
+                  >
+                    Crear primera categoría
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', textAlign: 'left' }}>
+                      <th style={{ padding: '12px 14px' }}>Ícono</th>
+                      <th style={{ padding: '12px 14px' }}>Categoría / Slug</th>
+                      <th style={{ padding: '12px 14px' }}>Descripción</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>Comercios</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>Estado</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCategories.map((cat) => {
+                      const bizCount = cat._count?.businesses ?? 0;
+                      return (
+                        <tr key={cat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 14px' }}>
+                            <div
+                              style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '10px',
+                                background: '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.25rem',
+                                border: '1px solid #e2e8f0'
+                              }}
+                            >
+                              {cat.icon || '🏢'}
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '12px 14px' }}>
+                            <div style={{ fontWeight: 800, color: 'var(--text-title)' }}>{cat.name}</div>
+                            <div style={{ fontSize: '0.76rem', color: '#64748b', fontFamily: 'monospace' }}>
+                              /{cat.slug}
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '12px 14px', color: '#475569', maxWidth: '280px' }}>
+                            {cat.description ? (
+                              <span style={{ fontSize: '0.84rem' }}>{cat.description}</span>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.8rem' }}>Sin descripción</span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <span
+                              className={`badge ${bizCount > 0 ? 'badge-confirmed' : 'badge-completed'}`}
+                              style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                            >
+                              {bizCount} {bizCount === 1 ? 'comercio' : 'comercios'}
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCategory(cat)}
+                              style={{
+                                background: cat.isActive !== false ? '#ecfdf5' : '#f1f5f9',
+                                color: cat.isActive !== false ? '#059669' : '#64748b',
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                border: `1px solid ${cat.isActive !== false ? '#a7f3d0' : '#cbd5e1'}`
+                              }}
+                              title={cat.isActive !== false ? 'Click para desactivar' : 'Click para activar'}
+                            >
+                              <span
+                                style={{
+                                  width: '7px',
+                                  height: '7px',
+                                  borderRadius: '50%',
+                                  background: cat.isActive !== false ? '#10b981' : '#94a3b8'
+                                }}
+                              />
+                              {cat.isActive !== false ? 'Activa' : 'Inactiva'}
+                            </button>
+                          </td>
+
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => handleOpenCategoryModal(cat)}
+                                style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                title="Editar categoría"
+                              >
+                                <Edit2 size={13} />
+                                <span>Editar</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => setCategoryToDelete(cat)}
+                                disabled={bizCount > 0}
+                                style={{
+                                  color: bizCount > 0 ? '#94a3b8' : '#dc2626',
+                                  background: bizCount > 0 ? '#f1f5f9' : '#fef2f2',
+                                  borderColor: bizCount > 0 ? '#e2e8f0' : '#fecaca',
+                                  padding: '6px 10px',
+                                  fontSize: '0.78rem',
+                                  cursor: bizCount > 0 ? 'not-allowed' : 'pointer'
+                                }}
+                                title={bizCount > 0 ? 'No se puede eliminar: tiene comercios asociados' : 'Eliminar categoría'}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* PESTAÑA 8: AVISOS Y BANNERS DEL SISTEMA */}
+      {/* ======================================================================= */}
+      {activeTab === 'announcements' && (
+        <div className="ml-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-title)' }}>
+                Avisos del Sistema & Banners Globales
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                Transmite avisos oficiales, mantenimientos preventivos o alertas urgentes en la barra superior a todos los visitantes.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setAnnouncementForm({
+                  message: '',
+                  type: 'info',
+                  linkUrl: '',
+                  linkText: '',
+                  expiresAt: '',
+                });
+                setAnnouncementModalOpen(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                boxShadow: '0 2px 4px rgba(0, 158, 227, 0.25)'
+              }}
+            >
+              <Plus size={16} />
+              <span>Nuevo Comunicado</span>
+            </button>
+          </div>
+
+          {/* Tarjeta de Guía Rápida */}
+          <div
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px'
+            }}
+          >
+            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Megaphone size={18} />
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.45 }}>
+              El aviso activo más reciente se muestra de inmediato en la cabecera superior en todas las pantallas. Los usuarios pueden cerrarlo temporalmente en su sesión si ya lo leyeron. Puedes programar una fecha de vencimiento automático o pausarlo cuando lo desees.
+            </div>
+          </div>
+
+          {loadingTab ? (
+            <SkeletonTable rows={4} columns={5} />
+          ) : announcements.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <Megaphone size={28} />
+              </div>
+              <h4 style={{ margin: '0 0 6px', fontWeight: 800, color: 'var(--text-title)' }}>
+                No hay comunicados registrados
+              </h4>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.86rem', color: '#64748b' }}>
+                Crea un aviso para notificar a la comunidad sobre mantenimientos, novedades o información importante.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setAnnouncementModalOpen(true)}
+              >
+                Crear primer comunicado
+              </button>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', textAlign: 'left' }}>
+                    <th style={{ padding: '12px 14px' }}>Tipo / Nivel</th>
+                    <th style={{ padding: '12px 14px' }}>Mensaje del Comunicado</th>
+                    <th style={{ padding: '12px 14px' }}>Enlace / Acción</th>
+                    <th style={{ padding: '12px 14px' }}>Vencimiento</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>Estado</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {announcements.map((ann) => {
+                    const typeConfig: Record<string, { label: string; bg: string; color: string; border: string }> = {
+                      info: { label: 'Informativo', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+                      warning: { label: 'Advertencia', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+                      danger: { label: 'Urgente / Peligro', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
+                      success: { label: 'Novedad / Éxito', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
+                    };
+                    const badge = typeConfig[ann.type] || typeConfig.info;
+
+                    return (
+                      <tr key={ann.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span
+                            style={{
+                              background: badge.bg,
+                              color: badge.color,
+                              border: `1px solid ${badge.border}`,
+                              borderRadius: '20px',
+                              padding: '3px 10px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              display: 'inline-block'
+                            }}
+                          >
+                            {badge.label}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text-title)', maxWidth: '380px' }}>
+                          {ann.message}
+                        </td>
+
+                        <td style={{ padding: '12px 14px', color: '#475569' }}>
+                          {ann.linkUrl ? (
+                            <a
+                              href={ann.linkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#0284c7', textDecoration: 'underline', fontWeight: 600, fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            >
+                              {ann.linkText || 'Ver enlace'} <ExternalLink size={12} />
+                            </a>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Sin enlace</span>
+                          )}
+                        </td>
+
+                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                          {ann.expiresAt ? (
+                            <span>{new Date(ann.expiresAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          ) : (
+                            <span style={{ color: '#059669', fontWeight: 600 }}>Permanente</span>
+                          )}
+                        </td>
+
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAnnouncement(ann)}
+                            style={{
+                              background: ann.isActive ? '#ecfdf5' : '#f1f5f9',
+                              color: ann.isActive ? '#059669' : '#64748b',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              border: `1px solid ${ann.isActive ? '#a7f3d0' : '#cbd5e1'}`
+                            }}
+                            title={ann.isActive ? 'Click para pausar aviso' : 'Click para activar aviso'}
+                          >
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                background: ann.isActive ? '#10b981' : '#94a3b8'
+                              }}
+                            />
+                            {ann.isActive ? 'Activo' : 'Pausado'}
+                          </button>
+                        </td>
+
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light"
+                            onClick={() => setAnnouncementToDelete(ann)}
+                            style={{ color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca', padding: '6px 10px', fontSize: '0.78rem' }}
+                            title="Eliminar aviso permanentemente"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* PESTAÑA 9: AUDITORÍA DEL SISTEMA (AUDIT TRAIL) */}
+      {/* ======================================================================= */}
+      {activeTab === 'audit' && (
+        <div className="ml-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-title)' }}>
+                Registro de Auditoría del Sistema (*Audit Trail*)
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                Bitácora de seguridad con las acciones críticas ejecutadas por administradores en la plataforma.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', minWidth: '240px' }}>
+                <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Buscar en auditoría..."
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setAuditPage(1);
+                      fetchTabData();
+                    }
+                  }}
+                  style={{ paddingLeft: '36px', height: '42px', borderRadius: '10px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <select
+                className="form-select"
+                value={auditActionFilter}
+                onChange={(e) => {
+                  setAuditActionFilter(e.target.value);
+                  setAuditPage(1);
+                }}
+                style={{ height: '42px', borderRadius: '10px', fontSize: '0.88rem', padding: '0 12px', border: '1px solid #cbd5e1' }}
+              >
+                <option value="ALL">Todas las Acciones</option>
+                <option value="EMERGENCY_CANCELLATION">🚨 Cancelación de Emergencia</option>
+                <option value="BUSINESS_SUSPENDED">⏸ Suspensión de Comercio</option>
+                <option value="BUSINESS_REACTIVATED">▶ Reactivación de Comercio</option>
+                <option value="REVIEW_DELETED">🗑 Reseña Moderada</option>
+                <option value="BUSINESS_APPROVED">✓ Comercio Aprobado</option>
+                <option value="BUSINESS_REJECTED">✕ Comercio Rechazado</option>
+              </select>
+            </div>
+          </div>
+
+          {loadingTab ? (
+            <SkeletonTable rows={8} columns={6} />
+          ) : auditLogs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <History size={28} />
+              </div>
+              <h4 style={{ margin: '0 0 6px', fontWeight: 800, color: 'var(--text-title)' }}>
+                No se registraron eventos de auditoría
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b' }}>
+                No hay registros con los filtros seleccionados o el historial está limpio.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', textAlign: 'left' }}>
+                      <th style={{ padding: '10px 12px' }}>Fecha / Hora</th>
+                      <th style={{ padding: '10px 12px' }}>Administrador</th>
+                      <th style={{ padding: '10px 12px' }}>Acción</th>
+                      <th style={{ padding: '10px 12px' }}>Entidad</th>
+                      <th style={{ padding: '10px 12px' }}>Detalles</th>
+                      <th style={{ padding: '10px 12px' }}>IP</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Ver</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log) => {
+                      const actionBadgeConfig: Record<string, { label: string; bg: string; color: string; border: string }> = {
+                        EMERGENCY_CANCELLATION: { label: 'Cancelación Emergencia', bg: '#fee2e2', color: '#991b1b', border: '#fecaca' },
+                        BUSINESS_SUSPENDED: { label: 'Comercio Suspendido', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+                        BUSINESS_REACTIVATED: { label: 'Comercio Reactivado', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
+                        REVIEW_DELETED: { label: 'Reseña Moderada', bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
+                        BUSINESS_APPROVED: { label: 'Comercio Aprobado', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+                        BUSINESS_REJECTED: { label: 'Comercio Rechazado', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
+                      };
+                      const actionBadge = actionBadgeConfig[log.action] || {
+                        label: log.action,
+                        bg: '#f1f5f9',
+                        color: '#475569',
+                        border: '#e2e8f0',
+                      };
+
+                      return (
+                        <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#475569', fontSize: '0.8rem' }}>
+                            {log.createdAt ? (
+                              <span>
+                                {new Date(log.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}{' '}
+                                <strong>{new Date(log.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</strong>
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-title)' }}>
+                            {log.adminName || `Admin #${log.adminId}`}
+                          </td>
+
+                          <td style={{ padding: '10px 12px' }}>
+                            <span
+                              style={{
+                                background: actionBadge.bg,
+                                color: actionBadge.color,
+                                border: `1px solid ${actionBadge.border}`,
+                                borderRadius: '20px',
+                                padding: '3px 9px',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                display: 'inline-block'
+                              }}
+                            >
+                              {actionBadge.label}
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#475569' }}>
+                            <strong style={{ color: 'var(--text-title)' }}>{log.targetType}</strong>
+                            {log.targetId && (
+                              <span style={{ color: '#64748b', marginLeft: '4px' }}>#{log.targetId}</span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '10px 12px', maxWidth: '320px', fontSize: '0.8rem', color: '#334155' }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.details}>
+                              {log.details || '—'}
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '10px 12px', fontSize: '0.76rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                            {log.ipAddress || '—'}
+                          </td>
+
+                          <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-light"
+                              onClick={() => setSelectedAuditLog(log)}
+                              style={{ padding: '5px 8px', fontSize: '0.74rem' }}
+                              title="Ver detalles completos del evento"
+                            >
+                              <Eye size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                currentPage={auditPage}
+                totalPages={auditTotalPages}
+                totalItems={auditTotal}
+                itemsPerPage={20}
+                onPageChange={setAuditPage}
+                itemLabel="eventos de auditoría"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================================= */}
       {/* MODAL 1: FICHA RÁPIDA DE USUARIO */}
       {/* ======================================================================= */}
       {inspectedUser && (
@@ -2837,6 +3731,21 @@ export const SystemAdmin: React.FC = () => {
                     >
                       <ExternalLink size={14} /> Ver en sitio público
                     </a>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        const b = inspectedBusiness;
+                        setInspectedBusiness(null);
+                        setEmergencyCancelBiz(b);
+                        setEmergencyCancelDate(new Date().toISOString().split('T')[0]);
+                        setEmergencyCancelReason('');
+                      }}
+                      style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '8px 14px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      title="Cancelar turnos por fuerza mayor con aviso automático a clientes"
+                    >
+                      <AlertTriangle size={14} /> Cancelar por Emergencia
+                    </button>
                     <button
                       type="button"
                       className="btn btn-sm"
@@ -3566,6 +4475,574 @@ export const SystemAdmin: React.FC = () => {
                 style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
               >
                 {processingBizAction ? 'Reactivando...' : '▶ Sí, Reactivar Comercio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Crear / Editar Categoría */}
+      {categoryModalOpen && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !savingCategory && setCategoryModalOpen(false)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Tags size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    {editingCategory ? 'Editar Categoría' : 'Nueva Categoría Comercial'}
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    {editingCategory ? `ID #${editingCategory.id}` : 'Alta en el catálogo de rubros'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCategoryModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCategory}>
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '12px', marginBottom: '1rem' }}>
+                <div>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>Ícono</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="🏢"
+                    maxLength={10}
+                    value={categoryForm.icon}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                    style={{ textAlign: 'center', fontSize: '1.3rem', height: '42px', borderRadius: '8px' }}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>Nombre *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    placeholder="Ej: Barbería, Estética, Odontología..."
+                    value={categoryForm.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const autoSlug = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                      setCategoryForm({
+                        ...categoryForm,
+                        name: val,
+                        slug: (!editingCategory || !categoryForm.slug) ? autoSlug : categoryForm.slug,
+                      });
+                    }}
+                    style={{ height: '42px', borderRadius: '8px' }}
+                  />
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Slug (URL amigable)
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="ej: barberia"
+                  value={categoryForm.slug}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                  style={{ height: '40px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.84rem' }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Descripción comercial
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={2}
+                  placeholder="Breve reseña sobre los servicios que agrupa esta categoría..."
+                  value={categoryForm.description}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  style={{ borderRadius: '8px', fontSize: '0.84rem' }}
+                />
+              </div>
+
+              <div className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="catIsActiveCheck"
+                  checked={categoryForm.isActive}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, isActive: e.target.checked })}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="catIsActiveCheck" style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-title)', cursor: 'pointer' }}>
+                  Categoría activa (visible para registro y exploración)
+                </label>
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={savingCategory}
+                  onClick={() => setCategoryModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingCategory || !categoryForm.name.trim()}
+                  style={{ fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {savingCategory ? 'Guardando...' : editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminar Categoría */}
+      {categoryToDelete && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !deletingCategory && setCategoryToDelete(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center', padding: '1.5rem' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+              <Trash2 size={24} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+              ¿Eliminar Categoría?
+            </h3>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+              ¿Estás seguro de eliminar la categoría <strong>{categoryToDelete.name}</strong>? Esta acción no se puede deshacer.
+            </p>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={deletingCategory}
+                onClick={() => setCategoryToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={deletingCategory}
+                onClick={handleDeleteCategory}
+                style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+              >
+                {deletingCategory ? 'Eliminando...' : '🗑 Eliminar Categoría'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Crear Comunicado / Aviso */}
+      {announcementModalOpen && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !savingAnnouncement && setAnnouncementModalOpen(false)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Megaphone size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Nuevo Comunicado Oficial
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Banner de aviso global en la cabecera
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAnnouncementModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAnnouncement}>
+              {/* Selector de Tipo */}
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Nivel de Alerta / Tipo de Banner *
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  {[
+                    { type: 'info' as const, label: 'Informativo', color: '#2563eb', bg: '#eff6ff' },
+                    { type: 'warning' as const, label: 'Mantenimiento', color: '#d97706', bg: '#fffbeb' },
+                    { type: 'danger' as const, label: 'Urgente', color: '#dc2626', bg: '#fef2f2' },
+                    { type: 'success' as const, label: 'Novedad', color: '#059669', bg: '#ecfdf5' },
+                  ].map((item) => (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => setAnnouncementForm({ ...announcementForm, type: item.type })}
+                      style={{
+                        padding: '10px 6px',
+                        borderRadius: '8px',
+                        border: announcementForm.type === item.type ? `2px solid ${item.color}` : '1px solid #e2e8f0',
+                        background: announcementForm.type === item.type ? item.bg : '#ffffff',
+                        color: announcementForm.type === item.type ? item.color : '#64748b',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mensaje */}
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Mensaje del Aviso *
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={2}
+                  required
+                  placeholder="Ej: Mantenimiento programado: el servicio no estará disponible este domingo de 03:00 a 05:00 hs."
+                  value={announcementForm.message}
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, message: e.target.value })}
+                  style={{ borderRadius: '8px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              {/* Enlace opcional */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1rem' }}>
+                <div>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                    Texto del Enlace (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej: Más información"
+                    value={announcementForm.linkText}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, linkText: e.target.value })}
+                    style={{ height: '40px', borderRadius: '8px', fontSize: '0.84rem' }}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                    URL destino (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="https://... o /ruta"
+                    value={announcementForm.linkUrl}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, linkUrl: e.target.value })}
+                    style={{ height: '40px', borderRadius: '8px', fontSize: '0.84rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Fecha de expiración */}
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Fecha y hora de expiración automática (opcional)
+                </label>
+                <input
+                  type="datetime-local"
+                  className="form-control"
+                  value={announcementForm.expiresAt}
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, expiresAt: e.target.value })}
+                  style={{ height: '40px', borderRadius: '8px', fontSize: '0.84rem' }}
+                />
+                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  Si se deja en blanco, el aviso se mantendrá activo de forma permanente hasta que se pause.
+                </span>
+              </div>
+
+              {/* Live Preview del Banner */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                  Vista previa en vivo del banner
+                </span>
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    fontSize: '0.84rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: {
+                      info: '#eff6ff',
+                      warning: '#fffbeb',
+                      danger: '#fef2f2',
+                      success: '#ecfdf5',
+                    }[announcementForm.type],
+                    color: {
+                      info: '#1e40af',
+                      warning: '#92400e',
+                      danger: '#991b1b',
+                      success: '#065f46',
+                    }[announcementForm.type],
+                    border: `1px solid ${{
+                      info: '#bfdbfe',
+                      warning: '#fde68a',
+                      danger: '#fecaca',
+                      success: '#a7f3d0',
+                    }[announcementForm.type]}`,
+                  }}
+                >
+                  <Info size={16} />
+                  <span style={{ flex: 1 }}>{announcementForm.message || 'Escribe un mensaje para previsualizar...'}</span>
+                  {announcementForm.linkText && (
+                    <span style={{ textDecoration: 'underline', fontWeight: 700 }}>
+                      {announcementForm.linkText} →
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={savingAnnouncement}
+                  onClick={() => setAnnouncementModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingAnnouncement || !announcementForm.message.trim()}
+                  style={{ fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
+                >
+                  {savingAnnouncement ? 'Publicando...' : 'Publicar Comunicado'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminar Comunicado */}
+      {announcementToDelete && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !deletingAnnouncement && setAnnouncementToDelete(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center', padding: '1.5rem' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+              <Trash2 size={24} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+              ¿Eliminar Comunicado?
+            </h3>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+              ¿Deseas eliminar este aviso permanentemente del historial de banners?
+            </p>
+            <div className="modal-footer-responsive" style={{ justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={deletingAnnouncement}
+                onClick={() => setAnnouncementToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={deletingAnnouncement}
+                onClick={handleDeleteAnnouncement}
+                style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px' }}
+              >
+                {deletingAnnouncement ? 'Eliminando...' : '🗑 Eliminar Aviso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cancelación de Emergencia por Fuerza Mayor */}
+      {emergencyCancelBiz && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !processingEmergencyCancel && setEmergencyCancelBiz(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                  Cancelación por Fuerza Mayor
+                </h3>
+                <span style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                  Comercio: <strong>{emergencyCancelBiz.name}</strong>
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '0.84rem', color: '#991b1b', lineHeight: 1.45 }}>
+              <strong>Advertencia de Seguridad:</strong> Esta acción cancelará todos los turnos confirmados y pendientes para la fecha seleccionada en este negocio. El sistema despachará automáticamente notificaciones por correo y alertas internas a cada cliente y al titular explicando el motivo de la emergencia.
+            </div>
+
+            <form onSubmit={handleEmergencyCancel}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Fecha afectada por la contingencia *
+                </label>
+                <input
+                  type="date"
+                  className="form-control"
+                  required
+                  value={emergencyCancelDate}
+                  onChange={(e) => setEmergencyCancelDate(e.target.value)}
+                  style={{ height: '42px', borderRadius: '8px' }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                  Motivo de Fuerza Mayor comunicado a los clientes *
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  required
+                  placeholder="Ej: Corte general imprevisto de suministro eléctrico en la zona comercial / Alerta meteorológica por temporal severo."
+                  value={emergencyCancelReason}
+                  onChange={(e) => setEmergencyCancelReason(e.target.value)}
+                  style={{ borderRadius: '8px', fontSize: '0.88rem' }}
+                />
+                <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '4px' }}>
+                  Este texto se incluirá en el correo electrónico y notificación que recibirá cada cliente.
+                </span>
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={processingEmergencyCancel}
+                  onClick={() => setEmergencyCancelBiz(null)}
+                >
+                  Cancelar Operación
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                  disabled={processingEmergencyCancel || !emergencyCancelReason.trim()}
+                  style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {processingEmergencyCancel ? 'Procesando cancelación...' : '🚨 Ejecutar Cancelación Masiva'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Resultado de Cancelación de Emergencia */}
+      {emergencyCancelResult && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => setEmergencyCancelResult(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center', padding: '1.75rem' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+              <CheckCircle2 size={32} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-title)' }}>
+              Operación Completada
+            </h3>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.88rem', color: '#475569' }}>
+              {emergencyCancelResult.message}
+            </p>
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '1.5rem', fontWeight: 700, color: '#0f172a' }}>
+              Turnos cancelados: <span style={{ color: '#dc2626', fontSize: '1.1rem' }}>{emergencyCancelResult.cancelledCount}</span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setEmergencyCancelResult(null)}
+              style={{ width: '100%', padding: '10px', fontWeight: 700, borderRadius: '8px' }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalle de Log de Auditoría */}
+      {selectedAuditLog && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => setSelectedAuditLog(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <History size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Detalle de Evento #{selectedAuditLog.id}
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {selectedAuditLog.createdAt ? new Date(selectedAuditLog.createdAt).toLocaleString('es-AR') : '—'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAuditLog(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.88rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '6px' }}>
+                <strong style={{ color: '#64748b' }}>Administrador:</strong>
+                <span>{selectedAuditLog.adminName} (ID #{selectedAuditLog.adminId})</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '6px' }}>
+                <strong style={{ color: '#64748b' }}>Acción:</strong>
+                <span style={{ fontWeight: 700 }}>{selectedAuditLog.action}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '6px' }}>
+                <strong style={{ color: '#64748b' }}>Entidad afectada:</strong>
+                <span>{selectedAuditLog.targetType} {selectedAuditLog.targetId ? `(#${selectedAuditLog.targetId})` : ''}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '6px' }}>
+                <strong style={{ color: '#64748b' }}>IP de Origen:</strong>
+                <span style={{ fontFamily: 'monospace' }}>{selectedAuditLog.ipAddress || 'No registrada'}</span>
+              </div>
+              <div>
+                <strong style={{ color: '#64748b', display: 'block', marginBottom: '6px' }}>Detalles / Justificación:</strong>
+                <div style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', fontSize: '0.84rem', color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                  {selectedAuditLog.details || 'Sin detalles adicionales.'}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                onClick={() => setSelectedAuditLog(null)}
+              >
+                Cerrar
               </button>
             </div>
           </div>
