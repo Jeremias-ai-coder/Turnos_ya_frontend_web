@@ -36,7 +36,8 @@ import {
   Edit2,
   Info,
   EyeOff,
-  Flag
+  Flag,
+  Lock
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
@@ -48,6 +49,17 @@ import { SkeletonTable } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
 import { type Business, type Appointment } from '../types';
 import { getAdminBugReportsApi, updateBugReportStatusApi } from '../services/bugReportService';
+
+const ROOT_ADMIN_EMAILS = [
+  'turnosyapp@gmail.com',
+  'jeremiascollaud@gmail.com',
+  'jeremiascoll@gmail.com',
+];
+
+const isRootEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  return ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());
+};
 
 const ROLE_LABELS: Record<string, { label: string; badge: string }> = {
   client: { label: 'Cliente', badge: 'badge-completed' },
@@ -255,8 +267,8 @@ export const SystemAdmin: React.FC = () => {
   const [adminNotesInput, setAdminNotesInput] = useState('');
   const [savingReportId, setSavingReportId] = useState<number | null>(null);
 
-  // Modal de confirmación para eliminar usuario
-  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string } | null>(null);
+  // Modal de confirmación para eliminar usuario (con jerarquía de seguridad)
+  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string; email?: string; role?: string } | null>(null);
 
   // Estados de Caché Inteligente
   const [cacheStats, setCacheStats] = useState<{ hits: number; misses: number; totalKeys: number; hitRatio: string; engine: string } | null>(null);
@@ -2080,9 +2092,29 @@ export const SystemAdmin: React.FC = () => {
                               {u.phone || <span style={{ color: '#cbd5e1' }}>Sin registrar</span>}
                             </td>
                             <td style={{ padding: '12px 14px' }}>
-                              <span className={`badge ${ROLE_LABELS[u.role]?.badge || 'badge-completed'}`}>
-                                {ROLE_LABELS[u.role]?.label || u.role}
-                              </span>
+                              {isRootEmail(u.email) ? (
+                                <span
+                                  style={{
+                                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                                    color: '#ffffff',
+                                    padding: '3px 9px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                                  }}
+                                  title="Cuenta Oficial del Sistema - Inmutable"
+                                >
+                                  <ShieldCheck size={13} color="#ffffff" /> Cuenta Raíz
+                                </span>
+                              ) : (
+                                <span className={`badge ${ROLE_LABELS[u.role]?.badge || 'badge-completed'}`}>
+                                  {ROLE_LABELS[u.role]?.label || u.role}
+                                </span>
+                              )}
                             </td>
                             <td style={{ padding: '12px 14px', fontSize: '0.82rem' }}>
                               {bizCount > 0 ? (
@@ -2116,7 +2148,11 @@ export const SystemAdmin: React.FC = () => {
                               )}
                             </td>
                             <td style={{ padding: '12px 14px' }}>
-                              {u.role === 'administrator' ? (
+                              {isRootEmail(u.email) ? (
+                                <span style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <Lock size={13} /> Inmutable
+                                </span>
+                              ) : u.role === 'administrator' ? (
                                 <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                   <ShieldCheck size={14} color="#0284c7" /> Protegido
                                 </span>
@@ -2149,16 +2185,39 @@ export const SystemAdmin: React.FC = () => {
                                 >
                                   <Eye size={14} /> Ficha
                                 </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-light-danger"
-                                  onClick={() => setUserToDelete({ id: u.id, name: u.name })}
-                                  style={{ padding: '5px 9px' }}
-                                  title="Eliminar usuario de la plataforma"
-                                  disabled={u.id === user?.id}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                {isRootEmail(u.email) ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-light"
+                                    style={{ padding: '5px 9px', opacity: 0.5, cursor: 'not-allowed' }}
+                                    title="Cuenta Raíz protegida contra eliminación"
+                                    disabled
+                                  >
+                                    <Lock size={14} color="#64748b" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-light-danger"
+                                    onClick={() => setUserToDelete({ id: u.id, name: u.name, email: u.email, role: u.role })}
+                                    style={{
+                                      padding: '5px 9px',
+                                      ...(u.id === user?.id || (u.role === 'administrator' && !isRootEmail(user?.email))
+                                        ? { opacity: 0.4, cursor: 'not-allowed' }
+                                        : {}),
+                                    }}
+                                    title={
+                                      u.id === user?.id
+                                        ? 'No puedes eliminar tu propia cuenta'
+                                        : u.role === 'administrator' && !isRootEmail(user?.email)
+                                        ? 'Solo la Cuenta Raíz puede eliminar a otros administradores'
+                                        : 'Eliminar usuario de la plataforma'
+                                    }
+                                    disabled={u.id === user?.id || (u.role === 'administrator' && !isRootEmail(user?.email))}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -3712,7 +3771,25 @@ export const SystemAdmin: React.FC = () => {
                 <label style={{ fontSize: '0.84rem', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
                   Modificar rol del usuario:
                 </label>
-                {inspectedUser.role === 'administrator' ? (
+                {isRootEmail(inspectedUser.email) ? (
+                  <div
+                    style={{
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: '#1e40af',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <ShieldCheck size={16} color="#0284c7" />
+                    <span>Cuenta Raíz Oficial del Sistema (Inmutable y Protegida contra cambios de rol y baja).</span>
+                  </div>
+                ) : inspectedUser.role === 'administrator' ? (
                   <div
                     style={{
                       background: '#f8fafc',
@@ -4822,10 +4899,27 @@ export const SystemAdmin: React.FC = () => {
                 <AlertTriangle size={26} />
               </div>
               <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                ¿Eliminar usuario?
+                ¿Eliminar {userToDelete.role === 'administrator' ? 'cuenta de Administrador' : 'usuario'}?
               </h3>
+              {userToDelete.role === 'administrator' && (
+                <div
+                  style={{
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    marginBottom: '10px',
+                    color: '#991b1b',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textAlign: 'left',
+                  }}
+                >
+                  ⚠️ Advertencia de Seguridad: Esta cuenta tiene privilegios de Administrador global. Solo la Cuenta Raíz oficial tiene facultades para confirmar esta baja.
+                </div>
+              )}
               <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
-                Estás por eliminar a <strong>{userToDelete.name}</strong>. Esta acción dará de baja su cuenta y no podrá iniciar sesión en la plataforma.
+                Estás por eliminar a <strong>{userToDelete.name}</strong>{userToDelete.email ? ` (${userToDelete.email})` : ''}. Esta acción revocará todas sus sesiones activas de forma permanente.
               </p>
             </div>
 
