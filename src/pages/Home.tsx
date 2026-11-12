@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
-import { cachedGet, clientCache } from '../services/api';
-import { Building2, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
+import api, { cachedGet, clientCache } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { Building2, Heart, MapPin, Navigation, SlidersHorizontal, Sparkles, Star, X } from 'lucide-react';
 import { SkeletonCard } from '../components/common/SkeletonLoaders';
 import { Pagination } from '../components/common/Pagination';
 import { DefaultBusinessCover } from '../components/common/DefaultBusinessCover';
@@ -22,6 +23,7 @@ const normalizeText = (text: string = '') =>
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const cachedBizData = clientCache.get<any>('/businesses?{}');
   const cachedList: Business[] = Array.isArray(cachedBizData?.data) ? cachedBizData.data : (Array.isArray(cachedBizData) ? cachedBizData : []);
 
@@ -41,6 +43,51 @@ const Home: React.FC = () => {
   const [maxDistanceKm, setMaxDistanceKm] = useState<number | null>(null);
   const [locatingUser, setLocatingUser] = useState(false);
   const [locationLabel, setLocationLabel] = useState<string>('');
+
+  // Estados de Favoritos / Comercios Seguidos
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setFavoriteIds([]);
+      setOnlyFavorites(false);
+      return;
+    }
+    api.get('/businesses/my/favorites')
+      .then(res => {
+        const list = res.data?.data ?? res.data ?? [];
+        if (Array.isArray(list)) {
+          setFavoriteIds(list.map((f: any) => Number(f.businessId)));
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent, businessId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    const wasFav = favoriteIds.includes(businessId);
+    setFavoriteIds(prev => wasFav ? prev.filter(id => id !== businessId) : [...prev, businessId]);
+    try {
+      const res = await api.post(`/businesses/${businessId}/follow`);
+      const isFollowing = res.data?.data?.isFollowing;
+      if (typeof isFollowing === 'boolean') {
+        setFavoriteIds(prev =>
+          isFollowing
+            ? (prev.includes(businessId) ? prev : [...prev, businessId])
+            : prev.filter(id => id !== businessId)
+        );
+      }
+    } catch {
+      // Revertir en caso de error
+      setFavoriteIds(prev => wasFav ? [...prev, businessId] : prev.filter(id => id !== businessId));
+    }
+  };
 
   useEffect(() => {
     const fetchBusinesses = async () => {
@@ -109,16 +156,19 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    const result = filterAndSortBusinesses(businesses, {
+    let result = filterAndSortBusinesses(businesses, {
       searchQuery,
       selectedCategory,
       userCoords,
       sortByProximity,
       maxDistanceKm,
-    });
-    setFiltered(result as Business[]);
+    }) as Business[];
+    if (onlyFavorites) {
+      result = result.filter(b => favoriteIds.includes(b.id));
+    }
+    setFiltered(result);
     setPage(1);
-  }, [searchQuery, selectedCategory, businesses, userCoords, sortByProximity, maxDistanceKm]);
+  }, [searchQuery, selectedCategory, businesses, userCoords, sortByProximity, maxDistanceKm, onlyFavorites, favoriteIds]);
 
   const getCategoryCount = (cat: string) => {
     let list = Array.isArray(businesses) ? businesses : [];
@@ -150,11 +200,52 @@ const Home: React.FC = () => {
       <div className="two-col-layout">
         {/* Sidebar de filtros */}
         <aside className="sidebar-filters">
-          <div className="filter-main-title-wrapper" style={{ marginBottom: '1.5rem' }}>
+          <div className="filter-main-title-wrapper" style={{ marginBottom: '1.25rem' }}>
             <div className="filter-section-title">
               <SlidersHorizontal size={15} /> Filtros
             </div>
           </div>
+
+          {/* Mis Comercios Favoritos */}
+          {user && (
+            <div style={{ marginBottom: '1.15rem' }}>
+              <button
+                type="button"
+                onClick={() => setOnlyFavorites(prev => !prev)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: onlyFavorites ? '1.5px solid #e11d48' : '1.5px solid #fecdd3',
+                  background: onlyFavorites ? '#fff1f2' : '#ffffff',
+                  color: onlyFavorites ? '#be123c' : '#e11d48',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: onlyFavorites ? '0 2px 8px rgba(225, 29, 72, 0.12)' : 'none',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                  <Heart size={15} fill={onlyFavorites ? '#e11d48' : 'none'} color="#e11d48" />
+                  Mis Favoritos
+                </span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: onlyFavorites ? '#e11d48' : '#ffe4e6',
+                  color: onlyFavorites ? '#ffffff' : '#be123c',
+                }}>
+                  {favoriteIds.length}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Tu Ubicación y Cercanía */}
           <div className="location-filter-box" style={{ marginBottom: '1.25rem' }}>
@@ -332,6 +423,41 @@ const Home: React.FC = () => {
 
         {/* Columna de negocios */}
         <div className="two-col-content" style={{ width: '100%', minWidth: 0 }}>
+          {onlyFavorites && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.65rem 1rem',
+              background: '#fff1f2',
+              border: '1px solid #fecdd3',
+              borderRadius: '10px',
+              marginBottom: '1rem',
+              fontSize: '0.85rem',
+              color: '#be123c',
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                <Heart size={14} fill="#e11d48" color="#e11d48" />
+                Mostrando tus comercios seguidos / favoritos ({safeFiltered.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setOnlyFavorites(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#be123c',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.80rem',
+                  textDecoration: 'underline',
+                }}
+              >
+                Ver todos los comercios
+              </button>
+            </div>
+          )}
+
           {sortByProximity && (
             <div style={{
               display: 'flex',
@@ -418,6 +544,7 @@ const Home: React.FC = () => {
                 onClick={() => {
                   setSelectedCategory('Todos');
                   setSearchParams({});
+                  setOnlyFavorites(false);
                   handleClearLocation();
                 }}
                 className="btn btn-outline-primary"
@@ -429,7 +556,15 @@ const Home: React.FC = () => {
           ) : (
             <>
               <div className="business-grid">
-                {paginated.map(business => (
+                {paginated.map(business => {
+                  const isFav = favoriteIds.includes(business.id);
+                  const rawSchedules = (business as any).schedules;
+                  const bizSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
+                  const jsDay = new Date().getDay();
+                  const todayDayOfWeek = jsDay === 0 ? 7 : jsDay;
+                  const opensToday = bizSchedules.some((s: any) => Number(s.dayOfWeek) === todayDayOfWeek);
+
+                  return (
                   <Link
                       to={`/businesses/${business.id}`}
                       state={{ business }}
@@ -442,7 +577,38 @@ const Home: React.FC = () => {
                       key={business.id}
                       style={{ textDecoration: 'none', display: 'block', width: '100%' }}
                     >
-                    <div className="ml-card ml-card-hoverable" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+                    <div className="ml-card ml-card-hoverable" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+                      {/* Botón flotante de Favorito / Seguir en 1 clic */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleFavorite(e, business.id)}
+                        title={isFav ? 'Quitar de Mis Favoritos' : 'Seguir y guardar en Mis Favoritos'}
+                        aria-label={isFav ? 'Quitar de Mis Favoritos' : 'Guardar en Mis Favoritos'}
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          zIndex: 4,
+                          width: '34px',
+                          height: '34px',
+                          borderRadius: '50%',
+                          background: isFav ? '#fff1f2' : 'rgba(255, 255, 255, 0.92)',
+                          border: isFav ? '1.5px solid #fecdd3' : '1px solid rgba(226, 232, 240, 0.9)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.14)',
+                          transition: 'transform 0.15s ease, background 0.15s ease',
+                        }}
+                      >
+                        <Heart
+                          size={16}
+                          fill={isFav ? '#e11d48' : 'none'}
+                          color={isFav ? '#e11d48' : '#64748b'}
+                        />
+                      </button>
+
                       {/* Fondo por defecto de negocio con patrón de turnos y avatar */}
                       <DefaultBusinessCover name={business.name} size="card" />
 
@@ -456,6 +622,40 @@ const Home: React.FC = () => {
                             <span className="badge badge-confirmed" style={{ fontSize: '0.75rem' }}>
                               {business.category}
                             </span>
+                          )}
+                          {bizSchedules.length > 0 && (
+                            opensToday ? (
+                              <span style={{
+                                fontSize: '0.71rem',
+                                fontWeight: 700,
+                                color: '#065f46',
+                                background: '#ecfdf5',
+                                border: '1px solid #a7f3d0',
+                                borderRadius: '12px',
+                                padding: '1px 7px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                                Abre hoy
+                              </span>
+                            ) : (
+                              <span style={{
+                                fontSize: '0.71rem',
+                                fontWeight: 600,
+                                color: '#64748b',
+                                background: '#f1f5f9',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '12px',
+                                padding: '1px 7px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}>
+                                Cerrado hoy
+                              </span>
+                            )
                           )}
                           {business.distanceKm !== undefined && (
                             <span style={{
@@ -564,7 +764,8 @@ const Home: React.FC = () => {
                       </div>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Paginación */}

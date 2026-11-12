@@ -28,7 +28,10 @@ import {
   AlertCircle,
   Tags,
   Flag,
-  MessageCircle
+  MessageCircle,
+  Heart,
+  Sparkles,
+  Bell
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -107,6 +110,40 @@ const Dashboard: React.FC = () => {
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reportReviewReason, setReportReviewReason] = useState('');
   const [submittingReviewReport, setSubmittingReviewReport] = useState(false);
+
+  // Comunidad: Seguidores, Difusión de Promos/Avisos y Días Cerrados (Modo Feriado)
+  const [communitySummary, setCommunitySummary] = useState<{
+    followersCount: number;
+    weeklyBroadcastsUsed: number;
+    weeklyBroadcastsRemaining: number;
+    closedDates: { id: number; closedDate: string; reason: string }[];
+    recentBroadcasts: { id: number; type: string; title: string; message: string; sentCount: number; createdAt: string }[];
+  }>({
+    followersCount: 0,
+    weeklyBroadcastsUsed: 0,
+    weeklyBroadcastsRemaining: 3,
+    closedDates: [],
+    recentBroadcasts: [],
+  });
+  const [allBizAppointments, setAllBizAppointments] = useState<Appointment[]>([]);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastForm, setBroadcastForm] = useState<{
+    type: 'PROMO' | 'HOLIDAY' | 'SLOTS' | 'NEWS';
+    title: string;
+    message: string;
+  }>({
+    type: 'PROMO',
+    title: '',
+    message: '',
+  });
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
+  const [closedDateForm, setClosedDateForm] = useState({
+    closedDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+    reason: 'Cerrado por Feriado',
+    notifyFollowers: true,
+  });
+  const [savingClosedDate, setSavingClosedDate] = useState(false);
 
   const [services, setServices] = useState<Service[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -277,14 +314,96 @@ const Dashboard: React.FC = () => {
     Promise.all([
       api.get(`/businesses/${selectedBiz.id}/services`),
       api.get(`/businesses/${selectedBiz.id}/schedules`),
-      api.get(`/businesses/${selectedBiz.id}/reviews`)
-    ]).then(([sRes, schRes, rRes]) => {
+      api.get(`/businesses/${selectedBiz.id}/reviews`),
+      api.get(`/businesses/${selectedBiz.id}/community`).catch(() => null),
+      api.get(`/appointments?businessId=${selectedBiz.id}&limit=100`).catch(() => null),
+    ]).then(([sRes, schRes, rRes, commRes, allAptRes]) => {
       setServices(sRes.data.data ?? sRes.data ?? []);
       setSchedules(schRes.data ?? []);
       setReviews(rRes.data.data ?? []);
       setReviewsStats(rRes.data.stats ?? { average: 0, count: 0 });
+      if (commRes?.data) {
+        const cData = commRes.data?.data ?? commRes.data;
+        setCommunitySummary({
+          followersCount: Number(cData.followersCount || 0),
+          weeklyBroadcastsUsed: Number(cData.weeklyBroadcastsUsed || 0),
+          weeklyBroadcastsRemaining: typeof cData.weeklyBroadcastsRemaining === 'number' ? cData.weeklyBroadcastsRemaining : 3,
+          closedDates: Array.isArray(cData.closedDates) ? cData.closedDates : [],
+          recentBroadcasts: Array.isArray(cData.recentBroadcasts) ? cData.recentBroadcasts : [],
+        });
+      }
+      if (allAptRes?.data) {
+        const list = allAptRes.data?.data ?? allAptRes.data ?? [];
+        setAllBizAppointments(Array.isArray(list) ? list : []);
+      }
     });
   }, [selectedBiz]);
+
+  const refreshCommunitySummary = async (bizId: number) => {
+    try {
+      const res = await api.get(`/businesses/${bizId}/community`);
+      const cData = res.data?.data ?? res.data;
+      if (cData) {
+        setCommunitySummary({
+          followersCount: Number(cData.followersCount || 0),
+          weeklyBroadcastsUsed: Number(cData.weeklyBroadcastsUsed || 0),
+          weeklyBroadcastsRemaining: typeof cData.weeklyBroadcastsRemaining === 'number' ? cData.weeklyBroadcastsRemaining : 3,
+          closedDates: Array.isArray(cData.closedDates) ? cData.closedDates : [],
+          recentBroadcasts: Array.isArray(cData.recentBroadcasts) ? cData.recentBroadcasts : [],
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBiz || !broadcastForm.title.trim() || !broadcastForm.message.trim()) return;
+    setSendingBroadcast(true);
+    try {
+      const res = await api.post(`/businesses/${selectedBiz.id}/broadcasts`, broadcastForm);
+      const sentCount = res.data?.data?.sentCount ?? 0;
+      showToast(`✓ Aviso enviado con éxito a ${sentCount} ${sentCount === 1 ? 'seguidor' : 'seguidores'}`);
+      setShowBroadcastModal(false);
+      setBroadcastForm({ type: 'PROMO', title: '', message: '' });
+      refreshCommunitySummary(selectedBiz.id);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || err.response?.data?.detail || 'No se pudo enviar el aviso');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const handleAddClosedDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBiz || !closedDateForm.closedDate) return;
+    setSavingClosedDate(true);
+    try {
+      await api.post(`/businesses/${selectedBiz.id}/closed-dates`, closedDateForm);
+      showToast(
+        closedDateForm.notifyFollowers
+          ? '✓ Fecha bloqueada por feriado/cierre y seguidores notificados'
+          : '✓ Fecha bloqueada en el calendario de reservas'
+      );
+      refreshCommunitySummary(selectedBiz.id);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al registrar día cerrado');
+    } finally {
+      setSavingClosedDate(false);
+    }
+  };
+
+  const handleRemoveClosedDate = async (dateStr: string) => {
+    if (!selectedBiz) return;
+    try {
+      await api.delete(`/businesses/${selectedBiz.id}/closed-dates/${dateStr}`);
+      showToast('✓ Bloqueo de fecha eliminado. El día vuelve a estar habilitado.');
+      refreshCommunitySummary(selectedBiz.id);
+    } catch {
+      showToast('Error al quitar bloqueo de fecha');
+    }
+  };
 
   // Load agenda
   const fetchAgendaAppointments = () => {
@@ -684,6 +803,28 @@ const Dashboard: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 type="button"
+                onClick={() => setShowBroadcastModal(true)}
+                style={{
+                  padding: '7px 13px',
+                  fontSize: '0.82rem',
+                  gap: '6px',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: 'linear-gradient(135deg, #fff1f2, #fdf2f8)',
+                  color: '#be123c',
+                  border: '1.5px solid #fecdd3',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+                title="Enviar promoción, novedad o aviso de feriado a los clientes que siguen tu comercio"
+              >
+                <Sparkles size={14} color="#e11d48" />
+                <span>Avisar a Seguidores ({communitySummary.followersCount})</span>
+              </button>
+
+              <button
+                type="button"
                 className="btn btn-light"
                 onClick={() => setShowFichaModal(true)}
                 style={{ padding: '7px 12px', fontSize: '0.82rem', gap: '6px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center' }}
@@ -725,8 +866,8 @@ const Dashboard: React.FC = () => {
           <div className="dashboard-metrics-grid">
             {[
               { icon: <CalendarDays size={20} />, label: 'Turnos Hoy', value: agendaAppointments.length },
+              { icon: <Heart size={20} color="#e11d48" />, label: 'Seguidores', value: `${communitySummary.followersCount} ❤️` },
               { icon: <Briefcase size={20} />, label: 'Servicios', value: services.length },
-              { icon: <Clock size={20} />, label: 'Horarios', value: schedules.length },
               { icon: <Star size={20} />, label: 'Calificación', value: reviewsStats.average > 0 ? `${reviewsStats.average.toFixed(1)} ★ (${reviewsStats.count})` : 'Nuevo' },
             ].map((m, i) => (
               <div key={i} className="metric-card-compact">
@@ -951,9 +1092,76 @@ const Dashboard: React.FC = () => {
                               {apt.user?.name ? apt.user.name.charAt(0).toUpperCase() : <User size={16} />}
                             </div>
                             <div style={{ minWidth: 0 }}>
-                              <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: '0 0 2px 0', fontSize: '0.92rem' }}>
-                                {apt.user?.name || 'Cliente'}
-                              </p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '2px' }}>
+                                <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: 0, fontSize: '0.92rem' }}>
+                                  {apt.user?.name || 'Cliente'}
+                                </p>
+                                {(() => {
+                                  const clientAppts = allBizAppointments.filter(
+                                    a => (apt.userId && a.userId === apt.userId) || (apt.user?.email && a.user?.email === apt.user.email)
+                                  );
+                                  const completedVisits = clientAppts.filter(a => a.status === 'COMPLETED').length;
+                                  const cancelledVisits = clientAppts.filter(a => a.status === 'CANCELLED').length;
+
+                                  return (
+                                    <>
+                                      {completedVisits >= 2 ? (
+                                        <span style={{
+                                          fontSize: '0.69rem',
+                                          fontWeight: 800,
+                                          background: '#ecfdf5',
+                                          color: '#047857',
+                                          border: '1px solid #a7f3d0',
+                                          borderRadius: '10px',
+                                          padding: '1px 7px',
+                                        }}>
+                                          ⭐ Frecuente ({completedVisits} visitas)
+                                        </span>
+                                      ) : completedVisits === 1 ? (
+                                        <span style={{
+                                          fontSize: '0.69rem',
+                                          fontWeight: 700,
+                                          background: '#f0f9ff',
+                                          color: '#0369a1',
+                                          border: '1px solid #bae6fd',
+                                          borderRadius: '10px',
+                                          padding: '1px 7px',
+                                        }}>
+                                          ✓ 1 visita previa
+                                        </span>
+                                      ) : (
+                                        <span style={{
+                                          fontSize: '0.69rem',
+                                          fontWeight: 700,
+                                          background: '#eef2ff',
+                                          color: '#4338ca',
+                                          border: '1px solid #c7d2fe',
+                                          borderRadius: '10px',
+                                          padding: '1px 7px',
+                                        }}>
+                                          🆕 1° visita al local
+                                        </span>
+                                      )}
+                                      {cancelledVisits >= 2 && (
+                                        <span
+                                          style={{
+                                            fontSize: '0.69rem',
+                                            fontWeight: 800,
+                                            background: '#fff7ed',
+                                            color: '#c2410c',
+                                            border: '1px solid #fed7aa',
+                                            borderRadius: '10px',
+                                            padding: '1px 7px',
+                                          }}
+                                          title="Este usuario registra cancelaciones previas en tu comercio. Te sugerimos confirmar asistencia por WhatsApp."
+                                        >
+                                          ⚠️ {cancelledVisits} cancelaciones
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
                               <p className="text-muted text-xs" style={{ margin: '0 0 2px 0', fontWeight: 600 }}>
                                 {apt.service?.name || 'Servicio'} {apt.service?.durationMinutes ? `(${apt.service.durationMinutes} min)` : ''}
                               </p>
@@ -1235,6 +1443,7 @@ const Dashboard: React.FC = () => {
 
           {/* ======= HORARIOS ======= */}
           {activeTab === 'schedules' && (
+            <>
             <div className="dashboard-panel-grid">
               <div className="ml-card dashboard-card-responsive">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -1479,6 +1688,131 @@ const Dashboard: React.FC = () => {
                 </form>
               </div>
             </div>
+
+            {/* Panel de Modo Feriado / Días Cerrados Especiales */}
+            <div className="ml-card dashboard-card-responsive" style={{ marginTop: '1.5rem', border: '1px solid #fde68a', background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 60%)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ fontWeight: 800, margin: 0, color: '#92400e', fontSize: '1.12rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🏖️ Modo Feriado y Días Cerrados Especiales
+                  </h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#b45309' }}>
+                    Bloqueá fechas puntuales (feriados, vacaciones o reformas) sin borrar tus horarios habituales de la semana.
+                  </p>
+                </div>
+                <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', fontWeight: 800, fontSize: '0.78rem', padding: '4px 10px', borderRadius: '12px' }}>
+                  {communitySummary.closedDates.length} {communitySummary.closedDates.length === 1 ? 'fecha bloqueada' : 'fechas bloqueadas'}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
+                {/* Formulario para bloquear un día */}
+                <form onSubmit={handleAddClosedDate} style={{ background: '#ffffff', padding: '1rem', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                  <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Agendar Nuevo Cierre / Feriado
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700 }}>Fecha a cerrar *</label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        min={format(new Date(), 'yyyy-MM-dd')}
+                        value={closedDateForm.closedDate}
+                        onChange={e => setClosedDateForm(f => ({ ...f, closedDate: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700 }}>Motivo del cierre *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Ej: Feriado Nacional / Vacaciones"
+                        value={closedDateForm.reason}
+                        onChange={e => setClosedDateForm(f => ({ ...f, reason: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#334155', fontWeight: 600, cursor: 'pointer', marginBottom: '0.85rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={closedDateForm.notifyFollowers}
+                      onChange={e => setClosedDateForm(f => ({ ...f, notifyFollowers: e.target.checked }))}
+                    />
+                    <span>
+                      🔔 Notificar automáticamente a mis <strong>{communitySummary.followersCount}</strong> seguidores sobre este cierre
+                    </span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={savingClosedDate}
+                    style={{ width: '100%', background: '#d97706', borderColor: '#d97706', fontWeight: 800 }}
+                  >
+                    {savingClosedDate ? 'Guardando cierre...' : '🏖️ Bloquear Fecha en Agenda'}
+                  </button>
+                </form>
+
+                {/* Lista de fechas bloqueadas */}
+                <div>
+                  <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Próximos Días Cerrados Programados
+                  </h4>
+                  {communitySummary.closedDates.length === 0 ? (
+                    <div style={{ padding: '1.25rem', background: '#ffffff', borderRadius: '12px', border: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '0.84rem', color: '#64748b' }}>
+                      No tenés días feriados ni cierres especiales programados próximamente.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {communitySummary.closedDates.map(cd => (
+                        <div
+                          key={cd.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: '#ffffff',
+                            border: '1px solid #fde68a',
+                            borderRadius: '10px',
+                            padding: '10px 12px',
+                            gap: '10px',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#92400e', textTransform: 'capitalize' }}>
+                              📅 {(() => {
+                                try {
+                                  return format(new Date(`${cd.closedDate}T12:00:00`), "EEEE d 'de' MMMM, yyyy", { locale: es });
+                                } catch {
+                                  return cd.closedDate;
+                                }
+                              })()}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#b45309', fontWeight: 600 }}>
+                              Motivo: {cd.reason}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light-danger"
+                            onClick={() => handleRemoveClosedDate(cd.closedDate)}
+                            title="Reabrir fecha para turnos"
+                            style={{ padding: '5px 10px', fontSize: '0.76rem', fontWeight: 700, flexShrink: 0 }}
+                          >
+                            <Trash2 size={13} /> Reabrir día
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            </>
           )}
 
           {/* ======= OPINIONES Y RESEÑAS ======= */}
@@ -2672,6 +3006,140 @@ const Dashboard: React.FC = () => {
                   style={{ background: '#e11d48', borderColor: '#e11d48', fontWeight: 700, padding: '8px 18px', borderRadius: '8px' }}
                 >
                   {submittingReviewReport ? 'Enviando...' : 'Enviar a Moderación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Enviar Aviso / Promoción / Novedad a Seguidores del Comercio */}
+      {showBroadcastModal && selectedBiz && (
+        <div className="modal-overlay" onClick={() => !sendingBroadcast && setShowBroadcastModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fff1f2', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Sparkles size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Enviar Aviso a Seguidores
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Llegá directo a la campanita de tus {communitySummary.followersCount} seguidores en tiempo real
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBroadcastModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '10px 12px',
+              marginBottom: '1rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '0.8rem',
+              flexWrap: 'wrap',
+              gap: '6px',
+            }}>
+              <span style={{ color: '#475569', fontWeight: 600 }}>
+                <Bell size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Política Anti-Spam (cuidamos a tus seguidores):
+              </span>
+              <span style={{
+                fontWeight: 800,
+                color: communitySummary.weeklyBroadcastsRemaining > 0 ? '#059669' : '#dc2626',
+                background: communitySummary.weeklyBroadcastsRemaining > 0 ? '#ecfdf5' : '#fef2f2',
+                padding: '2px 8px',
+                borderRadius: '10px',
+              }}>
+                {communitySummary.weeklyBroadcastsRemaining} de 3 envíos disponibles esta semana
+              </span>
+            </div>
+
+            <form onSubmit={handleSendBroadcast}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Tipo de comunicado *
+                </label>
+                <select
+                  className="form-control"
+                  value={broadcastForm.type}
+                  onChange={e => setBroadcastForm(f => ({ ...f, type: e.target.value as any }))}
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 600 }}
+                >
+                  <option value="PROMO">🎁 Promoción o Descuento Especial</option>
+                  <option value="SLOTS">⚡ Turnos Libres Hoy / Último Momento</option>
+                  <option value="HOLIDAY">🏖️ Aviso de Feriado / Horario Especial</option>
+                  <option value="NEWS">✨ Novedad o Nuevo Servicio en el Local</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Título corto del aviso *
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  required
+                  maxLength={90}
+                  placeholder="Ej: ¡20% OFF en Corte + Barba este Jueves!"
+                  value={broadcastForm.title}
+                  onChange={e => setBroadcastForm(f => ({ ...f, title: e.target.value }))}
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Mensaje para tus seguidores *
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  required
+                  maxLength={400}
+                  placeholder="Contales los detalles de la promoción, los horarios disponibles o el motivo del aviso..."
+                  value={broadcastForm.message}
+                  onChange={e => setBroadcastForm(f => ({ ...f, message: e.target.value }))}
+                  style={{ borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={sendingBroadcast}
+                  onClick={() => setShowBroadcastModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    sendingBroadcast ||
+                    communitySummary.weeklyBroadcastsRemaining <= 0 ||
+                    !broadcastForm.title.trim() ||
+                    !broadcastForm.message.trim()
+                  }
+                  style={{ background: '#e11d48', borderColor: '#e11d48', fontWeight: 800, padding: '8px 18px', borderRadius: '8px' }}
+                >
+                  {sendingBroadcast ? 'Enviando aviso...' : '📢 Publicar y Notificar'}
                 </button>
               </div>
             </form>

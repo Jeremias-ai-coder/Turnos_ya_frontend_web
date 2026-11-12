@@ -10,7 +10,9 @@ import {
   Info,
   Building2,
   Star,
-  Flag
+  Flag,
+  Heart,
+  Sparkles
 } from 'lucide-react';
 import { 
   getNotifications, 
@@ -194,6 +196,18 @@ export const NotificationBell: React.FC = () => {
     const type = (notif.type || '').toUpperCase();
     const title = (notif.title || '').toLowerCase();
     const msg = (notif.message || '').toLowerCase();
+
+    // Extraer posible ID de comercio embebido (#BIZ_123) para avisos a seguidores o cierres por feriado
+    const bizIdMatch = notif.message?.match(/#BIZ_(\d+)/i);
+    if (
+      bizIdMatch ||
+      type === 'BUSINESS_BROADCAST' ||
+      type === 'BUSINESS_HOLIDAY_CLOSURE'
+    ) {
+      if (bizIdMatch?.[1]) {
+        return `/businesses/${bizIdMatch[1]}`;
+      }
+    }
 
     // Extraer posible nombre de negocio entre comillas para pre-seleccionarlo en el Dashboard
     const quotedMatches = notif.message?.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
@@ -390,6 +404,20 @@ export const NotificationBell: React.FC = () => {
         </div>
       );
     }
+    if (type === 'BUSINESS_BROADCAST') {
+      return (
+        <div className="notification-icon-wrapper icon-booking" style={{ background: '#fdf2f8', color: '#db2777' }}>
+          <Sparkles size={18} />
+        </div>
+      );
+    }
+    if (type === 'BUSINESS_HOLIDAY_CLOSURE') {
+      return (
+        <div className="notification-icon-wrapper icon-reminder" style={{ background: '#fff7ed', color: '#ea580c' }}>
+          <Heart size={18} />
+        </div>
+      );
+    }
     return (
       <div className="notification-icon-wrapper icon-info">
         <Info size={18} />
@@ -452,7 +480,7 @@ export const NotificationBell: React.FC = () => {
                   {getNotificationIcon(notif)}
                   <div className="notification-body">
                     <h5 className="notification-item-title">{notif.title}</h5>
-                    <p className="notification-item-msg">{notif.message}</p>
+                    <p className="notification-item-msg">{(notif.message || '').replace(/\s*\(#BIZ_\d+\)/gi, '')}</p>
                     <span className="notification-item-time">
                       {formatRelativeTime(notif.createdAt)}
                     </span>

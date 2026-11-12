@@ -22,7 +22,12 @@ import {
   CheckCircle2,
   Globe,
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  Heart,
+  Bell,
+  BellOff,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -70,6 +75,71 @@ const BusinessDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(!previewBusiness);
 
   const { user } = useAuth();
+
+  // Estado de Comunidad (Seguidores, Notificaciones, Feriados y Avisos del Comercio)
+  const [community, setCommunity] = useState<{
+    followersCount: number;
+    isFollowing: boolean;
+    receiveNotifications: boolean;
+    closedDates: { id: number; closedDate: string; reason: string }[];
+    recentBroadcasts: { id: number; type: string; title: string; message: string; sentCount: number; createdAt: string }[];
+  }>({
+    followersCount: 0,
+    isFollowing: false,
+    receiveNotifications: true,
+    closedDates: [],
+    recentBroadcasts: [],
+  });
+  const [togglingFollow, setTogglingFollow] = useState(false);
+
+  const handleToggleFollow = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!id || togglingFollow) return;
+    setTogglingFollow(true);
+    try {
+      const res = await api.post(`/businesses/${id}/follow`);
+      const data = res.data?.data ?? res.data;
+      if (data) {
+        setCommunity(prev => ({
+          ...prev,
+          isFollowing: Boolean(data.isFollowing),
+          receiveNotifications: Boolean(data.receiveNotifications),
+          followersCount: typeof data.followersCount === 'number' ? data.followersCount : prev.followersCount,
+        }));
+        showToast(
+          data.isFollowing
+            ? `❤️ Ahora seguís a ${business?.name || 'este comercio'}. Recibirás avisos de promos y feriados.`
+            : `Dejaste de seguir a ${business?.name || 'este comercio'}`
+        );
+      }
+    } catch {
+      showToast('No se pudo actualizar el seguimiento');
+    } finally {
+      setTogglingFollow(false);
+    }
+  };
+
+  const handleToggleNotifications = async () => {
+    if (!user || !id || !community.isFollowing) return;
+    const nextVal = !community.receiveNotifications;
+    setCommunity(prev => ({ ...prev, receiveNotifications: nextVal }));
+    try {
+      await api.patch(`/businesses/${id}/follow/notifications`, {
+        receiveNotifications: nextVal,
+      });
+      showToast(
+        nextVal
+          ? '🔔 Avisos de promociones y feriados activados'
+          : '🔕 Avisos de este comercio silenciados (seguís teniéndolo en Favoritos)'
+      );
+    } catch {
+      setCommunity(prev => ({ ...prev, receiveNotifications: !nextVal }));
+      showToast('Error al cambiar preferencia de avisos');
+    }
+  };
 
   // Estados de Moderación In-Situ y Reportes
   const [reviewToReport, setReviewToReport] = useState<Review | null>(null);
@@ -158,12 +228,27 @@ const BusinessDetail: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bRes, sRes, rRes, schRes] = await Promise.all([
+        const [bRes, sRes, rRes, schRes, commRes] = await Promise.all([
           cachedGet(`/businesses/${id}`, undefined, 180),
           cachedGet(`/businesses/${id}/services`, undefined, 180),
           cachedGet(`/businesses/${id}/reviews`, undefined, 60),
-          cachedGet(`/businesses/${id}/schedules`, undefined, 180)
+          cachedGet(`/businesses/${id}/schedules`, undefined, 180),
+          api.get(`/businesses/${id}/community`).catch(() => null),
         ]);
+
+        if (commRes?.data) {
+          const cData = commRes.data?.data ?? commRes.data;
+          if (cData && typeof cData === 'object') {
+            setCommunity(prev => ({
+              ...prev,
+              followersCount: Number(cData.followersCount || 0),
+              isFollowing: Boolean(cData.isFollowing),
+              receiveNotifications: cData.receiveNotifications !== false,
+              closedDates: Array.isArray(cData.closedDates) ? cData.closedDates : [],
+              recentBroadcasts: Array.isArray(cData.recentBroadcasts) ? cData.recentBroadcasts : [],
+            }));
+          }
+        }
 
         const loadedSchedules = Array.isArray(schRes) ? schRes : (Array.isArray(schRes?.data) ? schRes.data : []);
         setSchedules(loadedSchedules);
@@ -254,16 +339,83 @@ const BusinessDetail: React.FC = () => {
               {business.category && <span className="badge badge-confirmed">{business.category}</span>}
             </div>
 
-            {/* Valoración única en header */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '0.8rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontWeight: 700, fontSize: '1.15rem' }}>
-                <Star size={20} fill="currentColor" /> {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : 'Nuevo'}
+            {/* Valoración + Botón Seguir / Favorito en header */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '0.8rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontWeight: 700, fontSize: '1.15rem' }}>
+                  <Star size={20} fill="currentColor" /> {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : 'Nuevo'}
+                </div>
+                {reviewsStats.count > 0 && (
+                  <span className="text-muted text-sm" style={{ fontWeight: 500 }}>
+                    ({reviewsStats.count} {reviewsStats.count === 1 ? 'opinión' : 'opiniones'})
+                  </span>
+                )}
               </div>
-              {reviewsStats.count > 0 && (
-                <span className="text-muted text-sm" style={{ fontWeight: 500 }}>
-                  ({reviewsStats.count} {reviewsStats.count === 1 ? 'opinión' : 'opiniones'})
-                </span>
-              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleToggleFollow}
+                  disabled={togglingFollow}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    borderRadius: '20px',
+                    border: community.isFollowing ? '1.5px solid #e11d48' : '1.5px solid #fecdd3',
+                    background: community.isFollowing ? '#fff1f2' : '#ffffff',
+                    color: '#e11d48',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    cursor: togglingFollow ? 'wait' : 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: community.isFollowing ? '0 2px 8px rgba(225, 29, 72, 0.12)' : 'none',
+                  }}
+                  title={community.isFollowing ? 'Dejar de seguir este comercio' : 'Seguir comercio para guardarlo en favoritos y recibir avisos'}
+                >
+                  <Heart size={15} fill={community.isFollowing ? '#e11d48' : 'none'} color="#e11d48" />
+                  <span>{community.isFollowing ? 'Siguiendo' : 'Seguir'}</span>
+                  <span style={{
+                    background: community.isFollowing ? '#e11d48' : '#ffe4e6',
+                    color: community.isFollowing ? '#ffffff' : '#be123c',
+                    padding: '1px 7px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                  }}>
+                    {community.followersCount}
+                  </span>
+                </button>
+
+                {community.isFollowing && (
+                  <button
+                    type="button"
+                    onClick={handleToggleNotifications}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '7px 11px',
+                      borderRadius: '20px',
+                      border: community.receiveNotifications ? '1px solid #bae6fd' : '1px solid #cbd5e1',
+                      background: community.receiveNotifications ? '#f0f9ff' : '#f8fafc',
+                      color: community.receiveNotifications ? '#0284c7' : '#64748b',
+                      fontWeight: 700,
+                      fontSize: '0.76rem',
+                      cursor: 'pointer',
+                    }}
+                    title={
+                      community.receiveNotifications
+                        ? 'Recibís notificaciones de promociones, feriados y turnos libres (clic para silenciar)'
+                        : 'Notificaciones silenciadas (clic para activar avisos del comercio)'
+                    }
+                  >
+                    {community.receiveNotifications ? <Bell size={13} /> : <BellOff size={13} />}
+                    <span>{community.receiveNotifications ? 'Avisos activos' : 'Silenciado'}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -415,6 +567,117 @@ const BusinessDetail: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Cartelera de Avisos a la Comunidad y Próximos Feriados / Días Cerrados */}
+      {(community.closedDates.length > 0 || community.recentBroadcasts.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          {community.closedDates.length > 0 && (
+            <div style={{
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: '14px',
+              padding: '1rem 1.25rem',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.6rem' }}>
+                <AlertTriangle size={18} color="#d97706" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#92400e' }}>
+                  Próximos Días Cerrados / Feriados
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {community.closedDates.slice(0, 4).map(cd => {
+                  const dateFormatted = (() => {
+                    try {
+                      return format(new Date(`${cd.closedDate}T12:00:00`), "EEEE d 'de' MMMM", { locale: es });
+                    } catch {
+                      return cd.closedDate;
+                    }
+                  })();
+                  return (
+                    <div
+                      key={cd.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: '#ffffff',
+                        border: '1px solid #fef3c7',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        fontSize: '0.82rem',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <strong style={{ color: '#92400e', textTransform: 'capitalize' }}>🏖️ {dateFormatted}</strong>
+                      <span style={{ color: '#b45309', fontWeight: 600 }}>{cd.reason}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {community.recentBroadcasts.length > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #fdf2f8, #fff1f2)',
+              border: '1px solid #fbcfe8',
+              borderRadius: '14px',
+              padding: '1rem 1.25rem',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={18} color="#db2777" />
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#9d174d' }}>
+                    Novedades y Promos del Comercio
+                  </h3>
+                </div>
+                {!community.isFollowing && (
+                  <button
+                    type="button"
+                    onClick={handleToggleFollow}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #f472b6',
+                      color: '#db2777',
+                      borderRadius: '12px',
+                      padding: '2px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Recibir avisos
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {community.recentBroadcasts.slice(0, 2).map(bc => (
+                  <div
+                    key={bc.id}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #fce7f3',
+                      borderRadius: '8px',
+                      padding: '8px 11px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <strong style={{ fontSize: '0.84rem', color: '#831843' }}>{bc.title}</strong>
+                      <span style={{ fontSize: '0.71rem', color: '#9d174d', fontWeight: 600 }}>
+                        {formatDate(bc.createdAt)}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: 1.4 }}>
+                      {bc.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Servicios Disponibles */}
       <div style={{ marginBottom: '2.5rem' }}>

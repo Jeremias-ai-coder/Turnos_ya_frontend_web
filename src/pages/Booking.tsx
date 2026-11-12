@@ -90,6 +90,7 @@ const Booking: React.FC = () => {
   // Busy slots for selected date
   const [busySlots, setBusySlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [closedDateReason, setClosedDateReason] = useState<string | null>(null);
 
   // Hold state
   const [holdToken, setHoldToken] = useState<string | null>(null);
@@ -153,12 +154,20 @@ const Booking: React.FC = () => {
   useEffect(() => {
     if (!id || !selectedDate) {
       setBusySlots([]);
+      setClosedDateReason(null);
       return;
     }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     setLoadingSlots(true);
+    setClosedDateReason(null);
     api.get(`/businesses/${id}/busy-slots?date=${dateStr}`)
       .then(res => {
+        if (res.data?.isClosedDate) {
+          setClosedDateReason(res.data.closedReason || 'Feriado / Día cerrado');
+          setBusySlots([]);
+          setSelectedTime(null);
+          return;
+        }
         const rawList = res.data.data ?? [];
         const formattedList = rawList.map((item: string) => formatTimeToHHMM(item));
         setBusySlots(formattedList);
@@ -546,7 +555,24 @@ const Booking: React.FC = () => {
                     </div>
                   ) : null}
 
-                  {slotGroups.length === 0 ? (
+                  {closedDateReason ? (
+                    <div style={{
+                      padding: '1.5rem',
+                      textAlign: 'center',
+                      background: '#fffbeb',
+                      borderRadius: '12px',
+                      border: '1.5px solid #fde68a',
+                      margin: '1rem 0',
+                    }}>
+                      <div style={{ fontSize: '1.6rem', marginBottom: '0.4rem' }}>🏖️</div>
+                      <p style={{ fontWeight: 800, color: '#92400e', marginBottom: '4px', fontSize: '0.98rem' }}>
+                        Comercio cerrado en esta fecha
+                      </p>
+                      <p style={{ color: '#b45309', fontSize: '0.84rem', margin: 0, fontWeight: 600 }}>
+                        Motivo informado por el local: "{closedDateReason}". Por favor, seleccioná otro día en el calendario.
+                      </p>
+                    </div>
+                  ) : slotGroups.length === 0 ? (
                     <div style={{ padding: '1.5rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--border-color)', margin: '1rem 0' }}>
                       <Clock size={28} style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }} />
                       <p style={{ fontWeight: 600, color: 'var(--text-title)', marginBottom: '4px' }}>No hay turnos disponibles para este día</p>
