@@ -55,6 +55,13 @@ const ROLE_LABELS: Record<string, { label: string; badge: string }> = {
   administrator: { label: 'Administrador', badge: 'badge-pending' },
 };
 
+const APPOINTMENT_STATUS_LABELS: Record<string, { label: string; badge: string }> = {
+  CONFIRMED: { label: '✓ Confirmado', badge: 'badge-confirmed' },
+  COMPLETED: { label: '★ Completado', badge: 'badge-completed' },
+  CANCELLED: { label: '✕ Cancelado', badge: 'badge-cancelled' },
+  PENDING: { label: '⏳ Pendiente', badge: 'badge-pending' },
+};
+
 
 const InstagramIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -227,11 +234,8 @@ export const SystemAdmin: React.FC = () => {
   const [bizCategoryFilter, setBizCategoryFilter] = useState('ALL');
   const [bizPage, setBizPage] = useState(1);
 
-  // Filtros de Turnos
+  // Buscador de Turno Puntual (Inspector en Centro de Control)
   const [aptSearch, setAptSearch] = useState('');
-  const [aptStatusFilter, setAptStatusFilter] = useState<string>('ALL');
-  const [aptDateFilter, setAptDateFilter] = useState<'ALL' | 'TODAY' | 'UPCOMING' | 'PAST'>('ALL');
-  const [aptPage, setAptPage] = useState(1);
 
   const PER_PAGE = 8;
 
@@ -314,17 +318,31 @@ export const SystemAdmin: React.FC = () => {
   const fetchTabData = async () => {
     setLoadingTab(true);
     try {
+      if (activeTab === 'cockpit') {
+        const [usersRes, bizRes, aptRes] = await Promise.all([
+          api.get('/admin/users'),
+          api.get('/admin/businesses?status=ALL&limit=250'),
+          api.get('/admin/appointments'),
+        ]);
+        setUsers(usersRes.data.data ?? []);
+        setBusinesses(bizRes.data.data ?? []);
+        setAppointments(aptRes.data.data ?? []);
+      }
       if (activeTab === 'users') {
-        const res = await api.get('/admin/users');
+        const [res, aptRes] = await Promise.all([
+          api.get('/admin/users'),
+          appointments.length === 0 ? api.get('/admin/appointments') : Promise.resolve(null),
+        ]);
         setUsers(res.data.data ?? []);
+        if (aptRes) setAppointments(aptRes.data.data ?? []);
       }
       if (activeTab === 'businesses') {
-        const res = await api.get('/admin/businesses?status=ALL&limit=250');
+        const [res, aptRes] = await Promise.all([
+          api.get('/admin/businesses?status=ALL&limit=250'),
+          appointments.length === 0 ? api.get('/admin/appointments') : Promise.resolve(null),
+        ]);
         setBusinesses(res.data.data ?? []);
-      }
-      if (activeTab === 'appointments') {
-        const res = await api.get('/admin/appointments');
-        setAppointments(res.data.data ?? []);
+        if (aptRes) setAppointments(aptRes.data.data ?? []);
       }
       if (activeTab === 'reports') {
         const res = await getAdminBugReportsApi({
@@ -748,32 +766,19 @@ export const SystemAdmin: React.FC = () => {
   const totalBizPages = Math.ceil(filteredBusinesses.length / PER_PAGE) || 1;
   const paginatedBusinesses = filteredBusinesses.slice((bizPage - 1) * PER_PAGE, bizPage * PER_PAGE);
 
-  // Filtrado reactivo de Turnos
-  const todayDateStr = new Date().toISOString().split('T')[0];
+  // Filtrado reactivo de Turnos (Inspector Puntual)
   const filteredAppointments = appointments.filter((apt) => {
-    const matchesSearch =
-      (apt.user?.name || '').toLowerCase().includes(aptSearch.toLowerCase()) ||
-      (apt.user?.email || '').toLowerCase().includes(aptSearch.toLowerCase()) ||
-      (apt.business?.name || '').toLowerCase().includes(aptSearch.toLowerCase()) ||
-      (apt.service?.name || '').toLowerCase().includes(aptSearch.toLowerCase()) ||
-      `#${apt.id}`.includes(aptSearch);
-
-    const matchesStatus = aptStatusFilter === 'ALL' || apt.status === aptStatusFilter;
-
-    let matchesDate = true;
-    const aptDateOnly = typeof apt.date === 'string' ? apt.date.split('T')[0] : '';
-    if (aptDateFilter === 'TODAY') {
-      matchesDate = aptDateOnly === todayDateStr;
-    } else if (aptDateFilter === 'UPCOMING') {
-      matchesDate = aptDateOnly >= todayDateStr;
-    } else if (aptDateFilter === 'PAST') {
-      matchesDate = aptDateOnly < todayDateStr;
-    }
-
-    return matchesSearch && matchesStatus && matchesDate;
+    const q = aptSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (apt.user?.name || '').toLowerCase().includes(q) ||
+      (apt.user?.email || '').toLowerCase().includes(q) ||
+      (apt.business?.name || '').toLowerCase().includes(q) ||
+      (apt.service?.name || '').toLowerCase().includes(q) ||
+      `#${apt.id}`.includes(q) ||
+      String(apt.id).includes(q)
+    );
   });
-  const totalAptPages = Math.ceil(filteredAppointments.length / PER_PAGE) || 1;
-  const paginatedAppointments = filteredAppointments.slice((aptPage - 1) * PER_PAGE, aptPage * PER_PAGE);
 
   return (
     <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '1rem 0.5rem 3rem' }}>
@@ -855,7 +860,7 @@ export const SystemAdmin: React.FC = () => {
         </div>
       </div>
 
-      {/* Segmented Navigation Tabs (5 Pestañas Maestras sin desborde horizontal) */}
+      {/* Segmented Navigation Tabs (4 Pilares Ejecutivos sin desborde horizontal) */}
       <nav className="admin-cockpit-nav" aria-label="Navegación del panel de administración">
         <button
           type="button"
@@ -886,16 +891,6 @@ export const SystemAdmin: React.FC = () => {
           <Users size={16} />
           <span>Usuarios</span>
           <span className="admin-nav-badge">{stats.totalUsers}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`admin-nav-item ${activeTab === 'appointments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('appointments')}
-        >
-          <Calendar size={16} />
-          <span>Turnos Globales</span>
-          <span className="admin-nav-badge">{stats.totalAppointments}</span>
         </button>
 
         <button
@@ -1242,7 +1237,19 @@ export const SystemAdmin: React.FC = () => {
             </div>
 
             {/* KPI 3: Turnos */}
-            <div className="admin-kpi-card-v2" onClick={() => setActiveTab('appointments')} role="button" tabIndex={0}>
+            <div
+              className="admin-kpi-card-v2"
+              onClick={() => {
+                const el = document.getElementById('admin-apt-inspector-input');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.focus();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              title="Hacé clic para buscar o auditar un turno puntual por #ID"
+            >
               <div className="admin-kpi-header">
                 <span className="admin-kpi-title">Turnos en la Plataforma</span>
                 <div className="admin-kpi-icon-box" style={{ background: '#eff6ff', color: '#2563eb' }}>
@@ -1280,6 +1287,405 @@ export const SystemAdmin: React.FC = () => {
             </div>
           </div>
 
+          {/* Inteligencia de Negocio: Ranking de Rendimiento Comercial (GMV) + Radar Anti-Sabotaje e Inspector de Turnos */}
+          <div className="admin-activity-grid" style={{ marginBottom: '1.25rem' }}>
+            {/* Columna Izquierda: Ranking de Rendimiento Comercial y GMV Movilizado */}
+            <div className="ml-card" style={{ padding: '1.25rem 1.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Building2 size={18} color="#0284c7" />
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                      Rendimiento por Comercio & Volumen (GMV)
+                    </h3>
+                  </div>
+                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                    Tracción real de reservas, tasa de efectividad y facturación estimada.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-light"
+                  onClick={() => setActiveTab('businesses')}
+                  style={{ fontSize: '0.76rem', fontWeight: 700 }}
+                >
+                  Directorio ({businesses.length || stats.totalBusinesses})
+                </button>
+              </div>
+
+              {(() => {
+                // Calcular métricas operativas por comercio
+                const bizMetricsMap = new Map<
+                  number,
+                  {
+                    id: number;
+                    name: string;
+                    category: string;
+                    total: number;
+                    completed: number;
+                    confirmed: number;
+                    cancelled: number;
+                    gmv: number;
+                    businessObj?: any;
+                  }
+                >();
+
+                businesses
+                  .filter((b) => (b.status || 'approved') === 'approved')
+                  .forEach((b) => {
+                    bizMetricsMap.set(b.id, {
+                      id: b.id,
+                      name: b.name,
+                      category: b.category || (b as any).categoryRel?.name || 'General',
+                      total: 0,
+                      completed: 0,
+                      confirmed: 0,
+                      cancelled: 0,
+                      gmv: 0,
+                      businessObj: b,
+                    });
+                  });
+
+                appointments.forEach((apt) => {
+                  const bId = apt.businessId || apt.business?.id;
+                  if (!bId) return;
+                  const existing = bizMetricsMap.get(bId) || {
+                    id: bId,
+                    name: apt.business?.name || `Comercio #${bId}`,
+                    category: (apt.business as any)?.category || 'General',
+                    total: 0,
+                    completed: 0,
+                    confirmed: 0,
+                    cancelled: 0,
+                    gmv: 0,
+                    businessObj: businesses.find((b) => b.id === bId) || apt.business,
+                  };
+                  existing.total += 1;
+                  const price = Number(apt.service?.price || 0);
+                  if (apt.status === 'COMPLETED') {
+                    existing.completed += 1;
+                    existing.gmv += price;
+                  } else if (apt.status === 'CONFIRMED') {
+                    existing.confirmed += 1;
+                    existing.gmv += price;
+                  } else if (apt.status === 'CANCELLED') {
+                    existing.cancelled += 1;
+                  }
+                  bizMetricsMap.set(bId, existing);
+                });
+
+                const ranked = Array.from(bizMetricsMap.values())
+                  .sort((a, b) => b.gmv - a.gmv || b.total - a.total)
+                  .slice(0, 5);
+
+                const totalPlatformGmv = Array.from(bizMetricsMap.values()).reduce((acc, item) => acc + item.gmv, 0);
+
+                if (ranked.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.85rem' }}>
+                      Aún no hay comercios activos con actividad registrada.
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    <div
+                      style={{
+                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                        border: '1px solid #bae6fd',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        marginBottom: '12px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '8px',
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', display: 'block' }}>
+                          Volumen Económico Movilizado (GMV Activo + Completado)
+                        </span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0c4a6e' }}>
+                          ${totalPlatformGmv.toLocaleString('es-AR')}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.76rem', color: '#0284c7', fontWeight: 700, background: '#ffffff', padding: '4px 10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                        {appointments.filter((a) => a.status === 'COMPLETED' || a.status === 'CONFIRMED').length} turnos efectivos
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {ranked.map((item, idx) => {
+                        const effRate = item.total > 0 ? Math.round(((item.completed + item.confirmed) / item.total) * 100) : 100;
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              border: '1px solid #f1f5f9',
+                              background: '#fafbfc',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '10px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                              <div
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '8px',
+                                  background: idx === 0 ? '#fef3c7' : '#e0f2fe',
+                                  color: idx === 0 ? '#b45309' : '#0284c7',
+                                  fontWeight: 800,
+                                  fontSize: '0.8rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                #{idx + 1}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-title)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {item.name}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span>{item.category}</span>
+                                  <span>•</span>
+                                  <span>
+                                    <strong>{item.total}</strong> turnos ({item.completed} compl. / {item.cancelled} canc.)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#059669' }}>
+                                  ${item.gmv.toLocaleString('es-AR')}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: effRate >= 70 ? '#16a34a' : '#d97706', fontWeight: 700 }}>
+                                  {effRate}% efectividad
+                                </div>
+                              </div>
+                              {item.businessObj && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-light"
+                                  onClick={() => setInspectedBusiness(item.businessObj)}
+                                  style={{ padding: '4px 8px' }}
+                                  title="Abrir ficha del comercio"
+                                >
+                                  <Eye size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Columna Derecha: Inspector Puntual de Turno (#ID) & Radar Anti-Sabotaje */}
+            <div className="ml-card" style={{ padding: '1.25rem 1.4rem', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                  <ShieldCheck size={18} color="#dc2626" />
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Inspector de Soporte & Radar Anti-Sabotaje
+                  </h3>
+                </div>
+                <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                  Buscá cualquier turno por #ID para intervenir o detectá cuentas que bloquean agendas con cancelaciones.
+                </span>
+              </div>
+
+              {/* Buscador Puntual de Turno (#ID / Cliente / Comercio) */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
+                <label
+                  htmlFor="admin-apt-inspector-input"
+                  style={{ fontSize: '0.73rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}
+                >
+                  🔍 Auditar o Cancelar Turno Puntual (#ID, Cliente o Comercio)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '11px' }} />
+                  <input
+                    id="admin-apt-inspector-input"
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej: #300001, nombre del cliente o comercio..."
+                    value={aptSearch}
+                    onChange={(e) => setAptSearch(e.target.value)}
+                    style={{ paddingLeft: '32px', height: '38px', fontSize: '0.84rem', background: '#ffffff', borderRadius: '8px' }}
+                  />
+                  {aptSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setAptSearch('')}
+                      style={{ position: 'absolute', right: '8px', top: '9px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+
+                {aptSearch.trim().length > 0 && (
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '190px', overflowY: 'auto' }}>
+                    {filteredAppointments.length === 0 ? (
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', padding: '6px 4px' }}>
+                        No se encontró ningún turno que coincida con &ldquo;{aptSearch}&rdquo;.
+                      </div>
+                    ) : (
+                      filteredAppointments.slice(0, 5).map((apt) => (
+                        <div
+                          key={apt.id}
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '8px 10px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.78rem', minWidth: 0 }}>
+                            <div>
+                              <strong style={{ color: '#0284c7' }}>#{apt.id}</strong> · <strong>{apt.user?.name || 'Cliente'}</strong> en{' '}
+                              <span style={{ fontWeight: 600 }}>{apt.business?.name || 'Comercio'}</span>
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.73rem' }}>
+                              {apt.service?.name} ·{' '}
+                              {(() => {
+                                try {
+                                  return `${format(new Date(apt.date), 'dd/MM/yyyy', { locale: es })} ${formatTimeToHHMM(apt.time)} hs`;
+                                } catch {
+                                  return '—';
+                                }
+                              })()}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span className={`badge ${APPOINTMENT_STATUS_LABELS[apt.status]?.badge || 'badge-pending'}`} style={{ fontSize: '0.68rem' }}>
+                              {APPOINTMENT_STATUS_LABELS[apt.status]?.label || apt.status}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              onClick={() => setInspectedAppointment(apt)}
+                              style={{ padding: '3px 8px', fontSize: '0.73rem', fontWeight: 700 }}
+                            >
+                              Intervenir
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Radar de Cancelaciones Reiteradas / Bloqueo de Agenda */}
+              <div>
+                <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                  🛡️ Radar de Cancelaciones por Usuario (Prevención de Bloqueo de Agenda)
+                </span>
+                {(() => {
+                  const userCancelMap = new Map<
+                    number,
+                    { id: number; name: string; email: string; cancelled: number; total: number; userObj?: any }
+                  >();
+
+                  appointments.forEach((apt) => {
+                    const uId = apt.userId || apt.user?.id;
+                    if (!uId) return;
+                    const curr = userCancelMap.get(uId) || {
+                      id: uId,
+                      name: apt.user?.name || `Usuario #${uId}`,
+                      email: apt.user?.email || '',
+                      cancelled: 0,
+                      total: 0,
+                      userObj: users.find((u) => u.id === uId) || apt.user,
+                    };
+                    curr.total += 1;
+                    if (apt.status === 'CANCELLED') curr.cancelled += 1;
+                    userCancelMap.set(uId, curr);
+                  });
+
+                  const flaggedUsers = Array.from(userCancelMap.values())
+                    .filter((u) => u.cancelled >= 1)
+                    .sort((a, b) => b.cancelled - a.cancelled || b.total - a.total)
+                    .slice(0, 4);
+
+                  if (flaggedUsers.length === 0) {
+                    return (
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.8rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CheckCircle2 size={16} color="#16a34a" />
+                        <span>Sin anomalías: no se detectan cuentas con cancelaciones sospechosas.</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {flaggedUsers.map((fu) => {
+                        const isHighRisk = fu.cancelled >= 2;
+                        return (
+                          <div
+                            key={fu.id}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: `1px solid ${isHighRisk ? '#fecaca' : '#e2e8f0'}`,
+                              background: isHighRisk ? '#fef2f2' : '#fafbfc',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '8px',
+                            }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.83rem', color: isHighRisk ? '#991b1b' : 'var(--text-title)' }}>
+                                {fu.name}{' '}
+                                <span style={{ fontWeight: 500, fontSize: '0.75rem', color: '#64748b' }}>({fu.email})</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: isHighRisk ? '#b91c1c' : '#64748b', fontWeight: 600 }}>
+                                {fu.cancelled} {fu.cancelled === 1 ? 'turno cancelado' : 'turnos cancelados'} de {fu.total} reservados
+                              </div>
+                            </div>
+                            {fu.userObj && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => setInspectedUser(users.find((u) => u.id === fu.id) || fu.userObj)}
+                                style={{ fontSize: '0.74rem', padding: '4px 8px', fontWeight: 700, flexShrink: 0 }}
+                                title="Inspeccionar cuenta del usuario"
+                              >
+                                <Eye size={12} /> Ficha
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
           {/* Actividad Reciente en Vivo (Live Feed) */}
           <div className="admin-activity-grid">
             {/* Columna Izquierda: Últimos Turnos Reservados */}
@@ -1291,14 +1697,9 @@ export const SystemAdmin: React.FC = () => {
                     Últimos Turnos Reservados
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-light"
-                  onClick={() => setActiveTab('appointments')}
-                  style={{ fontSize: '0.78rem' }}
-                >
-                  Ver todos ({stats.totalAppointments})
-                </button>
+                <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                  Tiempo real ({stats.totalAppointments} totales)
+                </span>
               </div>
 
               {(stats.recentAppointments?.length ? stats.recentAppointments : appointments.slice(0, 5)).length === 0 ? (
@@ -1332,6 +1733,8 @@ export const SystemAdmin: React.FC = () => {
                           </span>
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <span>#{apt.id}</span>
+                          <span>·</span>
                           <span>{apt.service?.name || 'Servicio'}</span>
                           <span>·</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>
@@ -1348,25 +1751,17 @@ export const SystemAdmin: React.FC = () => {
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                         <span
-                          className={`badge ${
-                            apt.status === 'CONFIRMED'
-                              ? 'badge-confirmed'
-                              : apt.status === 'COMPLETED'
-                              ? 'badge-completed'
-                              : apt.status === 'CANCELLED'
-                              ? 'badge-cancelled'
-                              : 'badge-pending'
-                          }`}
+                          className={`badge ${APPOINTMENT_STATUS_LABELS[apt.status]?.badge || 'badge-pending'}`}
                           style={{ fontSize: '0.72rem' }}
                         >
-                          {apt.status}
+                          {APPOINTMENT_STATUS_LABELS[apt.status]?.label || apt.status}
                         </span>
                         <button
                           type="button"
                           className="btn btn-sm btn-light"
                           onClick={() => setInspectedAppointment(apt)}
                           style={{ padding: '4px 8px' }}
-                          title="Inspeccionar turno"
+                          title="Inspeccionar o cancelar turno"
                         >
                           <Eye size={13} />
                         </button>
@@ -2214,232 +2609,7 @@ export const SystemAdmin: React.FC = () => {
       )}
 
       {/* ======================================================================= */}
-      {/* PESTAÑA 4: LISTADO MAESTRO DE TURNOS */}
-      {/* ======================================================================= */}
-      {activeTab === 'appointments' && (
-        <div className="ml-card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-title)' }}>
-                Listado Maestro de Turnos
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
-                Control y auditoría global de reservas, asistencias y cancelaciones en todos los comercios.
-              </p>
-            </div>
-
-            {/* Buscador de turnos */}
-            <div style={{ position: 'relative', minWidth: '280px' }}>
-              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Buscar por cliente, comercio o ID..."
-                value={aptSearch}
-                onChange={(e) => {
-                  setAptSearch(e.target.value);
-                  setAptPage(1);
-                }}
-                style={{ paddingLeft: '36px', height: '42px', borderRadius: '10px', fontSize: '0.88rem' }}
-              />
-            </div>
-          </div>
-
-          {/* Filtros rápidos: Estado y Fecha */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div className="admin-chips-filter-row" style={{ margin: 0 }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>
-                Estado:
-              </span>
-              <button
-                type="button"
-                className={`admin-filter-chip ${aptStatusFilter === 'ALL' ? 'active' : ''}`}
-                onClick={() => {
-                  setAptStatusFilter('ALL');
-                  setAptPage(1);
-                }}
-              >
-                Todos ({appointments.length})
-              </button>
-              <button
-                type="button"
-                className={`admin-filter-chip ${aptStatusFilter === 'CONFIRMED' ? 'active' : ''}`}
-                onClick={() => {
-                  setAptStatusFilter('CONFIRMED');
-                  setAptPage(1);
-                }}
-              >
-                Confirmados ({appointments.filter((a) => a.status === 'CONFIRMED').length})
-              </button>
-              <button
-                type="button"
-                className={`admin-filter-chip ${aptStatusFilter === 'PENDING' ? 'active' : ''}`}
-                onClick={() => {
-                  setAptStatusFilter('PENDING');
-                  setAptPage(1);
-                }}
-              >
-                Pendientes ({appointments.filter((a) => a.status === 'PENDING').length})
-              </button>
-              <button
-                type="button"
-                className={`admin-filter-chip ${aptStatusFilter === 'COMPLETED' ? 'active' : ''}`}
-                onClick={() => {
-                  setAptStatusFilter('COMPLETED');
-                  setAptPage(1);
-                }}
-              >
-                Completados ({appointments.filter((a) => a.status === 'COMPLETED').length})
-              </button>
-              <button
-                type="button"
-                className={`admin-filter-chip ${aptStatusFilter === 'CANCELLED' ? 'active' : ''}`}
-                onClick={() => {
-                  setAptStatusFilter('CANCELLED');
-                  setAptPage(1);
-                }}
-              >
-                Cancelados ({appointments.filter((a) => a.status === 'CANCELLED').length})
-              </button>
-            </div>
-
-            {/* Filtro por fecha */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>Fecha:</span>
-              <select
-                className="form-control"
-                value={aptDateFilter}
-                onChange={(e) => {
-                  setAptDateFilter(e.target.value as any);
-                  setAptPage(1);
-                }}
-                style={{ padding: '6px 12px', fontSize: '0.82rem', width: 'auto' }}
-              >
-                <option value="ALL">Todas las fechas</option>
-                <option value="TODAY">Turnos de Hoy</option>
-                <option value="UPCOMING">Próximos turnos</option>
-                <option value="PAST">Turnos pasados</option>
-              </select>
-            </div>
-          </div>
-
-          {loadingTab ? (
-            <SkeletonTable rows={6} columns={6} />
-          ) : (
-            <>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        ID
-                      </th>
-                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Cliente
-                      </th>
-                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Comercio & Servicio
-                      </th>
-                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Fecha y Hora
-                      </th>
-                      <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Estado
-                      </th>
-                      <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase' }}>
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAppointments.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                          No se encontraron turnos con los filtros seleccionados.
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedAppointments.map((apt) => (
-                        <tr key={apt.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '12px 14px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>
-                            #{apt.id}
-                          </td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-title)' }}>
-                              {apt.user?.name || 'Cliente'}
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{apt.user?.email}</div>
-                          </td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7' }}>
-                              {apt.business?.name || 'Comercio'}
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: '#475569' }}>
-                              {apt.service?.name} {apt.service?.price ? `($${apt.service.price})` : ''}
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 14px', fontSize: '0.85rem' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--text-title)' }}>
-                              {(() => {
-                                try {
-                                  return format(new Date(apt.date), 'dd/MM/yyyy', { locale: es });
-                                } catch {
-                                  return '—';
-                                }
-                              })()}
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                              {formatTimeToHHMM(apt.time)} hs
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <span
-                              className={`badge ${
-                                apt.status === 'CONFIRMED'
-                                  ? 'badge-confirmed'
-                                  : apt.status === 'COMPLETED'
-                                  ? 'badge-completed'
-                                  : apt.status === 'CANCELLED'
-                                  ? 'badge-cancelled'
-                                  : 'badge-pending'
-                              }`}
-                            >
-                              {apt.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-light"
-                              onClick={() => setInspectedAppointment(apt)}
-                              style={{ fontSize: '0.8rem', padding: '5px 10px' }}
-                              title="Inspeccionar turno"
-                            >
-                              <Eye size={14} /> Ficha
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <Pagination
-                currentPage={aptPage}
-                totalPages={totalAptPages}
-                totalItems={filteredAppointments.length}
-                itemsPerPage={PER_PAGE}
-                onPageChange={setAptPage}
-                itemLabel="turnos"
-              />
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ======================================================================= */}
-      {/* PESTAÑA 5: REPORTES DE ERRORES Y TICKETS TÉCNICOS */}
+      {/* PESTAÑA 4: REPORTES DE ERRORES Y TICKETS TÉCNICOS */}
       {/* ======================================================================= */}
       {activeTab === 'reports' && (
         <div className="ml-card" style={{ padding: '1.5rem' }}>
@@ -3520,6 +3690,78 @@ export const SystemAdmin: React.FC = () => {
               </div>
             )}
 
+            {/* Historial de Turnos del Usuario */}
+            {(() => {
+              const userApts = appointments
+                .filter((a) => a.userId === inspectedUser.id || a.user?.id === inspectedUser.id)
+                .slice(0, 6);
+              return (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '0.88rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Turnos del Usuario ({userApts.length})</span>
+                    {userApts.filter((a) => a.status === 'CANCELLED').length > 0 && (
+                      <span style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 700 }}>
+                        {userApts.filter((a) => a.status === 'CANCELLED').length} cancelados
+                      </span>
+                    )}
+                  </h4>
+                  {userApts.length === 0 ? (
+                    <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      El usuario no registra reservas en la plataforma.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '190px', overflowY: 'auto' }}>
+                      {userApts.map((apt) => (
+                        <div
+                          key={apt.id}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.78rem', minWidth: 0 }}>
+                            <div>
+                              <strong style={{ color: '#0284c7' }}>#{apt.id}</strong> ·{' '}
+                              <strong>{apt.business?.name || 'Comercio'}</strong> ({apt.service?.name || 'Servicio'})
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.73rem' }}>
+                              {(() => {
+                                try {
+                                  return `${format(new Date(apt.date), 'dd/MM/yyyy', { locale: es })} · ${formatTimeToHHMM(apt.time)} hs`;
+                                } catch {
+                                  return '—';
+                                }
+                              })()}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span className={`badge ${APPOINTMENT_STATUS_LABELS[apt.status]?.badge || 'badge-pending'}`} style={{ fontSize: '0.68rem' }}>
+                              {APPOINTMENT_STATUS_LABELS[apt.status]?.label || apt.status}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-light"
+                              onClick={() => setInspectedAppointment(apt)}
+                              style={{ fontSize: '0.72rem', padding: '3px 7px' }}
+                              title="Ver ficha o intervenir turno"
+                            >
+                              <Eye size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="modal-footer-responsive" style={{ margin: 0 }}>
               <button type="button" className="btn btn-light" onClick={() => setInspectedUser(null)}>
                 Cerrar ficha
@@ -3884,6 +4126,78 @@ export const SystemAdmin: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* 6. Últimos Turnos del Comercio */}
+              {(() => {
+                const bizApts = appointments
+                  .filter((a) => a.businessId === inspectedBusiness.id || a.business?.id === inspectedBusiness.id)
+                  .slice(0, 6);
+                return (
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px' }}>
+                    <h4 style={{ margin: '0 0 10px', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Últimos Turnos del Comercio ({bizApts.length})</span>
+                      {bizApts.length > 0 && (
+                        <span style={{ fontSize: '0.73rem', color: '#0284c7', textTransform: 'none', fontWeight: 700 }}>
+                          Clic en 👁️ para auditar o cancelar individualmente
+                        </span>
+                      )}
+                    </h4>
+                    {bizApts.length === 0 ? (
+                      <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                        Este comercio aún no registra turnos agendados.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {bizApts.map((apt) => (
+                          <div
+                            key={apt.id}
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '10px',
+                            }}
+                          >
+                            <div style={{ fontSize: '0.8rem', minWidth: 0 }}>
+                              <div>
+                                <strong style={{ color: '#0284c7' }}>#{apt.id}</strong> ·{' '}
+                                <strong>{apt.user?.name || 'Cliente'}</strong> ({apt.service?.name || 'Servicio'})
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                                {(() => {
+                                  try {
+                                    return `${format(new Date(apt.date), 'dd/MM/yyyy', { locale: es })} a las ${formatTimeToHHMM(apt.time)} hs`;
+                                  } catch {
+                                    return '—';
+                                  }
+                                })()}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                              <span className={`badge ${APPOINTMENT_STATUS_LABELS[apt.status]?.badge || 'badge-pending'}`} style={{ fontSize: '0.7rem' }}>
+                                {APPOINTMENT_STATUS_LABELS[apt.status]?.label || apt.status}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => setInspectedAppointment(apt)}
+                                style={{ padding: '4px 8px', fontSize: '0.74rem' }}
+                                title="Inspeccionar o cancelar turno"
+                              >
+                                <Eye size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Pie del Modal con Acciones de Moderación */}
@@ -4056,18 +4370,10 @@ export const SystemAdmin: React.FC = () => {
                     Turno #{inspectedAppointment.id}
                   </h3>
                   <span
-                    className={`badge ${
-                      inspectedAppointment.status === 'CONFIRMED'
-                        ? 'badge-confirmed'
-                        : inspectedAppointment.status === 'COMPLETED'
-                        ? 'badge-completed'
-                        : inspectedAppointment.status === 'CANCELLED'
-                        ? 'badge-cancelled'
-                        : 'badge-pending'
-                    }`}
+                    className={`badge ${APPOINTMENT_STATUS_LABELS[inspectedAppointment.status]?.badge || 'badge-pending'}`}
                     style={{ fontSize: '0.72rem', marginTop: '2px' }}
                   >
-                    {inspectedAppointment.status}
+                    {APPOINTMENT_STATUS_LABELS[inspectedAppointment.status]?.label || inspectedAppointment.status}
                   </span>
                 </div>
               </div>
