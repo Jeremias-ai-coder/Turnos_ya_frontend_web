@@ -174,13 +174,11 @@ export const SystemAdmin: React.FC = () => {
     name: string;
     slug: string;
     description: string;
-    icon: string;
     isActive: boolean;
   }>({
     name: '',
     slug: '',
     description: '',
-    icon: '🏢',
     isActive: true,
   });
   const [savingCategory, setSavingCategory] = useState(false);
@@ -518,7 +516,6 @@ export const SystemAdmin: React.FC = () => {
         name: cat.name,
         slug: cat.slug,
         description: cat.description || '',
-        icon: cat.icon || '🏢',
         isActive: cat.isActive !== false,
       });
     } else {
@@ -527,7 +524,6 @@ export const SystemAdmin: React.FC = () => {
         name: '',
         slug: '',
         description: '',
-        icon: '🏢',
         isActive: true,
       });
     }
@@ -3101,7 +3097,6 @@ export const SystemAdmin: React.FC = () => {
                 <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', textAlign: 'left' }}>
-                      <th style={{ padding: '12px 14px' }}>Ícono</th>
                       <th style={{ padding: '12px 14px' }}>Categoría / Slug</th>
                       <th style={{ padding: '12px 14px' }}>Descripción</th>
                       <th style={{ padding: '12px 14px', textAlign: 'center' }}>Comercios</th>
@@ -3115,27 +3110,28 @@ export const SystemAdmin: React.FC = () => {
                       return (
                         <tr key={cat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '12px 14px' }}>
-                            <div
-                              style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '10px',
-                                background: '#f1f5f9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '1.25rem',
-                                border: '1px solid #e2e8f0'
-                              }}
-                            >
-                              {cat.icon || '🏢'}
-                            </div>
-                          </td>
-
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ fontWeight: 800, color: 'var(--text-title)' }}>{cat.name}</div>
-                            <div style={{ fontSize: '0.76rem', color: '#64748b', fontFamily: 'monospace' }}>
-                              /{cat.slug}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{
+                                  width: '34px',
+                                  height: '34px',
+                                  borderRadius: '8px',
+                                  background: '#e0f2fe',
+                                  color: '#0284c7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Tags size={16} />
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 800, color: 'var(--text-title)' }}>{cat.name}</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                  /{cat.slug}
+                                </div>
+                              </div>
                             </div>
                           </td>
 
@@ -5588,39 +5584,25 @@ export const SystemAdmin: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveCategory}>
-              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '12px', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>Ícono</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="🏢"
-                    maxLength={10}
-                    value={categoryForm.icon}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
-                    style={{ textAlign: 'center', fontSize: '1.3rem', height: '42px', borderRadius: '8px' }}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>Nombre *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="Ej: Barbería, Estética, Odontología..."
-                    value={categoryForm.name}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const autoSlug = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                      setCategoryForm({
-                        ...categoryForm,
-                        name: val,
-                        slug: (!editingCategory || !categoryForm.slug) ? autoSlug : categoryForm.slug,
-                      });
-                    }}
-                    style={{ height: '42px', borderRadius: '8px' }}
-                  />
-                </div>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>Nombre del Rubro *</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  required
+                  placeholder="Ej: Barbería, Estética, Odontología..."
+                  value={categoryForm.name}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const autoSlug = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    setCategoryForm({
+                      ...categoryForm,
+                      name: val,
+                      slug: (!editingCategory || !categoryForm.slug) ? autoSlug : categoryForm.slug,
+                    });
+                  }}
+                  style={{ height: '42px', borderRadius: '8px' }}
+                />
               </div>
 
               <div className="mb-3">
