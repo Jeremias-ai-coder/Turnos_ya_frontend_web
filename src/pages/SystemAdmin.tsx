@@ -1287,20 +1287,20 @@ export const SystemAdmin: React.FC = () => {
             </div>
           </div>
 
-          {/* Inteligencia de Negocio: Ranking de Rendimiento Comercial (GMV) + Radar Anti-Sabotaje e Inspector de Turnos */}
+          {/* Inteligencia Operativa: Salud y Adopción de Comercios + Radar Anti-Sabotaje e Inspector de Turnos */}
           <div className="admin-activity-grid" style={{ marginBottom: '1.25rem' }}>
-            {/* Columna Izquierda: Ranking de Rendimiento Comercial y GMV Movilizado */}
+            {/* Columna Izquierda: Monitor de Salud Operativa y Adopción de Comercios */}
             <div className="ml-card" style={{ padding: '1.25rem 1.4rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Building2 size={18} color="#0284c7" />
                     <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-title)' }}>
-                      Rendimiento por Comercio & Volumen (GMV)
+                      Salud Operativa y Adopción de Comercios
                     </h3>
                   </div>
                   <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                    Tracción real de reservas, tasa de efectividad y facturación estimada.
+                    Estado de configuración de servicios, tracción de turnos y tasa de cumplimiento.
                   </span>
                 </div>
                 <button
@@ -1314,60 +1314,61 @@ export const SystemAdmin: React.FC = () => {
               </div>
 
               {(() => {
-                // Calcular métricas operativas por comercio
+                // Calcular métricas operativas y de configuración por comercio activo
+                const approvedBusinesses = businesses.filter((b) => (b.status || 'approved') === 'approved');
+                const incompleteBusinesses = approvedBusinesses.filter(
+                  (b) => !b.services || b.services.length === 0
+                );
+
                 const bizMetricsMap = new Map<
                   number,
                   {
                     id: number;
                     name: string;
                     category: string;
+                    servicesCount: number;
                     total: number;
                     completed: number;
                     confirmed: number;
                     cancelled: number;
-                    gmv: number;
                     businessObj?: any;
                   }
                 >();
 
-                businesses
-                  .filter((b) => (b.status || 'approved') === 'approved')
-                  .forEach((b) => {
-                    bizMetricsMap.set(b.id, {
-                      id: b.id,
-                      name: b.name,
-                      category: b.category || (b as any).categoryRel?.name || 'General',
-                      total: 0,
-                      completed: 0,
-                      confirmed: 0,
-                      cancelled: 0,
-                      gmv: 0,
-                      businessObj: b,
-                    });
-                  });
-
-                appointments.forEach((apt) => {
-                  const bId = apt.businessId || apt.business?.id;
-                  if (!bId) return;
-                  const existing = bizMetricsMap.get(bId) || {
-                    id: bId,
-                    name: apt.business?.name || `Comercio #${bId}`,
-                    category: (apt.business as any)?.category || 'General',
+                approvedBusinesses.forEach((b) => {
+                  bizMetricsMap.set(b.id, {
+                    id: b.id,
+                    name: b.name,
+                    category: b.category || (b as any).categoryRel?.name || 'General',
+                    servicesCount: b.services?.length ?? 0,
                     total: 0,
                     completed: 0,
                     confirmed: 0,
                     cancelled: 0,
-                    gmv: 0,
-                    businessObj: businesses.find((b) => b.id === bId) || apt.business,
+                    businessObj: b,
+                  });
+                });
+
+                appointments.forEach((apt) => {
+                  const bId = apt.businessId || apt.business?.id;
+                  if (!bId) return;
+                  const foundBiz = businesses.find((b) => b.id === bId);
+                  const existing = bizMetricsMap.get(bId) || {
+                    id: bId,
+                    name: apt.business?.name || `Comercio #${bId}`,
+                    category: (apt.business as any)?.category || 'General',
+                    servicesCount: foundBiz?.services?.length ?? 0,
+                    total: 0,
+                    completed: 0,
+                    confirmed: 0,
+                    cancelled: 0,
+                    businessObj: foundBiz || apt.business,
                   };
                   existing.total += 1;
-                  const price = Number(apt.service?.price || 0);
                   if (apt.status === 'COMPLETED') {
                     existing.completed += 1;
-                    existing.gmv += price;
                   } else if (apt.status === 'CONFIRMED') {
                     existing.confirmed += 1;
-                    existing.gmv += price;
                   } else if (apt.status === 'CANCELLED') {
                     existing.cancelled += 1;
                   }
@@ -1375,47 +1376,94 @@ export const SystemAdmin: React.FC = () => {
                 });
 
                 const ranked = Array.from(bizMetricsMap.values())
-                  .sort((a, b) => b.gmv - a.gmv || b.total - a.total)
+                  .sort((a, b) => (b.completed + b.confirmed) - (a.completed + a.confirmed) || b.total - a.total)
                   .slice(0, 5);
-
-                const totalPlatformGmv = Array.from(bizMetricsMap.values()).reduce((acc, item) => acc + item.gmv, 0);
 
                 if (ranked.length === 0) {
                   return (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.85rem' }}>
-                      Aún no hay comercios activos con actividad registrada.
+                      Aún no hay comercios activos registrados.
                     </div>
                   );
                 }
 
                 return (
                   <>
-                    <div
-                      style={{
-                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                        border: '1px solid #bae6fd',
-                        borderRadius: '10px',
-                        padding: '10px 14px',
-                        marginBottom: '12px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '8px',
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', display: 'block' }}>
-                          Volumen Económico Movilizado (GMV Activo + Completado)
+                    {/* Detector de Comercios Aprobados sin Servicios Configurados */}
+                    {incompleteBusinesses.length > 0 ? (
+                      <div
+                        style={{
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          borderRadius: '10px',
+                          padding: '10px 12px',
+                          marginBottom: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertTriangle size={15} color="#d97706" />
+                            <span>
+                              Atención: {incompleteBusinesses.length}{' '}
+                              {incompleteBusinesses.length === 1
+                                ? 'comercio aprobado aún no cargó servicios'
+                                : 'comercios aprobados aún no cargaron servicios'}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                          {incompleteBusinesses.slice(0, 4).map((ib) => (
+                            <button
+                              key={ib.id}
+                              type="button"
+                              onClick={() => setInspectedBusiness(ib)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1px solid #fcd34d',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
+                                fontSize: '0.73rem',
+                                fontWeight: 700,
+                                color: '#b45309',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              title="Ver ficha para contactar al dueño por WhatsApp"
+                            >
+                              <span>{ib.name}</span>
+                              <Eye size={11} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '10px',
+                          padding: '9px 12px',
+                          marginBottom: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '8px',
+                          fontSize: '0.78rem',
+                          color: '#166534',
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={15} color="#16a34a" />
+                          Todos los comercios aprobados tienen servicios configurados
                         </span>
-                        <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0c4a6e' }}>
-                          ${totalPlatformGmv.toLocaleString('es-AR')}
+                        <span style={{ fontWeight: 700, color: '#15803d' }}>
+                          {appointments.filter((a) => a.status === 'COMPLETED' || a.status === 'CONFIRMED').length} turnos activos/completados
                         </span>
                       </div>
-                      <span style={{ fontSize: '0.76rem', color: '#0284c7', fontWeight: 700, background: '#ffffff', padding: '4px 10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                        {appointments.filter((a) => a.status === 'COMPLETED' || a.status === 'CONFIRMED').length} turnos efectivos
-                      </span>
-                    </div>
+                    )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {ranked.map((item, idx) => {
@@ -1440,8 +1488,8 @@ export const SystemAdmin: React.FC = () => {
                                   width: '28px',
                                   height: '28px',
                                   borderRadius: '8px',
-                                  background: idx === 0 ? '#fef3c7' : '#e0f2fe',
-                                  color: idx === 0 ? '#b45309' : '#0284c7',
+                                  background: idx === 0 ? '#e0f2fe' : '#f1f5f9',
+                                  color: idx === 0 ? '#0284c7' : '#475569',
                                   fontWeight: 800,
                                   fontSize: '0.8rem',
                                   display: 'flex',
@@ -1453,14 +1501,23 @@ export const SystemAdmin: React.FC = () => {
                                 #{idx + 1}
                               </div>
                               <div style={{ minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-title)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {item.name}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-title)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {item.name}
+                                  </span>
+                                  {item.servicesCount === 0 && (
+                                    <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px' }}>
+                                      Sin servicios
+                                    </span>
+                                  )}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                   <span>{item.category}</span>
                                   <span>•</span>
+                                  <span>{item.servicesCount} {item.servicesCount === 1 ? 'servicio' : 'servicios'}</span>
+                                  <span>•</span>
                                   <span>
-                                    <strong>{item.total}</strong> turnos ({item.completed} compl. / {item.cancelled} canc.)
+                                    {item.completed} compl. / {item.confirmed} conf. / {item.cancelled} canc.
                                   </span>
                                 </div>
                               </div>
@@ -1468,11 +1525,11 @@ export const SystemAdmin: React.FC = () => {
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                               <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#059669' }}>
-                                  ${item.gmv.toLocaleString('es-AR')}
+                                <div style={{ fontWeight: 800, fontSize: '0.86rem', color: 'var(--text-title)' }}>
+                                  {item.total} {item.total === 1 ? 'turno' : 'turnos'}
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: effRate >= 70 ? '#16a34a' : '#d97706', fontWeight: 700 }}>
-                                  {effRate}% efectividad
+                                <div style={{ fontSize: '0.7rem', color: item.total === 0 ? '#94a3b8' : effRate >= 70 ? '#16a34a' : '#d97706', fontWeight: 700 }}>
+                                  {item.total === 0 ? 'Sin reservas aún' : `${effRate}% cumplimiento`}
                                 </div>
                               </div>
                               {item.businessObj && (
