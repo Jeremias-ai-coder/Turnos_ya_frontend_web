@@ -50,15 +50,11 @@ import { Pagination } from '../components/common/Pagination';
 import { type Business, type Appointment } from '../types';
 import { getAdminBugReportsApi, updateBugReportStatusApi } from '../services/bugReportService';
 
-const ROOT_ADMIN_EMAILS = [
-  'turnosyapp@gmail.com',
-  'jeremiascollaud@gmail.com',
-  'jeremiascoll@gmail.com',
-];
+const ROOT_ADMIN_EMAIL = 'turnosyapp@gmail.com';
 
 const isRootEmail = (email?: string | null): boolean => {
   if (!email) return false;
-  return ROOT_ADMIN_EMAILS.includes(email.toLowerCase().trim());
+  return email.toLowerCase().trim() === ROOT_ADMIN_EMAIL.toLowerCase();
 };
 
 const ROLE_LABELS: Record<string, { label: string; badge: string }> = {
@@ -2152,6 +2148,23 @@ export const SystemAdmin: React.FC = () => {
                                 <span style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                   <Lock size={13} /> Inmutable
                                 </span>
+                              ) : isRootEmail(user?.email) ? (
+                                <select
+                                  className="form-control"
+                                  value={u.role}
+                                  onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '0.82rem',
+                                    borderRadius: '8px',
+                                    borderColor: '#cbd5e1',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <option value="administrator">Administrador</option>
+                                  <option value="owner">Dueño</option>
+                                  <option value="client">Cliente</option>
+                                </select>
                               ) : u.role === 'administrator' ? (
                                 <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                   <ShieldCheck size={14} color="#0284c7" /> Protegido
@@ -3789,7 +3802,7 @@ export const SystemAdmin: React.FC = () => {
                     <ShieldCheck size={16} color="#0284c7" />
                     <span>Cuenta Raíz Oficial del Sistema (Inmutable y Protegida contra cambios de rol y baja).</span>
                   </div>
-                ) : inspectedUser.role === 'administrator' ? (
+                ) : inspectedUser.role === 'administrator' && !isRootEmail(user?.email) ? (
                   <div
                     style={{
                       background: '#f8fafc',
@@ -3804,11 +3817,11 @@ export const SystemAdmin: React.FC = () => {
                     }}
                   >
                     <ShieldCheck size={16} color="#0284c7" />
-                    <span>Rol de Administrador protegido por seguridad del sistema (no modificable).</span>
+                    <span>Rol de Administrador protegido por seguridad del sistema (solo modificable por la Cuenta Raíz).</span>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    {(['client', 'owner'] as const).map((r) => (
+                    {(['client', 'owner', ...(isRootEmail(user?.email) ? ['administrator'] : [])] as const).map((r) => (
                       <button
                         key={r}
                         type="button"
