@@ -26,7 +26,9 @@ import {
   Globe,
   FileText,
   AlertCircle,
-  Tags
+  Tags,
+  Flag,
+  MessageCircle
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -81,8 +83,29 @@ const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'agenda' | 'services' | 'schedules' | 'reviews' | 'settings'>('agenda');
 
   const [agendaDate, setAgendaDate] = useState(new Date());
+  const [agendaViewMode, setAgendaViewMode] = useState<'day' | 'upcoming'>('day');
   const [agendaAppointments, setAgendaAppointments] = useState<Appointment[]>([]);
   const [agendaLoading, setAgendaLoading] = useState(false);
+
+  // Cancelación de turno por el comerciante
+  const [aptToCancel, setAptToCancel] = useState<Appointment | null>(null);
+  const [cancelAptReason, setCancelAptReason] = useState('');
+  const [cancellingApt, setCancellingApt] = useState(false);
+
+  // Registro de turno manual (presencial / telefónico)
+  const [showManualAptModal, setShowManualAptModal] = useState(false);
+  const [manualAptForm, setManualAptForm] = useState({
+    serviceId: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    time: '09:00',
+  });
+  const [manualBusySlots, setManualBusySlots] = useState<string[]>([]);
+  const [submittingManualApt, setSubmittingManualApt] = useState(false);
+
+  // Solicitud de moderación de reseña desde el panel del comerciante
+  const [reportingReview, setReportingReview] = useState<Review | null>(null);
+  const [reportReviewReason, setReportReviewReason] = useState('');
+  const [submittingReviewReport, setSubmittingReviewReport] = useState(false);
 
   const [services, setServices] = useState<Service[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -250,15 +273,117 @@ const Dashboard: React.FC = () => {
   }, [selectedBiz]);
 
   // Load agenda
-  useEffect(() => {
+  const fetchAgendaAppointments = () => {
     if (!selectedBiz) return;
     setAgendaLoading(true);
-    const dateStr = format(agendaDate, 'yyyy-MM-dd');
-    api.get(`/appointments?businessId=${selectedBiz.id}&date=${dateStr}`)
-      .then(res => setAgendaAppointments(res.data.data ?? []))
-      .catch(() => setAgendaAppointments([]))
-      .finally(() => setAgendaLoading(false));
-  }, [selectedBiz, agendaDate]);
+    if (agendaViewMode === 'day') {
+      const dateStr = format(agendaDate, 'yyyy-MM-dd');
+      api.get(`/appointments?businessId=${selectedBiz.id}&date=${dateStr}&limit=50`)
+        .then(res => {
+          const list: Appointment[] = res.data.data ?? [];
+          list.sort((a, b) => formatTime(a.time).localeCompare(formatTime(b.time)));
+          setAgendaAppointments(list);
+        })
+        .catch(() => setAgendaAppointments([]))
+        .finally(() => setAgendaLoading(false));
+    } else {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      api.get(`/appointments?businessId=${selectedBiz.id}&limit=100`)
+        .then(res => {
+          const list: Appointment[] = (res.data.data ?? []).filter((a: Appointment) => {
+            const dStr = typeof a.date === 'string' ? a.date.split('T')[0] : '';
+            return dStr >= todayStr && (a.status === 'CONFIRMED' || a.status === 'PENDING');
+          });
+          list.sort((a, b) => {
+            const dA = typeof a.date === 'string' ? a.date.split('T')[0] : '';
+            const dB = typeof b.date === 'string' ? b.date.split('T')[0] : '';
+            if (dA !== dB) return dA.localeCompare(dB);
+            return formatTime(a.time).localeCompare(formatTime(b.time));
+          });
+          setAgendaAppointments(list);
+        })
+        .catch(() => setAgendaAppointments([]))
+        .finally(() => setAgendaLoading(false));
+    }
+  };
+
+  useEffect(() => {
+    fetchAgendaAppointments();
+  }, [selectedBiz, agendaDate, agendaViewMode]);
+
+  // Load busy slots when manual appointment modal is open
+  useEffect(() => {
+    if (!showManualAptModal || !selectedBiz || !manualAptForm.date) return;
+    api.get(`/businesses/${selectedBiz.id}/busy-slots?date=${manualAptForm.date}`)
+      .then(res => {
+        const raw: string[] = res.data?.data ?? res.data ?? [];
+        setManualBusySlots(raw.map(s => formatTime(s)));
+      })
+      .catch(() => setManualBusySlots([]));
+  }, [showManualAptModal, selectedBiz, manualAptForm.date]);
+
+  const handleCancelAppointmentByOwner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aptToCancel) return;
+    setCancellingApt(true);
+    try {
+      await api.patch(`/appointments/${aptToCancel.id}/cancel`, {
+        reason: cancelAptReason.trim() || 'Cancelado por el comercio por motivos operativos',
+      });
+      showToast('✓ Turno cancelado y cliente notificado');
+      setAgendaAppointments(prev =>
+        prev.map(a => (a.id === aptToCancel.id ? { ...a, status: 'CANCELLED' } : a))
+      );
+      setAptToCancel(null);
+      setCancelAptReason('');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al cancelar el turno');
+    } finally {
+      setCancellingApt(false);
+    }
+  };
+
+  const handleCreateManualAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBiz || !manualAptForm.serviceId || !manualAptForm.date || !manualAptForm.time) return;
+    setSubmittingManualApt(true);
+    try {
+      await api.post('/appointments', {
+        businessId: selectedBiz.id,
+        serviceId: Number(manualAptForm.serviceId),
+        date: manualAptForm.date,
+        time: manualAptForm.time,
+      });
+      showToast('✓ Turno manual registrado en la agenda');
+      setShowManualAptModal(false);
+      fetchAgendaAppointments();
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'No se pudo registrar el turno manual');
+    } finally {
+      setSubmittingManualApt(false);
+    }
+  };
+
+  const handleReportReviewFromDashboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportingReview || !reportReviewReason.trim() || !selectedBiz) return;
+    setSubmittingReviewReport(true);
+    try {
+      await api.post('/reports', {
+        section: 'MODERACION_RESENA',
+        summary: `Reporte de reseña ID #${reportingReview.id} en ${selectedBiz.name}`,
+        steps: `Motivo del reclamo: ${reportReviewReason.trim()}\nAutor de la reseña: ${reportingReview.appointment?.user?.name || 'Cliente'} (${reportingReview.rating} estrellas)\nComentario: "${reportingReview.comment || 'Sin texto'}"\nID Reseña: #${reportingReview.id}`,
+        pageUrl: `/businesses/${selectedBiz.id}#reviews`,
+      });
+      showToast('✓ Solicitud de revisión enviada a moderación');
+      setReportingReview(null);
+      setReportReviewReason('');
+    } catch {
+      showToast('Error al enviar la solicitud de moderación');
+    } finally {
+      setSubmittingReviewReport(false);
+    }
+  };
 
   const handleCompleteAppointment = async (aptId: number) => {
     try {
@@ -618,27 +743,104 @@ const Dashboard: React.FC = () => {
           {/* ======= AGENDA ======= */}
           {activeTab === 'agenda' && (
             <div className="ml-card dashboard-card-responsive">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <button className="btn btn-light" style={{ padding: '6px 8px' }} onClick={() => setAgendaDate(d => subDays(d, 1))} aria-label="Día anterior">
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-title)', padding: '0 6px', textTransform: 'capitalize' }}>
-                      {format(agendaDate, "EEEE d 'de' MMMM", { locale: es })}
-                    </span>
-                    <button className="btn btn-light" style={{ padding: '6px 8px' }} onClick={() => setAgendaDate(d => addDays(d, 1))} aria-label="Día siguiente">
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                  <button className="btn btn-light" style={{ fontSize: '0.8rem', padding: '5px 11px', borderRadius: '20px' }} onClick={() => setAgendaDate(new Date())}>
-                    Hoy
+              {/* Barra superior: Selector de vista (Por Día / Próximos) + Registrar Turno Manual */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.85rem', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '4px', borderRadius: '10px', gap: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAgendaViewMode('day')}
+                    style={{
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: agendaViewMode === 'day' ? '#ffffff' : 'transparent',
+                      color: agendaViewMode === 'day' ? 'var(--primary-color)' : '#64748b',
+                      boxShadow: agendaViewMode === 'day' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    }}
+                  >
+                    📅 Por Día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAgendaViewMode('upcoming')}
+                    style={{
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: agendaViewMode === 'upcoming' ? '#ffffff' : 'transparent',
+                      color: agendaViewMode === 'upcoming' ? 'var(--primary-color)' : '#64748b',
+                      boxShadow: agendaViewMode === 'upcoming' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    }}
+                  >
+                    ⏳ Próximos Turnos
                   </button>
                 </div>
-                <span className="badge badge-pending" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
-                  {agendaAppointments.length} {agendaAppointments.length === 1 ? 'turno agendado' : 'turnos agendados'}
-                </span>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    if (services.length === 0) {
+                      showToast('Primero debés crear al menos un servicio en la pestaña Servicios');
+                      setActiveTab('services');
+                      return;
+                    }
+                    setManualAptForm({
+                      serviceId: String(services[0]?.id || ''),
+                      date: format(agendaDate, 'yyyy-MM-dd'),
+                      time: '09:00',
+                    });
+                    setShowManualAptModal(true);
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.82rem', padding: '7px 14px', borderRadius: '8px' }}
+                >
+                  <Plus size={15} /> Registrar Turno Manual
+                </button>
               </div>
+
+              {agendaViewMode === 'day' ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <button className="btn btn-light" style={{ padding: '6px 8px' }} onClick={() => setAgendaDate(d => subDays(d, 1))} aria-label="Día anterior">
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-title)', padding: '0 6px', textTransform: 'capitalize' }}>
+                        {format(agendaDate, "EEEE d 'de' MMMM", { locale: es })}
+                      </span>
+                      <button className="btn btn-light" style={{ padding: '6px 8px' }} onClick={() => setAgendaDate(d => addDays(d, 1))} aria-label="Día siguiente">
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                    <button className="btn btn-light" style={{ fontSize: '0.8rem', padding: '5px 11px', borderRadius: '20px' }} onClick={() => setAgendaDate(new Date())}>
+                      Hoy
+                    </button>
+                  </div>
+                  <span className="badge badge-pending" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                    {agendaAppointments.length} {agendaAppointments.length === 1 ? 'turno agendado' : 'turnos agendados'}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                      Próximas Reservas Activas
+                    </h4>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      Todos los turnos confirmados o pendientes desde hoy en adelante, ordenados cronológicamente.
+                    </p>
+                  </div>
+                  <span className="badge badge-confirmed" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                    {agendaAppointments.length} {agendaAppointments.length === 1 ? 'próximo turno' : 'próximos turnos'}
+                  </span>
+                </div>
+              )}
 
               {agendaLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -649,80 +851,176 @@ const Dashboard: React.FC = () => {
               ) : agendaAppointments.length === 0 ? (
                 <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
                   <CalendarDays size={42} color="var(--text-disabled)" style={{ marginBottom: '0.75rem' }} />
-                  <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px', fontSize: '1rem' }}>Sin turnos para esta fecha</p>
-                  <p className="text-muted text-sm" style={{ margin: 0 }}>No hay clientes agendados para este día.</p>
+                  <p style={{ fontWeight: 700, color: 'var(--text-title)', marginBottom: '4px', fontSize: '1rem' }}>
+                    {agendaViewMode === 'day' ? 'Sin turnos para esta fecha' : 'No tenés próximos turnos agendados'}
+                  </p>
+                  <p className="text-muted text-sm" style={{ margin: 0 }}>
+                    {agendaViewMode === 'day'
+                      ? 'No hay clientes agendados para este día. Podés cambiar de fecha o ver "Próximos Turnos".'
+                      : 'Cuando tus clientes reserven o registres un turno manual, aparecerán aquí.'}
+                  </p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {agendaAppointments.map(apt => (
-                    <div
-                      key={apt.id}
-                      style={{
-                        padding: '1rem',
-                        border: '1px solid var(--border-default)',
-                        borderRadius: '12px',
-                        background: apt.status === 'COMPLETED' ? '#f8fafc' : '#ffffff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{
-                            background: '#e0f2fe',
-                            color: 'var(--primary-color)',
-                            fontWeight: 800,
-                            fontSize: '0.95rem',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            <Clock size={13} /> {formatTime(apt.time)} hs
-                          </span>
-                          <span className={`badge badge-${apt.status.toLowerCase()}`} style={{ fontSize: '0.75rem' }}>
-                            {STATUS_MAP[apt.status] || apt.status}
-                          </span>
+                  {agendaAppointments.map(apt => {
+                    const clientPhone = (apt.user as any)?.phone || '';
+                    const cleanPhone = clientPhone.replace(/\D/g, '');
+                    const aptDateFormatted = (() => {
+                      try {
+                        const dStr = typeof apt.date === 'string' ? apt.date.split('T')[0] : '';
+                        return format(new Date(`${dStr}T12:00:00`), "EEE d 'de' MMM", { locale: es });
+                      } catch {
+                        return '';
+                      }
+                    })();
+
+                    return (
+                      <div
+                        key={apt.id}
+                        style={{
+                          padding: '1rem',
+                          border: '1px solid var(--border-default)',
+                          borderRadius: '12px',
+                          background: apt.status === 'COMPLETED' || apt.status === 'CANCELLED' ? '#f8fafc' : '#ffffff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {agendaViewMode === 'upcoming' && aptDateFormatted && (
+                              <span style={{
+                                background: '#f1f5f9',
+                                color: '#334155',
+                                fontWeight: 700,
+                                fontSize: '0.82rem',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                textTransform: 'capitalize'
+                              }}>
+                                📅 {aptDateFormatted}
+                              </span>
+                            )}
+                            <span style={{
+                              background: '#e0f2fe',
+                              color: 'var(--primary-color)',
+                              fontWeight: 800,
+                              fontSize: '0.95rem',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Clock size={13} /> {formatTime(apt.time)} hs
+                            </span>
+                            <span className={`badge badge-${apt.status.toLowerCase()}`} style={{ fontSize: '0.75rem' }}>
+                              {STATUS_MAP[apt.status] || apt.status}
+                            </span>
+                          </div>
+                          {apt.service?.price && (
+                            <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1rem' }}>
+                              ${apt.service.price}
+                            </span>
+                          )}
                         </div>
-                        {apt.service?.price && (
-                          <span style={{ fontWeight: 800, color: 'var(--status-success-text)', fontSize: '1rem' }}>
-                            ${apt.service.price}
-                          </span>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                            <div style={{
+                              width: '38px', height: '38px', borderRadius: '50%',
+                              background: '#f1f5f9', color: '#475569',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontWeight: 700, fontSize: '0.9rem', flexShrink: 0
+                            }}>
+                              {apt.user?.name ? apt.user.name.charAt(0).toUpperCase() : <User size={16} />}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: '0 0 2px 0', fontSize: '0.92rem' }}>
+                                {apt.user?.name || 'Cliente'}
+                              </p>
+                              <p className="text-muted text-xs" style={{ margin: '0 0 2px 0', fontWeight: 600 }}>
+                                {apt.service?.name || 'Servicio'} {apt.service?.durationMinutes ? `(${apt.service.durationMinutes} min)` : ''}
+                              </p>
+                              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.76rem', color: '#64748b' }}>
+                                {apt.user?.email && <span>✉️ {apt.user.email}</span>}
+                                {clientPhone && <span>📞 {clientPhone}</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Acciones de contacto directo con el cliente */}
+                          {cleanPhone && (
+                            <a
+                              href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+                                `Hola ${apt.user?.name || ''}, te escribimos de ${selectedBiz.name} por tu turno de "${apt.service?.name || 'servicio'}" a las ${formatTime(apt.time)} hs.`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-sm btn-light"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: '#ecfdf5',
+                                color: '#059669',
+                                border: '1px solid #a7f3d0',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                padding: '5px 10px',
+                                borderRadius: '8px',
+                                textDecoration: 'none'
+                              }}
+                              title="Contactar cliente por WhatsApp"
+                            >
+                              <MessageCircle size={14} /> WhatsApp
+                            </a>
+                          )}
+                        </div>
+
+                        {(apt.status === 'CONFIRMED' || apt.status === 'PENDING') && (
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            {apt.status === 'CONFIRMED' && (
+                              <button
+                                type="button"
+                                className="btn btn-success-fill"
+                                style={{ flex: 2, minWidth: '180px', padding: '0.5rem', fontSize: '0.84rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '8px' }}
+                                onClick={() => handleCompleteAppointment(apt.id)}
+                              >
+                                <Check size={15} /> Marcar como Completado
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-light"
+                              style={{
+                                flex: 1,
+                                minWidth: '130px',
+                                padding: '0.5rem',
+                                fontSize: '0.82rem',
+                                color: '#dc2626',
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                fontWeight: 700,
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '5px'
+                              }}
+                              onClick={() => {
+                                setAptToCancel(apt);
+                                setCancelAptReason('');
+                              }}
+                            >
+                              <X size={14} /> Cancelar Turno
+                            </button>
+                          </div>
                         )}
                       </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '36px', height: '36px', borderRadius: '50%',
-                          background: '#f1f5f9', color: '#475569',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 700, fontSize: '0.9rem', flexShrink: 0
-                        }}>
-                          {apt.user?.name ? apt.user.name.charAt(0).toUpperCase() : <User size={16} />}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ fontWeight: 700, color: 'var(--text-title)', margin: '0 0 2px 0', fontSize: '0.92rem' }}>
-                            {apt.user?.name || 'Cliente'}
-                          </p>
-                          <p className="text-muted text-xs" style={{ margin: 0 }}>
-                            {apt.service?.name || 'Servicio'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {apt.status === 'CONFIRMED' && (
-                        <button
-                          className="btn btn-success-fill"
-                          style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '8px', marginTop: '2px' }}
-                          onClick={() => handleCompleteAppointment(apt.id)}
-                        >
-                          <Check size={15} /> Marcar como Completado
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1268,8 +1566,8 @@ const Dashboard: React.FC = () => {
                                 </div>
                               </div>
 
-                              <div style={{ textAlign: 'right' }}>
-                                <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end', marginBottom: '2px' }}>
+                              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
                                   {[1, 2, 3, 4, 5].map(s => (
                                     <Star
                                       key={s}
@@ -1279,7 +1577,32 @@ const Dashboard: React.FC = () => {
                                     />
                                   ))}
                                 </div>
-                                <span className="text-muted text-xs">{formatDateReview(rev.createdAt)}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span className="text-muted text-xs">{formatDateReview(rev.createdAt)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReportingReview(rev);
+                                      setReportReviewReason('');
+                                    }}
+                                    style={{
+                                      background: '#fff1f2',
+                                      border: '1px solid #fecdd3',
+                                      color: '#e11d48',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      padding: '2px 8px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    title="Solicitar revisión o moderación de este comentario al administrador"
+                                  >
+                                    <Flag size={11} /> Solicitar revisión
+                                  </button>
+                                </div>
                               </div>
                             </div>
 
@@ -2077,6 +2400,258 @@ const Dashboard: React.FC = () => {
                   style={{ fontWeight: 700, padding: '10px 20px', borderRadius: '8px' }}
                 >
                   {submittingCategoryRequest ? 'Enviando...' : 'Enviar Solicitud'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Cancelación de Turno por el Comerciante */}
+      {aptToCancel && (
+        <div className="modal-overlay" onClick={() => !cancellingApt && setAptToCancel(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Cancelar Turno de {aptToCancel.user?.name || 'Cliente'}
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {aptToCancel.service?.name} · {formatTime(aptToCancel.time)} hs
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAptToCancel(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCancelAppointmentByOwner}>
+              <p style={{ fontSize: '0.84rem', color: '#475569', margin: '0 0 12px' }}>
+                El horario volverá a quedar libre en tu agenda y el cliente recibirá una notificación automática con el motivo indicado.
+              </p>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Motivo de la cancelación *
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  required
+                  placeholder="Ej: Inconveniente operativo en el local, reprogramación acordada por WhatsApp..."
+                  value={cancelAptReason}
+                  onChange={(e) => setCancelAptReason(e.target.value)}
+                  style={{ borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={cancellingApt}
+                  onClick={() => setAptToCancel(null)}
+                >
+                  Volver
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                  disabled={cancellingApt || !cancelAptReason.trim()}
+                  style={{ background: '#dc2626', borderColor: '#dc2626', fontWeight: 700, padding: '8px 18px', borderRadius: '8px' }}
+                >
+                  {cancellingApt ? 'Cancelando...' : 'Confirmar Cancelación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Registrar Turno Manual (Presencial / Telefónico) */}
+      {showManualAptModal && (
+        <div className="modal-overlay" onClick={() => !submittingManualApt && setShowManualAptModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CalendarDays size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Registrar Turno Manual
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Bloqueá un horario para clientes presenciales o por teléfono
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowManualAptModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualAppointment}>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Servicio a realizar *
+                </label>
+                <select
+                  className="form-control"
+                  required
+                  value={manualAptForm.serviceId}
+                  onChange={(e) => setManualAptForm(f => ({ ...f, serviceId: e.target.value }))}
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                >
+                  {services.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.durationMinutes ?? 30} min · ${s.price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Fecha del turno *
+                </label>
+                <input
+                  type="date"
+                  className="form-control"
+                  required
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                  value={manualAptForm.date}
+                  onChange={(e) => setManualAptForm(f => ({ ...f, date: e.target.value }))}
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Horario disponible (intervalos de 30 min) *
+                </label>
+                <select
+                  className="form-control"
+                  required
+                  value={manualAptForm.time}
+                  onChange={(e) => setManualAptForm(f => ({ ...f, time: e.target.value }))}
+                  style={{ height: '42px', borderRadius: '8px', fontSize: '0.88rem' }}
+                >
+                  {Array.from({ length: 28 }, (_, i) => {
+                    const totalMin = (8 * 60) + (i * 30);
+                    const h = String(Math.floor(totalMin / 60)).padStart(2, '0');
+                    const m = String(totalMin % 60).padStart(2, '0');
+                    const slot = `${h}:${m}`;
+                    const isBusy = manualBusySlots.includes(slot);
+                    return (
+                      <option key={slot} value={slot} disabled={isBusy}>
+                        {slot} hs {isBusy ? '(Ocupado)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={submittingManualApt}
+                  onClick={() => setShowManualAptModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingManualApt || manualBusySlots.includes(manualAptForm.time)}
+                  style={{ fontWeight: 700, padding: '8px 18px', borderRadius: '8px' }}
+                >
+                  {submittingManualApt ? 'Guardando...' : 'Agendar Turno'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Solicitar Revisión de Reseña desde el Panel del Comerciante */}
+      {reportingReview && (
+        <div className="modal-overlay" onClick={() => !submittingReviewReport && setReportingReview(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fff1f2', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Flag size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Solicitar Revisión de Opinión
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Reseña #{reportingReview.id} de {reportingReview.appointment?.user?.name || 'Cliente'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportingReview(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleReportReviewFromDashboard}>
+              <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '12px', fontSize: '0.84rem', color: '#334155', fontStyle: 'italic' }}>
+                "{reportingReview.comment || `Calificación de ${reportingReview.rating} estrellas sin texto.`}"
+              </div>
+              <div className="mb-3">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  ¿Por qué solicitás la moderación de esta reseña? *
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  required
+                  placeholder="Ej: Lenguaje ofensivo, spam, comentario falso o ajeno al servicio brindado..."
+                  value={reportReviewReason}
+                  onChange={(e) => setReportReviewReason(e.target.value)}
+                  style={{ borderRadius: '8px', fontSize: '0.86rem' }}
+                />
+              </div>
+
+              <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  disabled={submittingReviewReport}
+                  onClick={() => setReportingReview(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingReviewReport || !reportReviewReason.trim()}
+                  style={{ background: '#e11d48', borderColor: '#e11d48', fontWeight: 700, padding: '8px 18px', borderRadius: '8px' }}
+                >
+                  {submittingReviewReport ? 'Enviando...' : 'Enviar a Moderación'}
                 </button>
               </div>
             </form>

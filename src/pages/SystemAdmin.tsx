@@ -125,6 +125,9 @@ export const SystemAdmin: React.FC = () => {
   const [reportsPage, setReportsPage] = useState(1);
   const [reportsTotalPages, setReportsTotalPages] = useState(1);
   const [reportsStatusFilter, setReportsStatusFilter] = useState<string>('ALL');
+  const [reportsTypeFilter, setReportsTypeFilter] = useState<'ALL' | 'SOLICITUD_RUBRO' | 'MODERACION_RESENA' | 'BUG'>('ALL');
+  const [adminAptCancelReason, setAdminAptCancelReason] = useState('');
+  const [cancellingAptId, setCancellingAptId] = useState<number | null>(null);
 
   // Gestión de Categorías y Rubros (Módulo 2)
   const [categories, setCategories] = useState<any[]>([]);
@@ -677,6 +680,7 @@ export const SystemAdmin: React.FC = () => {
 
   // Contadores de estado de comercios
   const pendingBizCount = businesses.filter((b) => b.status === 'pending_approval').length;
+  const effectivePendingBizCount = businesses.length > 0 ? pendingBizCount : ((stats as any).pendingBusinesses ?? 0);
   const approvedBizCount = businesses.filter((b) => (b.status || 'approved') === 'approved').length;
   const rejectedBizCount = businesses.filter((b) => b.status === 'rejected').length;
   const suspendedBizCount = businesses.filter((b) => (b.status as any) === 'suspended').length;
@@ -785,30 +789,6 @@ export const SystemAdmin: React.FC = () => {
           <button
             type="button"
             className="btn btn-light"
-            onClick={() => {
-              loadCacheStats();
-              setShowCacheModal(true);
-            }}
-            style={{
-              fontSize: '0.84rem',
-              padding: '8px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              border: '1px solid #e2e8f0',
-              background: '#f8fafc',
-              color: '#0284c7',
-              fontWeight: 600,
-            }}
-            title="Monitoreo de Caché Inteligente"
-          >
-            <Zap size={14} color="#0284c7" />
-            <span>Caché: {cacheStats ? cacheStats.hitRatio : 'Activa'}</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-light"
             onClick={handleRefresh}
             disabled={refreshing}
             style={{ fontSize: '0.84rem', padding: '8px 14px' }}
@@ -828,7 +808,7 @@ export const SystemAdmin: React.FC = () => {
         </div>
       </div>
 
-      {/* Segmented Navigation Tabs estilo Mercado Libre */}
+      {/* Segmented Navigation Tabs (5 Pestañas Maestras sin desborde horizontal) */}
       <nav className="admin-cockpit-nav" aria-label="Navegación del panel de administración">
         <button
           type="button"
@@ -837,6 +817,18 @@ export const SystemAdmin: React.FC = () => {
         >
           <Sparkles size={16} />
           <span>Centro de Control</span>
+        </button>
+
+        <button
+          type="button"
+          className={`admin-nav-item ${activeTab === 'businesses' || activeTab === 'categories' ? 'active' : ''}`}
+          onClick={() => setActiveTab('businesses')}
+        >
+          <Building2 size={16} />
+          <span>Comercios y Rubros</span>
+          <span className={`admin-nav-badge ${effectivePendingBizCount > 0 ? 'danger' : ''}`}>
+            {effectivePendingBizCount > 0 ? `${effectivePendingBizCount} pend.` : stats.totalBusinesses}
+          </span>
         </button>
 
         <button
@@ -851,16 +843,6 @@ export const SystemAdmin: React.FC = () => {
 
         <button
           type="button"
-          className={`admin-nav-item ${activeTab === 'businesses' ? 'active' : ''}`}
-          onClick={() => setActiveTab('businesses')}
-        >
-          <Building2 size={16} />
-          <span>Comercios</span>
-          <span className="admin-nav-badge">{stats.totalBusinesses}</span>
-        </button>
-
-        <button
-          type="button"
           className={`admin-nav-item ${activeTab === 'appointments' ? 'active' : ''}`}
           onClick={() => setActiveTab('appointments')}
         >
@@ -871,46 +853,165 @@ export const SystemAdmin: React.FC = () => {
 
         <button
           type="button"
-          className={`admin-nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+          className={`admin-nav-item ${activeTab === 'reports' || activeTab === 'announcements' || activeTab === 'audit' ? 'active' : ''}`}
           onClick={() => setActiveTab('reports')}
         >
           <Bug size={16} />
-          <span>Reportes y Soporte</span>
+          <span>Soporte y Sistema</span>
           <span className={`admin-nav-badge ${reportsCounts.pending > 0 ? 'danger' : ''}`}>
             {reportsCounts.pending > 0 ? reportsCounts.pending : reportsCounts.total}
           </span>
         </button>
-
-        <button
-          type="button"
-          className={`admin-nav-item ${activeTab === 'categories' ? 'active' : ''}`}
-          onClick={() => setActiveTab('categories')}
-        >
-          <Tags size={16} />
-          <span>Categorías</span>
-          <span className="admin-nav-badge">{categories.length}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`admin-nav-item ${activeTab === 'announcements' ? 'active' : ''}`}
-          onClick={() => setActiveTab('announcements')}
-        >
-          <Megaphone size={16} />
-          <span>Avisos</span>
-          <span className="admin-nav-badge">{announcements.filter((a) => a.isActive).length}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`admin-nav-item ${activeTab === 'audit' ? 'active' : ''}`}
-          onClick={() => setActiveTab('audit')}
-        >
-          <History size={16} />
-          <span>Auditoría</span>
-          <span className="admin-nav-badge">{auditTotal}</span>
-        </button>
       </nav>
+
+      {/* Sub-navegación contextual: Comercios y Rubros */}
+      {(activeTab === 'businesses' || activeTab === 'categories') && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '1rem',
+            padding: '6px',
+            background: '#f1f5f9',
+            borderRadius: '12px',
+            width: 'fit-content',
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('businesses')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: activeTab === 'businesses' ? '#ffffff' : 'transparent',
+              color: activeTab === 'businesses' ? '#0284c7' : '#64748b',
+              boxShadow: activeTab === 'businesses' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <Building2 size={15} />
+            <span>Directorio de Comercios ({stats.totalBusinesses})</span>
+            {effectivePendingBizCount > 0 && (
+              <span style={{ background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: '10px', fontSize: '0.72rem' }}>
+                {effectivePendingBizCount} por aprobar
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('categories')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: activeTab === 'categories' ? '#ffffff' : 'transparent',
+              color: activeTab === 'categories' ? '#0284c7' : '#64748b',
+              boxShadow: activeTab === 'categories' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <Tags size={15} />
+            <span>Rubros y Categorías ({categories.length || categoriesList.length})</span>
+          </button>
+        </div>
+      )}
+
+      {/* Sub-navegación contextual: Soporte y Sistema */}
+      {(activeTab === 'reports' || activeTab === 'announcements' || activeTab === 'audit') && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '1rem',
+            padding: '6px',
+            background: '#f1f5f9',
+            borderRadius: '12px',
+            width: 'fit-content',
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('reports')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: activeTab === 'reports' ? '#ffffff' : 'transparent',
+              color: activeTab === 'reports' ? '#0284c7' : '#64748b',
+              boxShadow: activeTab === 'reports' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <Bug size={15} />
+            <span>Tickets y Solicitudes ({reportsCounts.total})</span>
+            {reportsCounts.pending > 0 && (
+              <span style={{ background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: '10px', fontSize: '0.72rem' }}>
+                {reportsCounts.pending} pend.
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('announcements')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: activeTab === 'announcements' ? '#ffffff' : 'transparent',
+              color: activeTab === 'announcements' ? '#0284c7' : '#64748b',
+              boxShadow: activeTab === 'announcements' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <Megaphone size={15} />
+            <span>Avisos y Banners ({announcements.filter((a) => a.isActive).length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('audit')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: activeTab === 'audit' ? '#ffffff' : 'transparent',
+              color: activeTab === 'audit' ? '#0284c7' : '#64748b',
+              boxShadow: activeTab === 'audit' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <History size={15} />
+            <span>Registro de Auditoría ({auditTotal})</span>
+          </button>
+        </div>
+      )}
 
       {/* ======================================================================= */}
       {/* PESTAÑA 1: CENTRO DE CONTROL EJECUTIVO (COCKPIT) */}
@@ -918,41 +1019,89 @@ export const SystemAdmin: React.FC = () => {
       {activeTab === 'cockpit' && (
         <div>
           {/* Bandeja de Atención Inmediata (Action Center) */}
-          {reportsCounts.pending > 0 ? (
-            <div className="admin-alert-cockpit alert-has-pending">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '12px',
-                    background: '#fee2e2',
-                    color: '#dc2626',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Bug size={22} />
+          {effectivePendingBizCount > 0 || reportsCounts.pending > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+              {effectivePendingBizCount > 0 && (
+                <div className="admin-alert-cockpit" style={{ margin: 0, background: '#fffbeb', border: '1px solid #fde68a' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: '#fef3c7',
+                        color: '#d97706',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Building2 size={22} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 2px', fontSize: '0.98rem', fontWeight: 800, color: '#92400e' }}>
+                        Aprobación Comercial Pendiente: {effectivePendingBizCount} {effectivePendingBizCount === 1 ? 'nuevo comercio esperando revisión' : 'nuevos comercios esperando revisión'}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: '#b45309' }}>
+                        Verificá las evidencias de veracidad y aprobá el alta para publicarlos en el catálogo.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setActiveTab('businesses');
+                      setBizStatusFilter('pending_approval');
+                    }}
+                    style={{ fontSize: '0.84rem', padding: '8px 16px', background: '#d97706', borderColor: '#d97706' }}
+                  >
+                    Revisar comercios <ArrowRight size={14} />
+                  </button>
                 </div>
-                <div>
-                  <h4 style={{ margin: '0 0 2px', fontSize: '0.98rem', fontWeight: 800, color: '#991b1b' }}>
-                    Atención Inmediata: {reportsCounts.pending} {reportsCounts.pending === 1 ? 'ticket de error pendiente' : 'tickets de error pendientes'}
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.84rem', color: '#b91c1c' }}>
-                    Los usuarios han reportado inconvenientes técnicos que requieren revisión del equipo de soporte.
-                  </p>
+              )}
+
+              {reportsCounts.pending > 0 && (
+                <div className="admin-alert-cockpit alert-has-pending" style={{ margin: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Bug size={22} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 2px', fontSize: '0.98rem', fontWeight: 800, color: '#991b1b' }}>
+                        Atención de Soporte: {reportsCounts.pending} {reportsCounts.pending === 1 ? 'ticket pendiente' : 'tickets pendientes'}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: '#b91c1c' }}>
+                        Solicitudes de nuevos rubros, moderación de reseñas o reportes técnicos que requieren resolución.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setActiveTab('reports');
+                      setReportsStatusFilter('PENDING');
+                    }}
+                    style={{ fontSize: '0.84rem', padding: '8px 16px', background: '#dc2626', borderColor: '#dc2626' }}
+                  >
+                    Atender tickets <ArrowRight size={14} />
+                  </button>
                 </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setActiveTab('reports')}
-                style={{ fontSize: '0.84rem', padding: '8px 16px', background: '#dc2626', borderColor: '#dc2626' }}
-              >
-                Revisar tickets pendientes <ArrowRight size={14} />
-              </button>
+              )}
             </div>
           ) : (
             <div className="admin-alert-cockpit alert-all-good">
@@ -974,16 +1123,42 @@ export const SystemAdmin: React.FC = () => {
                 </div>
                 <div>
                   <h4 style={{ margin: '0 0 2px', fontSize: '0.94rem', fontWeight: 700, color: '#166534' }}>
-                    Plataforma 100% Operativa y Estable
+                    Plataforma 100% Operativa y Al Día
                   </h4>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#15803d' }}>
-                    No hay reportes de errores pendientes de resolución. Los servicios y bases de datos funcionan correctamente.
+                    No hay comercios ni tickets pendientes de revisión. Todos los servicios operan con normalidad.
                   </p>
                 </div>
               </div>
-              <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>
-                Base de datos TiDB / MySQL en línea
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>
+                  Base de datos TiDB / MySQL en línea
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-light"
+                  onClick={() => {
+                    loadCacheStats();
+                    setShowCacheModal(true);
+                  }}
+                  style={{
+                    fontSize: '0.76rem',
+                    padding: '4px 10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    border: '1px solid #bbf7d0',
+                    background: '#ffffff',
+                    color: '#0284c7',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                  }}
+                  title="Monitoreo de Caché Inteligente"
+                >
+                  <Zap size={12} color="#0284c7" />
+                  <span>Caché: {cacheStats ? cacheStats.hitRatio : 'Activa'}</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -2180,6 +2355,41 @@ export const SystemAdmin: React.FC = () => {
             </div>
           </div>
 
+          {/* Chips de filtro por tipo de ticket */}
+          <div className="admin-chips-filter-row" style={{ marginBottom: '1.25rem' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>
+              Tipo de solicitud:
+            </span>
+            <button
+              type="button"
+              className={`admin-filter-chip ${reportsTypeFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => setReportsTypeFilter('ALL')}
+            >
+              Todos ({reports.length})
+            </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${reportsTypeFilter === 'SOLICITUD_RUBRO' ? 'active' : ''}`}
+              onClick={() => setReportsTypeFilter('SOLICITUD_RUBRO')}
+            >
+              🏷️ Nuevos Rubros ({reports.filter((r) => r.section === 'SOLICITUD_RUBRO').length})
+            </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${reportsTypeFilter === 'MODERACION_RESENA' ? 'active' : ''}`}
+              onClick={() => setReportsTypeFilter('MODERACION_RESENA')}
+            >
+              🚩 Moderación de Reseñas ({reports.filter((r) => r.section === 'MODERACION_RESENA').length})
+            </button>
+            <button
+              type="button"
+              className={`admin-filter-chip ${reportsTypeFilter === 'BUG' ? 'active' : ''}`}
+              onClick={() => setReportsTypeFilter('BUG')}
+            >
+              🐛 Errores Técnicos ({reports.filter((r) => r.section !== 'SOLICITUD_RUBRO' && r.section !== 'MODERACION_RESENA').length})
+            </button>
+          </div>
+
           {loadingTab ? (
             <SkeletonTable rows={5} columns={6} />
           ) : reports.length === 0 ? (
@@ -2235,7 +2445,14 @@ export const SystemAdmin: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {reports.map((report) => (
+                    {reports
+                      .filter((r) => {
+                        if (reportsTypeFilter === 'ALL') return true;
+                        if (reportsTypeFilter === 'SOLICITUD_RUBRO') return r.section === 'SOLICITUD_RUBRO';
+                        if (reportsTypeFilter === 'MODERACION_RESENA') return r.section === 'MODERACION_RESENA';
+                        return r.section !== 'SOLICITUD_RUBRO' && r.section !== 'MODERACION_RESENA';
+                      })
+                      .map((report) => (
                       <tr key={report.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap', color: '#64748b' }}>
                           {format(new Date(report.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
@@ -3638,13 +3855,16 @@ export const SystemAdmin: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
               <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, display: 'block' }}>CLIENTE</span>
                 <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-title)' }}>
                   {inspectedAppointment.user?.name}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{inspectedAppointment.user?.email}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  {inspectedAppointment.user?.email}
+                  {inspectedAppointment.user?.phone ? ` · Tel: ${inspectedAppointment.user.phone}` : ''}
+                </div>
               </div>
 
               <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
@@ -3655,6 +3875,11 @@ export const SystemAdmin: React.FC = () => {
                 <div style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 600 }}>
                   {inspectedAppointment.service?.name} {inspectedAppointment.service?.price ? `· $${inspectedAppointment.service.price}` : ''}
                 </div>
+                {inspectedAppointment.business?.address && (
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                    📍 {inspectedAppointment.business.address}
+                  </div>
+                )}
               </div>
 
               <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
@@ -3669,10 +3894,58 @@ export const SystemAdmin: React.FC = () => {
                   })()}
                 </div>
               </div>
+
+              {(inspectedAppointment.status === 'CONFIRMED' || inspectedAppointment.status === 'PENDING') && (
+                <div style={{ background: '#fef2f2', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fecaca', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.76rem', color: '#991b1b', fontWeight: 800, display: 'block', marginBottom: '6px' }}>
+                    INTERVENCIÓN DE SOPORTE: CANCELAR TURNO INDIVIDUAL
+                  </span>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Motivo de cancelación (se enviará al cliente y comercio)..."
+                    value={adminAptCancelReason}
+                    onChange={(e) => setAdminAptCancelReason(e.target.value)}
+                    style={{ fontSize: '0.84rem', marginBottom: '8px', background: '#ffffff' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    disabled={cancellingAptId === inspectedAppointment.id}
+                    onClick={async () => {
+                      const reason = adminAptCancelReason.trim() || 'Cancelado por intervención de soporte administrativo';
+                      setCancellingAptId(inspectedAppointment.id);
+                      try {
+                        await api.patch(`/appointments/${inspectedAppointment.id}/cancel`, { reason });
+                        setAppointments((prev) =>
+                          prev.map((a) => (a.id === inspectedAppointment.id ? { ...a, status: 'CANCELLED' } : a))
+                        );
+                        setInspectedAppointment(null);
+                        setAdminAptCancelReason('');
+                        showToast(`✓ Turno #${inspectedAppointment.id} cancelado y notificado`);
+                      } catch (err: any) {
+                        showToast(err?.response?.data?.message || 'No se pudo cancelar el turno');
+                      } finally {
+                        setCancellingAptId(null);
+                      }
+                    }}
+                    style={{ width: '100%', fontWeight: 700, background: '#dc2626', borderColor: '#dc2626' }}
+                  >
+                    {cancellingAptId === inspectedAppointment.id ? 'Cancelando...' : 'Cancelar Turno y Notificar'}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="modal-footer-responsive" style={{ margin: 0 }}>
-              <button type="button" className="btn btn-light" onClick={() => setInspectedAppointment(null)}>
+              <button
+                type="button"
+                className="btn btn-light"
+                onClick={() => {
+                  setInspectedAppointment(null);
+                  setAdminAptCancelReason('');
+                }}
+              >
                 Cerrar
               </button>
             </div>

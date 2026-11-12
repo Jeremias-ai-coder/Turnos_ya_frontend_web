@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import api, { cachedGet, clientCache } from '../services/api';
-import { Calendar as CalendarIcon, Clock, XCircle, Info, Star, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, XCircle, Info, Star, CheckCircle, AlertTriangle, MapPin, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatTimeToHHMM, getHoursUntilAppointment } from '../utils/timeHelper';
@@ -30,6 +31,7 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 const MyAppointments: React.FC = () => {
+  const navigate = useNavigate();
   const cachedAppts = clientCache.get<any>('/appointments?{}');
   const initialAppts: Appointment[] = Array.isArray(cachedAppts?.data)
     ? cachedAppts.data
@@ -219,7 +221,17 @@ const MyAppointments: React.FC = () => {
                       <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-title)', marginBottom: '2px' }}>
                         {apt.service?.name ?? 'Servicio'}
                       </h3>
-                      <p className="text-muted text-sm">{apt.business?.name ?? 'Negocio'}</p>
+                      <Link
+                        to={`/businesses/${apt.businessId}`}
+                        style={{ color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.86rem', textDecoration: 'none' }}
+                      >
+                        {apt.business?.name ?? 'Negocio'} ↗
+                      </Link>
+                      {apt.business?.address && (
+                        <p className="text-muted text-xs" style={{ margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={12} color="#64748b" /> {apt.business.address}
+                        </p>
+                      )}
                     </div>
                     {getStatusBadge(apt.status)}
                   </div>
@@ -285,33 +297,55 @@ const MyAppointments: React.FC = () => {
 
                   {/* Feedback / Reseña en turnos completados */}
                   {apt.status === 'COMPLETED' && (
-                    apt.review ? (
-                      <div style={{
-                        padding: '10px',
-                        background: 'var(--background-app)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-default)',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#f59e0b', fontWeight: 700, fontSize: '0.9rem' }}>
-                          <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                          <span>Tu Calificación: {apt.review.rating} / 5</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {apt.review ? (
+                        <div style={{
+                          padding: '10px',
+                          background: 'var(--background-app)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-default)',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#f59e0b', fontWeight: 700, fontSize: '0.9rem' }}>
+                            <Star size={16} fill="#f59e0b" color="#f59e0b" />
+                            <span>Tu Calificación: {apt.review.rating} / 5</span>
+                          </div>
+                          {apt.review.comment && (
+                            <p className="text-muted text-xs" style={{ marginTop: '4px', fontStyle: 'italic', marginBottom: 0 }}>
+                              "{apt.review.comment}"
+                            </p>
+                          )}
                         </div>
-                        {apt.review.comment && (
-                          <p className="text-muted text-xs" style={{ marginTop: '4px', fontStyle: 'italic', marginBottom: 0 }}>
-                            "{apt.review.comment}"
-                          </p>
-                        )}
-                      </div>
-                    ) : (
+                      ) : (
+                        <button
+                          className="btn btn-primary"
+                          style={{ width: '100%', justifyContent: 'center', background: '#f59e0b', borderColor: '#d97706', color: 'white' }}
+                          onClick={() => openReviewModal(apt)}
+                        >
+                          <Star size={16} fill="white" /> Calificar Atención
+                        </button>
+                      )}
                       <button
-                        className="btn btn-primary"
-                        style={{ width: '100%', justifyContent: 'center', background: '#f59e0b', borderColor: '#d97706', color: 'white' }}
-                        onClick={() => openReviewModal(apt)}
+                        type="button"
+                        className="btn btn-light"
+                        style={{ width: '100%', justifyContent: 'center', fontSize: '0.84rem', fontWeight: 700, color: 'var(--primary-color)', border: '1px solid #bae6fd', background: '#f0f9ff' }}
+                        onClick={() => navigate(`/businesses/${apt.businessId}/book?serviceId=${apt.serviceId}`)}
                       >
-                        <Star size={16} fill="white" /> Calificar Atención
+                        <RotateCcw size={14} /> Volver a reservar
                       </button>
-                    )
+                    </div>
+                  )}
+
+                  {/* Volver a reservar en turnos cancelados */}
+                  {apt.status === 'CANCELLED' && (
+                    <button
+                      type="button"
+                      className="btn btn-light"
+                      style={{ width: '100%', justifyContent: 'center', fontSize: '0.84rem', fontWeight: 700, color: 'var(--primary-color)', border: '1px solid #bae6fd', background: '#f0f9ff' }}
+                      onClick={() => navigate(`/businesses/${apt.businessId}/book?serviceId=${apt.serviceId}`)}
+                    >
+                      <RotateCcw size={14} /> Volver a reservar este servicio
+                    </button>
                   )}
                 </div>
               </div>

@@ -19,7 +19,10 @@ import {
   Trash2,
   Flag,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Globe,
+  MessageCircle,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -264,21 +267,151 @@ const BusinessDetail: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-            {business.address && (
-              <p className="text-muted text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={14} color="var(--primary-color)" /> {business.address}
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {(business.address || business.city) && (
+              <p className="text-muted text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                <MapPin size={14} color="var(--primary-color)" />
+                {[business.address, business.city, business.province].filter(Boolean).join(', ')}
               </p>
             )}
             {business.phone && (
-              <p className="text-muted text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <p className="text-muted text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
                 <Phone size={14} color="var(--primary-color)" /> {business.phone}
               </p>
             )}
           </div>
 
           {business.description && (
-            <p style={{ marginTop: '0.75rem', color: 'var(--text-main)', lineHeight: 1.6 }}>{business.description}</p>
+            <p style={{ marginTop: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-main)', lineHeight: 1.6 }}>
+              {business.description}
+            </p>
+          )}
+
+          {/* Barra de Contacto Directo, Ubicación y Redes Sociales */}
+          {(business.address || business.googleMapsUrl || business.phone || business.instagramUrl || business.facebookUrl || business.websiteUrl) && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9' }}>
+              {(business.googleMapsUrl || business.address) && (
+                <a
+                  href={
+                    business.googleMapsUrl ||
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      [business.name, business.address, business.city, business.province].filter(Boolean).join(', ')
+                    )}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    border: '1px solid #fecaca',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <MapPin size={13} /> Cómo llegar (Maps)
+                </a>
+              )}
+
+              {business.phone && business.phone.replace(/\D/g, '').length >= 6 && (
+                <a
+                  href={`https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                    `Hola ${business.name}, te escribo desde Turnos Ya para hacer una consulta.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    background: '#ecfdf5',
+                    color: '#059669',
+                    border: '1px solid #a7f3d0',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <MessageCircle size={13} /> Consultar por WhatsApp
+                </a>
+              )}
+
+              {business.instagramUrl && (
+                <a
+                  href={business.instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    background: '#fff1f2',
+                    color: '#e1306c',
+                    border: '1px solid #fecdd3',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <ExternalLink size={12} /> Instagram
+                </a>
+              )}
+
+              {business.facebookUrl && (
+                <a
+                  href={business.facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    background: '#eff6ff',
+                    color: '#1877f2',
+                    border: '1px solid #bfdbfe',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <ExternalLink size={12} /> Facebook
+                </a>
+              )}
+
+              {business.websiteUrl && (
+                <a
+                  href={business.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    background: '#e0f2fe',
+                    color: '#0284c7',
+                    border: '1px solid #bae6fd',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <Globe size={13} /> Sitio Web
+                </a>
+              )}
+            </div>
           )}
         </div>
       </div>
