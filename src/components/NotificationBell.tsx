@@ -224,8 +224,10 @@ export const NotificationBell: React.FC = () => {
       type === 'BUSINESS_SUBMITTED' ||
       type === 'BUSINESS_REJECTED' ||
       type === 'BUSINESS_SUSPENDED' ||
+      type === 'BUSINESS_DELETED' ||
       title.includes('solicitud de negocio recibida') ||
       title.includes('solicitud de negocio observada') ||
+      title.includes('solicitud de negocio rechazada') ||
       title.includes('comercio suspendido')
     ) {
       return `/dashboard?tab=settings${bizParam}`;
@@ -344,7 +346,9 @@ export const NotificationBell: React.FC = () => {
       type === 'BUSINESS_EMERGENCY_CANCELLED' ||
       type === 'BUSINESS_REJECTED' ||
       type === 'BUSINESS_SUSPENDED' ||
+      type === 'BUSINESS_DELETED' ||
       title.includes('observada') ||
+      title.includes('rechazada') ||
       title.includes('cancelado')
     ) {
       return (

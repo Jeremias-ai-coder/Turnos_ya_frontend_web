@@ -134,6 +134,9 @@ export const SystemAdmin: React.FC = () => {
   const [suspendReasonInput, setSuspendReasonInput] = useState('');
   const [businessToReactivate, setBusinessToReactivate] = useState<any | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [businessToDelete, setBusinessToDelete] = useState<any | null>(null);
+  const [deleteBizReasonInput, setDeleteBizReasonInput] = useState('');
+  const [deleteBizAlsoOwner, setDeleteBizAlsoOwner] = useState(false);
   const [processingBizAction, setProcessingBizAction] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   
@@ -450,6 +453,32 @@ export const SystemAdmin: React.FC = () => {
       await Promise.all([fetchTabData(), loadStatsAndReports()]);
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Error al reactivar comercio');
+    } finally {
+      setProcessingBizAction(false);
+    }
+  };
+
+  const handleDeleteBusinessByAdmin = async () => {
+    if (!businessToDelete || deleteBizReasonInput.trim().length < 5) return;
+    setProcessingBizAction(true);
+    try {
+      const res = await api.delete(`/admin/businesses/${businessToDelete.id}`, {
+        data: {
+          reason: deleteBizReasonInput.trim(),
+          deleteOwner: deleteBizAlsoOwner
+        }
+      });
+      showToast(res.data?.message || `✓ Comercio "${businessToDelete.name}" eliminado definitivamente y registrado en Auditoría.`);
+      setBusinesses((prev) => prev.filter((b) => b.id !== businessToDelete.id));
+      if (res.data?.deletedOwnerId) {
+        setUsers((prev) => prev.filter((u) => u.id !== res.data.deletedOwnerId));
+      }
+      setBusinessToDelete(null);
+      setDeleteBizReasonInput('');
+      setDeleteBizAlsoOwner(false);
+      await Promise.all([fetchTabData(), loadStatsAndReports()]);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error al eliminar el comercio');
     } finally {
       setProcessingBizAction(false);
     }
@@ -2136,6 +2165,31 @@ export const SystemAdmin: React.FC = () => {
                                     ✓ Aprobar
                                   </button>
                                 )}
+
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  onClick={() => {
+                                    setBusinessToDelete(b);
+                                    setDeleteBizReasonInput('');
+                                    setDeleteBizAlsoOwner(false);
+                                  }}
+                                  style={{
+                                    background: '#fef2f2',
+                                    color: '#dc2626',
+                                    border: '1px solid #fecaca',
+                                    padding: '5px 8px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Rechazar definitivamente y eliminar de la base de datos (Fraude / Baja con registro forense en Auditoría)"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -3127,12 +3181,13 @@ export const SystemAdmin: React.FC = () => {
                 style={{ height: '42px', borderRadius: '10px', fontSize: '0.88rem', padding: '0 12px', border: '1px solid #cbd5e1' }}
               >
                 <option value="ALL">Todas las Acciones</option>
+                <option value="BUSINESS_DELETED_FRAUD">🗑️ Baja Definitiva / Fraude Comercio</option>
                 <option value="EMERGENCY_CANCELLATION">🚨 Cancelación de Emergencia</option>
                 <option value="BUSINESS_SUSPENDED">⏸ Suspensión de Comercio</option>
                 <option value="BUSINESS_REACTIVATED">▶ Reactivación de Comercio</option>
                 <option value="REVIEW_DELETED">🗑 Reseña Moderada</option>
                 <option value="BUSINESS_APPROVED">✓ Comercio Aprobado</option>
-                <option value="BUSINESS_REJECTED">✕ Comercio Rechazado</option>
+                <option value="BUSINESS_REJECTED">✕ Comercio Observado</option>
               </select>
             </div>
           </div>
@@ -3169,12 +3224,13 @@ export const SystemAdmin: React.FC = () => {
                   <tbody>
                     {auditLogs.map((log) => {
                       const actionBadgeConfig: Record<string, { label: string; bg: string; color: string; border: string }> = {
+                        BUSINESS_DELETED_FRAUD: { label: 'Baja Definitiva / Fraude', bg: '#fef2f2', color: '#991b1b', border: '#f87171' },
                         EMERGENCY_CANCELLATION: { label: 'Cancelación Emergencia', bg: '#fee2e2', color: '#991b1b', border: '#fecaca' },
                         BUSINESS_SUSPENDED: { label: 'Comercio Suspendido', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
                         BUSINESS_REACTIVATED: { label: 'Comercio Reactivado', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
                         REVIEW_DELETED: { label: 'Reseña Moderada', bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
                         BUSINESS_APPROVED: { label: 'Comercio Aprobado', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-                        BUSINESS_REJECTED: { label: 'Comercio Rechazado', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
+                        BUSINESS_REJECTED: { label: 'Comercio Observado', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
                       };
                       const actionBadge = actionBadgeConfig[log.action] || {
                         label: log.action,
@@ -3937,6 +3993,34 @@ export const SystemAdmin: React.FC = () => {
                     ✓ Reconsiderar y Aprobar
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    const b = inspectedBusiness;
+                    setInspectedBusiness(null);
+                    setBusinessToDelete(b);
+                    setDeleteBizReasonInput('');
+                    setDeleteBizAlsoOwner(false);
+                  }}
+                  style={{
+                    background: '#991b1b',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 14px',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="Elimina el negocio de la base de datos operativa y guarda registro forense en Auditoría"
+                >
+                  <Trash2 size={14} /> Rechazar y Eliminar (Fraude/Baja)
+                </button>
               </div>
             </div>
           </div>
@@ -4678,6 +4762,50 @@ export const SystemAdmin: React.FC = () => {
               <span className="text-muted text-xs" style={{ display: 'block', marginTop: '6px' }}>
                 Este mensaje se enviará por notificación y correo al dueño para que pueda corregir los datos y reenviar la solicitud.
               </span>
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '10px 12px',
+                  background: '#fef2f2',
+                  border: '1px dashed #fca5a5',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '10px',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <span style={{ fontSize: '0.78rem', color: '#991b1b', fontWeight: 600 }}>
+                  ¿Detectaste que el comercio es un fraude o spam?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = businessToReject;
+                    const draftReason = rejectionReasonInput;
+                    setBusinessToReject(null);
+                    setBusinessToDelete(b);
+                    setDeleteBizReasonInput(draftReason);
+                    setDeleteBizAlsoOwner(false);
+                  }}
+                  style={{
+                    background: '#991b1b',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Trash2 size={12} /> Eliminar Definitivamente
+                </button>
+              </div>
             </div>
 
             <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
@@ -4804,6 +4932,157 @@ export const SystemAdmin: React.FC = () => {
                 style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
               >
                 {processingBizAction ? 'Reactivando...' : '▶ Sí, Reactivar Comercio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Baja Definitiva / Rechazo por Fraude (Purga Operativa + Registro Forense) */}
+      {businessToDelete && (
+        <div className="modal-overlay admin-modal-overlay" onClick={() => !processingBizAction && setBusinessToDelete(null)}>
+          <div className="modal-box admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div className="modal-drag-handle" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#fef2f2', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.15rem', color: '#991b1b' }}>
+                    Rechazar y Eliminar Definitivamente
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Purga operativa por fraude o baja definitiva con trazabilidad forense
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBusinessToDelete(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Ficha resumen del comercio a eliminar */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', marginBottom: '12px', fontSize: '0.84rem' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.96rem', color: 'var(--text-title)', marginBottom: '4px' }}>
+                {businessToDelete.name} <span style={{ color: '#64748b', fontWeight: 600, fontSize: '0.8rem' }}>(ID #{businessToDelete.id})</span>
+              </div>
+              <div style={{ color: '#475569', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <span>Rubro: <strong>{businessToDelete.category || businessToDelete.categoryRel?.name || 'General'}</strong></span>
+                {businessToDelete.cuit && <span>• CUIT: <strong>{businessToDelete.cuit}</strong></span>}
+              </div>
+              <div style={{ color: '#475569', marginTop: '4px' }}>
+                Solicitante: <strong>{businessToDelete.owner?.name || 'Sin nombre'}</strong> ({businessToDelete.owner?.email || 'sin email'})
+              </div>
+            </div>
+
+            {/* Aviso de Arquitectura Forense */}
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px', fontSize: '0.8rem', color: '#1e40af', lineHeight: 1.45 }}>
+              <strong>🛡️ Trazabilidad Forense Garantizada:</strong> El negocio será eliminado físicamente de la tabla operativa para mantener limpias las métricas e impedir que el usuario vuelva a postularlo, pero todos sus datos y el motivo quedarán grabados de forma inmutable en la pestaña de <strong>Auditoría</strong>.
+            </div>
+
+            {/* Motivo + Chips rápidos */}
+            <div style={{ marginBottom: '14px' }}>
+              <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-title)', fontSize: '0.86rem', marginBottom: '6px', display: 'block' }}>
+                Motivo de la baja definitiva / fraude <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                {[
+                  'Fraude: Comercio inexistente o datos apócrifos',
+                  'Suplantación de identidad comercial',
+                  'Spam / Cuenta de prueba no autorizada',
+                  'Incumplimiento grave de términos del servicio'
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDeleteBizReasonInput(preset)}
+                    style={{
+                      background: deleteBizReasonInput === preset ? '#fee2e2' : '#f1f5f9',
+                      color: deleteBizReasonInput === preset ? '#991b1b' : '#475569',
+                      border: `1px solid ${deleteBizReasonInput === preset ? '#fca5a5' : '#cbd5e1'}`,
+                      borderRadius: '14px',
+                      padding: '3px 10px',
+                      fontSize: '0.73rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                className="form-control"
+                rows={3}
+                placeholder="Especifica el motivo de la eliminación definitiva para el registro de auditoría..."
+                value={deleteBizReasonInput}
+                onChange={(e) => setDeleteBizReasonInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {/* Opción de purgar también la cuenta del usuario spammer */}
+            {businessToDelete.owner && businessToDelete.owner.role !== 'administrator' && (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  background: deleteBizAlsoOwner ? '#fef2f2' : '#f8fafc',
+                  border: `1px solid ${deleteBizAlsoOwner ? '#fca5a5' : '#e2e8f0'}`,
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  marginBottom: '1.25rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={deleteBizAlsoOwner}
+                  onChange={(e) => setDeleteBizAlsoOwner(e.target.checked)}
+                  style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: '#dc2626', cursor: 'pointer' }}
+                />
+                <div style={{ fontSize: '0.82rem', lineHeight: 1.4 }}>
+                  <strong style={{ color: deleteBizAlsoOwner ? '#991b1b' : 'var(--text-title)', display: 'block' }}>
+                    Eliminar también la cuenta del usuario solicitante ({businessToDelete.owner.email})
+                  </strong>
+                  <span style={{ color: '#64748b', fontSize: '0.76rem' }}>
+                    Marca esta casilla si detectaste que el usuario es un bot o creó la cuenta únicamente con fines fraudulentos.
+                  </span>
+                </div>
+              </label>
+            )}
+
+            <div className="modal-footer-responsive" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={processingBizAction}
+                onClick={() => setBusinessToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={processingBizAction || deleteBizReasonInput.trim().length < 5}
+                onClick={handleDeleteBusinessByAdmin}
+                style={{ background: '#991b1b', borderColor: '#991b1b', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Trash2 size={15} />
+                <span>
+                  {processingBizAction
+                    ? 'Eliminando...'
+                    : deleteBizAlsoOwner
+                    ? 'Eliminar Comercio y Usuario'
+                    : 'Rechazar y Eliminar Comercio'}
+                </span>
               </button>
             </div>
           </div>
