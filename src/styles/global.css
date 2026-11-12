@@ -406,7 +406,6 @@ html[data-transition-dir="backward"]::view-transition-new(root) {
 }
 .btn-logout:hover {
   background: rgba(255,255,255,0.2);
-  transform: translateY(-1px);
 }
 .btn-logout:active {
   transform: scale(0.96);
@@ -463,7 +462,7 @@ a:hover {
 }
 
 .btn:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .btn-primary {
@@ -472,11 +471,10 @@ a:hover {
 }
 .btn-primary:hover:not(:disabled) {
   background-color: var(--primary-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 158, 227, 0.24);
+  box-shadow: 0 6px 16px rgba(0, 158, 227, 0.28);
 }
 .btn-primary:active:not(:disabled) {
-  transform: scale(0.96) translateY(0);
+  transform: scale(0.97);
   box-shadow: 0 2px 6px rgba(0, 158, 227, 0.16);
 }
 
@@ -488,11 +486,10 @@ a:hover {
 .btn-outline-primary:hover:not(:disabled) {
   background-color: var(--primary-color);
   color: #ffffff;
-  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 158, 227, 0.16);
 }
 .btn-outline-primary:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .btn-light {
@@ -503,10 +500,9 @@ a:hover {
 .btn-light:hover:not(:disabled) {
   background-color: var(--border-default);
   color: var(--text-main);
-  transform: translateY(-1px);
 }
 .btn-light:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .btn-light-danger {
@@ -518,10 +514,9 @@ a:hover {
   background-color: #fee2e2;
   color: #dc2626;
   border-color: #fca5a5;
-  transform: translateY(-1px);
 }
 .btn-light-danger:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .btn-success-fill {
@@ -531,11 +526,10 @@ a:hover {
 }
 .btn-success-fill:hover:not(:disabled) {
   background-color: #009944;
-  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 166, 80, 0.24);
 }
 .btn-success-fill:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
   box-shadow: 0 2px 6px rgba(0, 166, 80, 0.16);
 }
 
@@ -795,11 +789,10 @@ a:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
   background-color: #f6fbfd;
-  transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 158, 227, 0.12);
 }
 .btn-slot-pill:active:not(:disabled) {
-  transform: scale(0.94);
+  transform: scale(0.95);
 }
 .btn-slot-pill.active {
   background-color: var(--primary-color);
@@ -915,7 +908,6 @@ a:hover {
 .service-card-wizard:hover {
   border-color: var(--primary-color);
   box-shadow: 0 6px 16px rgba(0, 158, 227, 0.12);
-  transform: translateY(-2px);
 }
 .service-card-wizard:active {
   transform: scale(0.97);
@@ -1047,7 +1039,7 @@ a:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.01);
   transition: all 0.2s ease;
 }
-.timeline-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0, 158, 227, 0.04); }
+.timeline-card:hover { box-shadow: 0 4px 16px rgba(0, 158, 227, 0.08); }
 
 /* ====== LOGIN ====== */
 .login-logo {
@@ -1229,14 +1221,12 @@ a:hover {
 }
 
 .services-grid .ml-card {
-  transition: transform 0.22s var(--ease-spring),
-              box-shadow 0.22s var(--ease-spring),
+  transition: box-shadow 0.22s var(--ease-spring),
               border-color 0.2s ease;
 }
 
 .services-grid .ml-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 28px -4px rgba(0, 158, 227, 0.12), 0 4px 10px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 12px 28px -4px rgba(0, 158, 227, 0.14), 0 4px 10px rgba(15, 23, 42, 0.05);
   border-color: rgba(0, 158, 227, 0.35);
 }
 
@@ -1816,7 +1806,6 @@ a:hover {
 }
 
 .metric-card-compact:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
 }
 
@@ -1874,7 +1863,6 @@ a:hover {
   background: #f8fafc;
   color: var(--text-title);
   border-color: #cbd5e1;
-  transform: translateY(-1px);
 }
 
 .dashboard-tab-pill:active {
@@ -2104,7 +2092,6 @@ a:hover {
 
 .category-filter-btn:hover:not(.selected) {
   background: #f1f5f9 !important;
-  transform: translateY(-1px);
   border-color: #cbd5e1 !important;
 }
 
@@ -2792,7 +2779,6 @@ a:hover {
 .floating-report-btn:hover {
   background: #1e293b;
   color: #fca5a5;
-  transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28), 0 3px 8px rgba(220, 38, 38, 0.18);
   border-color: rgba(239, 68, 68, 0.35);
 }
@@ -3039,7 +3025,6 @@ a:hover {
 }
 
 .admin-kpi-card-v2:hover {
-  transform: translateY(-2px);
   border-color: #93c5fd;
   box-shadow: 0 8px 20px rgba(0, 158, 227, 0.08);
 }
@@ -3153,10 +3138,9 @@ a:hover {
 }
 
 .metric-card-compact {
-  transition: transform 0.18s var(--ease-spring), box-shadow 0.18s var(--ease-spring);
+  transition: box-shadow 0.18s var(--ease-spring), border-color 0.18s ease;
 }
 .metric-card-compact:hover {
-  transform: translateY(-3px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
