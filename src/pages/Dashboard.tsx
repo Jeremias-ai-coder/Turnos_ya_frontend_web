@@ -800,9 +800,10 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="dashboard-hero-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 type="button"
+                className="dashboard-broadcast-btn"
                 onClick={() => setShowBroadcastModal(true)}
                 style={{
                   padding: '7px 13px',
@@ -899,7 +900,7 @@ const Dashboard: React.FC = () => {
           {activeTab === 'agenda' && (
             <div className="ml-card dashboard-card-responsive">
               {/* Barra superior: Selector de vista (Por Día / Próximos) + Registrar Turno Manual */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.85rem', borderBottom: '1px solid #f1f5f9' }}>
+              <div className="dashboard-agenda-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.85rem', borderBottom: '1px solid #f1f5f9' }}>
                 <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '4px', borderRadius: '10px', gap: '4px' }}>
                   <button
                     type="button"
@@ -1711,7 +1712,7 @@ const Dashboard: React.FC = () => {
                   <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-title)' }}>
                     Agendar Nuevo Cierre / Feriado
                   </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div className="form-grid-2" style={{ gap: '0.75rem', marginBottom: '0.75rem' }}>
                     <div>
                       <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700 }}>Fecha a cerrar *</label>
                       <input

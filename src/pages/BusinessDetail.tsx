@@ -317,7 +317,7 @@ const BusinessDetail: React.FC = () => {
       </button>
 
       {/* Header del negocio con fondo de negocio por defecto */}
-      <div className="ml-card" style={{ marginBottom: '2rem', overflow: 'hidden' }}>
+      <div className="ml-card ml-card-flush" style={{ marginBottom: '2rem', overflow: 'hidden' }}>
         <DefaultBusinessCover size="banner" style={{ height: '130px' }} />
         <div style={{ padding: '0 clamp(1rem, 3.5vw, 2rem) 1.75rem', position: 'relative', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
@@ -334,13 +334,13 @@ const BusinessDetail: React.FC = () => {
             }}>
               {initials}
             </div>
-            <div style={{ paddingTop: '0.6rem' }}>
-              <h1 style={{ color: 'var(--text-title)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>{business.name}</h1>
+            <div style={{ paddingTop: '0.6rem', flex: '1 1 180px', minWidth: 0 }}>
+              <h1 style={{ color: 'var(--text-title)', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 800, marginBottom: '4px', lineHeight: 1.2 }}>{business.name}</h1>
               {business.category && <span className="badge badge-confirmed">{business.category}</span>}
             </div>
 
             {/* Valoración + Botón Seguir / Favorito en header */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '0.8rem', flexWrap: 'wrap' }}>
+            <div className="business-detail-header-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '0.8rem', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--star-color)', fontWeight: 700, fontSize: '1.15rem' }}>
                   <Star size={20} fill="currentColor" /> {reviewsStats.average > 0 ? reviewsStats.average.toFixed(1) : 'Nuevo'}
@@ -441,7 +441,7 @@ const BusinessDetail: React.FC = () => {
 
           {/* Barra de Contacto Directo, Ubicación y Redes Sociales */}
           {(business.address || business.googleMapsUrl || business.phone || business.instagramUrl || business.facebookUrl || business.websiteUrl) && (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9' }}>
+            <div className="business-contact-pills-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9' }}>
               {(business.googleMapsUrl || business.address) && (
                 <a
                   href={
@@ -570,7 +570,7 @@ const BusinessDetail: React.FC = () => {
 
       {/* Cartelera de Avisos a la Comunidad y Próximos Feriados / Días Cerrados */}
       {(community.closedDates.length > 0 || community.recentBroadcasts.length > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
           {community.closedDates.length > 0 && (
             <div style={{
               background: '#fffbeb',

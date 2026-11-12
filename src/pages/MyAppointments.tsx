@@ -171,7 +171,7 @@ const MyAppointments: React.FC = () => {
       </div>
 
       {/* Filtros de estado */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div className="mobile-chips-scroll" style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         {FILTERS.map(f => (
           <button
             key={f.value}
@@ -376,6 +376,7 @@ const MyAppointments: React.FC = () => {
       {cancelModalOpen && (
         <div className="modal-overlay" onClick={() => setCancelModalOpen(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-drag-handle" />
             <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.5rem' }}>Cancelar Turno</h2>
             <p className="text-muted text-sm" style={{ marginBottom: '1rem' }}>
               Recuerda que solo se pueden cancelar turnos con al menos 24 horas de anticipación.
@@ -399,7 +400,7 @@ const MyAppointments: React.FC = () => {
                   required
                 />
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <div className="modal-footer-responsive" style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
                 <button type="button" className="btn btn-light" style={{ flex: 1 }} onClick={() => setCancelModalOpen(false)}>
                   Volver
                 </button>
@@ -422,6 +423,7 @@ const MyAppointments: React.FC = () => {
       {reviewModalOpen && reviewApt && (
         <div className="modal-overlay" onClick={() => setReviewModalOpen(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-drag-handle" />
             <h2 style={{ color: 'var(--text-title)', fontWeight: 800, marginBottom: '0.5rem' }}>Calificar Atención</h2>
             <p className="text-muted text-sm" style={{ marginBottom: '1.25rem' }}>
               ¿Cómo fue tu experiencia con <strong>{reviewApt.service?.name}</strong> en <strong>{reviewApt.business?.name}</strong>?
@@ -485,7 +487,7 @@ const MyAppointments: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <div className="modal-footer-responsive" style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
                 <button type="button" className="btn btn-light" style={{ flex: 1 }} onClick={() => setReviewModalOpen(false)}>
                   Cancelar
                 </button>

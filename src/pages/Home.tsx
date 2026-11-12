@@ -46,7 +46,23 @@ const Home: React.FC = () => {
 
   // Estados de Favoritos / Comercios Seguidos
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [onlyFavorites, setOnlyFavorites] = useState<boolean>(() => searchParams.get('favs') === '1');
+
+  useEffect(() => {
+    setOnlyFavorites(searchParams.get('favs') === '1');
+  }, [searchParams]);
+
+  const toggleOnlyFavoritesFilter = (nextVal?: boolean) => {
+    const target = typeof nextVal === 'boolean' ? nextVal : !onlyFavorites;
+    setOnlyFavorites(target);
+    const nextParams = new URLSearchParams(searchParams);
+    if (target) {
+      nextParams.set('favs', '1');
+    } else {
+      nextParams.delete('favs');
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -206,12 +222,52 @@ const Home: React.FC = () => {
             </div>
           </div>
 
-          {/* Mis Comercios Favoritos */}
-          {user && (
-            <div style={{ marginBottom: '1.15rem' }}>
+          {/* Barra Rápida Mobile: Favoritos + Cercanía en 1 sola fila compacta */}
+          <div className="mobile-quick-filters-bar">
+            {user && (
               <button
                 type="button"
-                onClick={() => setOnlyFavorites(prev => !prev)}
+                onClick={() => toggleOnlyFavoritesFilter()}
+                className={`mobile-quick-chip ${onlyFavorites ? 'active-fav' : ''}`}
+              >
+                <Heart size={14} fill={onlyFavorites ? '#e11d48' : 'none'} color="#e11d48" />
+                <span>Favoritos ({favoriteIds.length})</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={sortByProximity ? handleClearLocation : handleGetLocation}
+              disabled={locatingUser}
+              className={`mobile-quick-chip ${sortByProximity ? 'active-loc' : ''}`}
+            >
+              <Navigation size={14} color={sortByProximity ? '#0284c7' : 'var(--primary-color)'} />
+              <span>
+                {locatingUser
+                  ? 'Localizando...'
+                  : sortByProximity
+                  ? `${locationLabel || 'Cerca mío'} ✕`
+                  : 'Cerca mío'}
+              </span>
+            </button>
+            {!sortByProximity && (
+              <button
+                type="button"
+                onClick={handleUseDemoLocation}
+                className="mobile-quick-chip"
+                title="Probar cercanía usando Centro CABA"
+              >
+                <MapPin size={13} color="#64748b" />
+                <span>CABA Demo</span>
+              </button>
+            )}
+          </div>
+
+          {/* Mis Comercios Favoritos (Desktop Sidebar) */}
+          {user && (
+            <div className="desktop-only-fav-box" style={{ marginBottom: '1.15rem' }}>
+              <button
+                type="button"
+                onClick={() => toggleOnlyFavoritesFilter()}
                 style={{
                   width: '100%',
                   display: 'flex',
@@ -248,7 +304,7 @@ const Home: React.FC = () => {
           )}
 
           {/* Tu Ubicación y Cercanía */}
-          <div className="location-filter-box" style={{ marginBottom: '1.25rem' }}>
+          <div className={`location-filter-box ${!sortByProximity ? 'hide-on-mobile-compact' : ''}`} style={{ marginBottom: '1.25rem' }}>
             <div className="filter-section-title" style={{ fontSize: '0.78rem' }}>
               <Navigation size={13} color="var(--primary-color)" /> Cercanía y Ubicación
             </div>
@@ -442,7 +498,7 @@ const Home: React.FC = () => {
               </span>
               <button
                 type="button"
-                onClick={() => setOnlyFavorites(false)}
+                onClick={() => toggleOnlyFavoritesFilter(false)}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -577,7 +633,7 @@ const Home: React.FC = () => {
                       key={business.id}
                       style={{ textDecoration: 'none', display: 'block', width: '100%' }}
                     >
-                    <div className="ml-card ml-card-hoverable" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+                    <div className="ml-card ml-card-hoverable ml-card-flush" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
                       {/* Botón flotante de Favorito / Seguir en 1 clic */}
                       <button
                         type="button"

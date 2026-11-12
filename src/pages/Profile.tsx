@@ -27,7 +27,13 @@ import {
   ArrowLeft,
   ShieldAlert,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Heart,
+  Bell,
+  BellOff,
+  ExternalLink,
+  ShieldCheck,
+  MapPin
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { flushSync } from 'react-dom';
@@ -61,7 +67,7 @@ const GoogleAuthIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
   </svg>
 );
 
-type ActiveTab = 'profile' | 'security' | 'notifications' | 'privacy';
+type ActiveTab = 'profile' | 'security' | 'notifications' | 'privacy' | 'favorites';
 
 interface ProfileData {
   name: string;
@@ -374,6 +380,71 @@ const Profile: React.FC = () => {
       console.warn('Error al cargar sesiones activas:', err);
     } finally {
       setSessionsLoading(false);
+    }
+  };
+
+  // Estados de Comercios Favoritos y Preferencias de Avisos por Negocio
+  interface FollowedBusinessItem {
+    id: number;
+    businessId: number;
+    receiveNotifications: boolean;
+    createdAt: string;
+    business?: {
+      id: number;
+      name: string;
+      category?: string;
+      address?: string;
+    };
+  }
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<FollowedBusinessItem[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+
+  const loadFavoriteBusinesses = async () => {
+    if (!user) return;
+    setLoadingFavorites(true);
+    try {
+      const res = await api.get('/businesses/my/favorites');
+      const list = res.data?.data ?? res.data ?? [];
+      setFavoriteBusinesses(Array.isArray(list) ? list : []);
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFavoriteBusinesses();
+  }, [user]);
+
+  useEffect(() => {
+    if (currentTab === 'favorites' || currentTab === 'notifications') {
+      loadFavoriteBusinesses();
+    }
+  }, [currentTab]);
+
+  const handleToggleFavBusinessNotifications = async (businessId: number, currentVal: boolean) => {
+    const nextVal = !currentVal;
+    setFavoriteBusinesses(prev =>
+      prev.map(item => item.businessId === businessId ? { ...item, receiveNotifications: nextVal } : item)
+    );
+    try {
+      await api.patch(`/businesses/${businessId}/follow/notifications`, {
+        receiveNotifications: nextVal,
+      });
+    } catch {
+      setFavoriteBusinesses(prev =>
+        prev.map(item => item.businessId === businessId ? { ...item, receiveNotifications: currentVal } : item)
+      );
+    }
+  };
+
+  const handleUnfollowBusinessFromProfile = async (businessId: number) => {
+    try {
+      await api.post(`/businesses/${businessId}/follow`);
+      setFavoriteBusinesses(prev => prev.filter(item => item.businessId !== businessId));
+    } catch {
+      // silencioso
     }
   };
 
@@ -1262,6 +1333,10 @@ const Profile: React.FC = () => {
         title: 'Privacidad',
         subtitle: 'Preferencias y control sobre el uso de tus datos y visibilidad.',
       },
+      favorites: {
+        title: 'Mis Comercios Favoritos',
+        subtitle: 'Administrá los comercios que seguís y configurá alertas de promociones o cierres por feriado.',
+      },
     };
 
     pageContent = (
@@ -1487,6 +1562,192 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
               </form>
+
+              <div className="divider" style={{ margin: '2rem 0 1.5rem' }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '0.85rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-title)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Heart size={16} color="#e11d48" fill="#e11d48" /> Avisos por Comercio Seguido ({favoriteBusinesses.length})
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    Elegí de qué comercios querés recibir avisos de promociones, turnos liberados o cierres por feriado.
+                  </p>
+                </div>
+              </div>
+
+              {favoriteBusinesses.length === 0 ? (
+                <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '1.25rem', textAlign: 'center' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '0.86rem', color: '#64748b' }}>
+                    Todavía no seguís a ningún comercio. Tocá el corazón ❤️ en tus locales favoritos para recibir sus novedades.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => startSmoothNavigation(navigate, '/')}
+                  >
+                    Explorar comercios
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {favoriteBusinesses.map(fav => (
+                    <div
+                      key={fav.businessId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap',
+                        padding: '0.85rem 1rem',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        background: '#ffffff',
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-title)' }}>
+                          {fav.business?.name || `Comercio #${fav.businessId}`}
+                        </div>
+                        {fav.business?.category && (
+                          <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600 }}>
+                            {fav.business.category}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFavBusinessNotifications(fav.businessId, fav.receiveNotifications)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          border: fav.receiveNotifications ? '1px solid #bae6fd' : '1px solid #cbd5e1',
+                          background: fav.receiveNotifications ? '#f0f9ff' : '#f8fafc',
+                          color: fav.receiveNotifications ? '#0284c7' : '#64748b',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {fav.receiveNotifications ? <Bell size={14} /> : <BellOff size={14} />}
+                        <span>{fav.receiveNotifications ? 'Avisos activos' : 'Silenciado'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ====== PESTAÑA: MIS COMERCIOS FAVORITOS ====== */}
+          {currentTab === 'favorites' && (
+            <div>
+              {loadingFavorites ? (
+                <p className="text-muted text-sm">Cargando tus comercios favoritos...</p>
+              ) : favoriteBusinesses.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
+                  <Heart size={42} color="#fda4af" style={{ marginBottom: '0.75rem' }} />
+                  <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-title)' }}>
+                    Aún no tenés comercios en Favoritos
+                  </h3>
+                  <p className="text-muted text-sm" style={{ maxWidth: '420px', margin: '0 auto 1.25rem' }}>
+                    Seguí a tus peluquerías, consultorios o centros favoritos para reservar en 1 toque y enterarte de promociones o cierres por feriado.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => startSmoothNavigation(navigate, '/')}
+                  >
+                    Explorar comercios
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {favoriteBusinesses.map(fav => (
+                    <div
+                      key={fav.businessId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '0.85rem',
+                        padding: '1rem 1.15rem',
+                        borderRadius: '14px',
+                        border: '1px solid #e2e8f0',
+                        background: '#ffffff',
+                        boxShadow: '0 2px 6px rgba(15, 23, 42, 0.03)',
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                          <strong style={{ fontSize: '1rem', color: 'var(--text-title)', fontWeight: 800 }}>
+                            {fav.business?.name || `Comercio #${fav.businessId}`}
+                          </strong>
+                          {fav.business?.category && (
+                            <span className="badge badge-confirmed" style={{ fontSize: '0.72rem' }}>
+                              {fav.business.category}
+                            </span>
+                          )}
+                        </div>
+                        {fav.business?.address && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', color: '#64748b' }}>
+                            <MapPin size={13} color="var(--primary-color)" />
+                            <span>{fav.business.address}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: 'auto' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFavBusinessNotifications(fav.businessId, fav.receiveNotifications)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '7px 12px',
+                            borderRadius: '20px',
+                            border: fav.receiveNotifications ? '1px solid #bae6fd' : '1px solid #cbd5e1',
+                            background: fav.receiveNotifications ? '#f0f9ff' : '#f8fafc',
+                            color: fav.receiveNotifications ? '#0284c7' : '#64748b',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                          }}
+                          title="Activar o silenciar avisos de este comercio"
+                        >
+                          {fav.receiveNotifications ? <Bell size={13} /> : <BellOff size={13} />}
+                          <span>{fav.receiveNotifications ? 'Avisos activos' : 'Silenciado'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => startSmoothNavigation(navigate, `/businesses/${fav.businessId}`)}
+                          style={{ padding: '7px 14px', borderRadius: '20px', fontSize: '0.8rem' }}
+                        >
+                          <ExternalLink size={13} /> Ver local
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-light"
+                          onClick={() => handleUnfollowBusinessFromProfile(fav.businessId)}
+                          style={{ padding: '7px 10px', borderRadius: '20px', fontSize: '0.78rem', color: '#e11d48' }}
+                          title="Quitar de Mis Favoritos"
+                        >
+                          <Heart size={13} fill="#e11d48" color="#e11d48" /> Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1720,6 +1981,38 @@ const Profile: React.FC = () => {
           </div>
         </div>
 
+        {/* 3.5. Mis Comercios Favoritos */}
+        <div
+          className="profile-hub-card"
+          onClick={() => navigateProfileTab('favorites')}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="profile-hub-card-top">
+            <div className="profile-hub-card-icon" style={{ color: '#e11d48', borderColor: '#fecdd3', background: '#fff1f2' }}>
+              <Heart size={24} strokeWidth={1.8} />
+            </div>
+            {favoriteBusinesses.length > 0 && (
+              <span
+                style={{
+                  background: '#ffe4e6',
+                  color: '#be123c',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                }}
+              >
+                {favoriteBusinesses.length} {favoriteBusinesses.length === 1 ? 'seguido' : 'seguidos'}
+              </span>
+            )}
+          </div>
+          <div>
+            <h3 className="profile-hub-card-title">Mis Favoritos</h3>
+            <p className="profile-hub-card-desc">Comercios que seguís, alertas de promos y avisos de feriados.</p>
+          </div>
+        </div>
+
         {/* 4. Comunicaciones */}
         <div
           className="profile-hub-card"
@@ -1779,6 +2072,38 @@ const Profile: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* 7. Centro de Administración (Solo Administradores) */}
+        {(profileForm.role === 'administrator' || user?.role === 'administrator') && (
+          <div
+            className="profile-hub-card"
+            onClick={() => startSmoothNavigation(navigate, '/system')}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="profile-hub-card-top">
+              <div className="profile-hub-card-icon" style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#e0f2fe' }}>
+                <ShieldCheck size={24} strokeWidth={1.8} />
+              </div>
+              <span
+                style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  padding: '2px 7px',
+                  borderRadius: '10px',
+                }}
+              >
+                ADMIN
+              </span>
+            </div>
+            <div>
+              <h3 className="profile-hub-card-title">Centro de Administración</h3>
+              <p className="profile-hub-card-desc">Auditoría de comercios, radar de calidad, usuarios y soporte.</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pie inferior idéntico a Mercado Libre */}

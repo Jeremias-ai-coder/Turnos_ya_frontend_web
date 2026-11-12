@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Search, X, Home, Calendar, Building2, User, AlertTriangle } from 'lucide-react';
+import { LogOut, Search, X, Home, Calendar, Building2, User, AlertTriangle, Heart, ShieldCheck } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { Footer } from './Footer';
 import { CookieBanner } from './CookieBanner';
@@ -264,17 +264,35 @@ export const Layout: React.FC = () => {
       <nav className="bottom-nav-mobile" aria-label="Navegación móvil inferior">
         <Link
           to="/"
-          className={`bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`}
+          className={`bottom-nav-item ${location.pathname === '/' && searchParams.get('favs') !== '1' ? 'active' : ''}`}
         >
-          <Home size={21} />
+          <Home size={20} />
           <span>Explorar</span>
         </Link>
+
+        {user?.role === 'administrator' ? (
+          <Link
+            to="/system"
+            className={`bottom-nav-item ${location.pathname.startsWith('/system') ? 'active' : ''}`}
+          >
+            <ShieldCheck size={20} />
+            <span>Sistema</span>
+          </Link>
+        ) : (
+          <Link
+            to={user ? '/?favs=1' : '/login'}
+            className={`bottom-nav-item ${location.pathname === '/' && searchParams.get('favs') === '1' ? 'active' : ''}`}
+          >
+            <Heart size={20} />
+            <span>Favoritos</span>
+          </Link>
+        )}
 
         <Link
           to={user ? '/my-appointments' : '/login'}
           className={`bottom-nav-item ${location.pathname === '/my-appointments' ? 'active' : ''}`}
         >
-          <Calendar size={21} />
+          <Calendar size={20} />
           <span>Mis Turnos</span>
         </Link>
 
@@ -282,15 +300,15 @@ export const Layout: React.FC = () => {
           to={user ? '/dashboard' : '/login'}
           className={`bottom-nav-item ${location.pathname.startsWith('/dashboard') ? 'active' : ''}`}
         >
-          <Building2 size={21} />
-          <span>{user?.role === 'owner' ? 'Mi Negocio' : 'Registrar'}</span>
+          <Building2 size={20} />
+          <span>{user?.role === 'owner' ? 'Mi Negocio' : 'Negocio'}</span>
         </Link>
 
         <Link
           to={user ? '/profile' : '/login'}
           className={`bottom-nav-item ${location.pathname === '/profile' || location.pathname === '/login' ? 'active' : ''}`}
         >
-          <User size={21} />
+          <User size={20} />
           <span>{user ? 'Perfil' : 'Ingresar'}</span>
         </Link>
       </nav>

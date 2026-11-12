@@ -2459,7 +2459,7 @@ a:hover {
     background-color: #f8fafc;
   }
 
-  .ml-card {
+  .ml-card:not(.ml-card-flush) {
     padding: 1.25rem 1rem !important;
   }
 }
@@ -3381,5 +3381,207 @@ a:hover {
   .register-buttons-row a {
     width: 100% !important;
     justify-content: center !important;
+  }
+}
+
+/* ====== MOBILE WEB UI/UX OVERHAUL (FAVORITOS, COMUNIDAD, WIZARD & VISTAS) ====== */
+.mobile-quick-filters-bar {
+  display: none;
+}
+
+.step-label-mobile {
+  display: none;
+}
+
+@media (max-width: 840px) {
+  /* Wizard de Reserva: barra de pasos horizontal compacta en móvil */
+  .wizard-steps-list {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    padding-top: 0.75rem !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.16) !important;
+  }
+
+  .wizard-steps-list .step-indicator-item {
+    margin-bottom: 0 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 5px !important;
+  }
+
+  .step-label-desktop {
+    display: none !important;
+  }
+
+  .step-label-mobile {
+    display: inline !important;
+    line-height: 1.15;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Bottom nav optimizada para 5 ítems ergonómicos */
+  .bottom-nav-item {
+    min-width: 54px !important;
+    padding: 6px 4px !important;
+    font-size: 0.68rem !important;
+  }
+
+  /* Barra rápida en Home: Favoritos + Cercanía en una sola línea */
+  .mobile-quick-filters-bar {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-bottom: 0.65rem;
+    padding-bottom: 2px;
+  }
+
+  .mobile-quick-filters-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-quick-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    color: #334155;
+    font-family: var(--font-family-base);
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  }
+
+  .mobile-quick-chip.active-fav {
+    background: #fff1f2;
+    border-color: #e11d48;
+    color: #be123c;
+  }
+
+  .mobile-quick-chip.active-loc {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
+  }
+
+  .desktop-only-fav-box,
+  .location-filter-box.hide-on-mobile-compact {
+    display: none !important;
+  }
+
+  /* Carruseles horizontales táctiles sin desborde para filtros y píldoras */
+  .mobile-chips-scroll,
+  .admin-chips-filter-row,
+  .business-contact-pills-row {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+
+  .mobile-chips-scroll::-webkit-scrollbar,
+  .admin-chips-filter-row::-webkit-scrollbar,
+  .business-contact-pills-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-chips-scroll > *,
+  .admin-chips-filter-row > *,
+  .business-contact-pills-row > * {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Grillas a 1 columna limpia en celulares para evitar scroll horizontal */
+  .appointments-grid,
+  .services-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  /* BusinessDetail: barra de calificación + Seguir + Avisos a ancho completo */
+  .business-detail-header-actions {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-top: 0.35rem !important;
+    padding-top: 0.75rem !important;
+    border-top: 1px solid #f1f5f9;
+    justify-content: space-between !important;
+  }
+
+  /* Booking: grilla uniforme de horarios disponibles para pulgar */
+  .slots-flex {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .slot-btn {
+    width: 100% !important;
+    text-align: center !important;
+    padding: 10px 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Dashboard: botones del Hero adaptados a móvil */
+  .dashboard-hero-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .dashboard-hero-actions .dashboard-broadcast-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 9px 14px !important;
+  }
+
+  .dashboard-hero-actions > .btn {
+    flex: 1 1 calc(50% - 6px) !important;
+    justify-content: center !important;
+  }
+
+  /* Dashboard Agenda Toolbar en móvil */
+  .dashboard-agenda-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .dashboard-agenda-toolbar > div {
+    width: 100% !important;
+    display: flex !important;
+  }
+
+  .dashboard-agenda-toolbar > div > button {
+    flex: 1 !important;
+    text-align: center !important;
+  }
+
+  .dashboard-agenda-toolbar > .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* SystemAdmin: cabecera compacta en pantallas estrechas */
+  .admin-cockpit-header {
+    gap: 0.75rem !important;
   }
 }

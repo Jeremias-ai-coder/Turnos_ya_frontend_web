@@ -437,17 +437,18 @@ const Booking: React.FC = () => {
           </div>
 
           {/* Indicadores de pasos */}
-          <div>
+          <div className="wizard-steps-list">
             {[
-              { num: 1, label: 'Seleccionar Servicio' },
-              { num: 2, label: 'Elegir Fecha y Hora' },
-              { num: 3, label: 'Confirmación' },
+              { num: 1, label: 'Seleccionar Servicio', shortLabel: 'Servicio' },
+              { num: 2, label: 'Elegir Fecha y Hora', shortLabel: 'Fecha y Hora' },
+              { num: 3, label: 'Confirmación', shortLabel: 'Confirmar' },
             ].map(s => (
               <div key={s.num} className={`step-indicator-item ${step >= s.num ? 'active' : ''}`}>
                 <div className="step-num">
                   {step > s.num ? <Check size={14} /> : s.num}
                 </div>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{s.label}</span>
+                <span className="step-label-desktop" style={{ fontSize: '0.88rem', fontWeight: 600 }}>{s.label}</span>
+                <span className="step-label-mobile" style={{ fontSize: '0.78rem', fontWeight: 700 }}>{s.shortLabel}</span>
               </div>
             ))}
           </div>
