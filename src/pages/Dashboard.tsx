@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import {
   CalendarDays,
@@ -69,6 +69,7 @@ const FacebookIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, 
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBiz, setSelectedBiz] = useState<Business | null>(null);
   const [showFichaModal, setShowFichaModal] = useState(false);
@@ -218,6 +219,19 @@ const Dashboard: React.FC = () => {
     setScheduleForm({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
     setShowScheduleForm(false);
   };
+
+  // Sincronizar pestaña y negocio desde parámetros de URL (ej. al hacer clic en una notificación)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['agenda', 'services', 'schedules', 'reviews', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+    const bizParam = searchParams.get('biz');
+    if (bizParam && businesses.length > 0) {
+      const matched = businesses.find(b => b.name.toLowerCase() === bizParam.toLowerCase());
+      if (matched) setSelectedBiz(matched);
+    }
+  }, [searchParams, businesses]);
 
   // Load my businesses and categories
   useEffect(() => {

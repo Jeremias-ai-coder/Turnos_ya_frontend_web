@@ -38,7 +38,7 @@ import {
   EyeOff,
   Flag
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
@@ -73,11 +73,29 @@ const FacebookIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, 
 export const SystemAdmin: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Navegación principal de pestañas
   const [activeTab, setActiveTab] = useState<
     'cockpit' | 'users' | 'businesses' | 'appointments' | 'reports' | 'categories' | 'announcements' | 'audit'
   >('cockpit');
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const statusParam = searchParams.get('status');
+    if (
+      tabParam &&
+      ['cockpit', 'users', 'businesses', 'appointments', 'reports', 'categories', 'announcements', 'audit'].includes(tabParam)
+    ) {
+      setActiveTab(tabParam as any);
+    }
+    if (tabParam === 'businesses' && statusParam && ['ALL', 'pending_approval', 'approved', 'rejected', 'suspended'].includes(statusParam)) {
+      setBizStatusFilter(statusParam as any);
+    }
+    if (tabParam === 'reports' && statusParam && ['ALL', 'PENDING', 'IN_REVIEW', 'RESOLVED', 'DISCARDED'].includes(statusParam)) {
+      setReportsStatusFilter(statusParam);
+    }
+  }, [searchParams]);
 
   // Estadísticas avanzadas del Centro de Control Ejecutivo
   const [stats, setStats] = useState<{

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api, { cachedGet, clientCache } from '../services/api';
 import { Calendar as CalendarIcon, Clock, XCircle, Info, Star, CheckCircle, AlertTriangle, MapPin, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
@@ -32,6 +32,7 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 
 const MyAppointments: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const cachedAppts = clientCache.get<any>('/appointments?{}');
   const initialAppts: Appointment[] = Array.isArray(cachedAppts?.data)
     ? cachedAppts.data
@@ -59,6 +60,14 @@ const MyAppointments: React.FC = () => {
   const [comment, setComment] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  useEffect(() => {
+    const statusParam = searchParams.get('status')?.toUpperCase();
+    if (statusParam && ['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(statusParam)) {
+      setStatusFilter(statusParam as StatusFilter);
+      setPage(1);
+    }
+  }, [searchParams]);
 
   const fetchAppointments = async () => {
     try {
