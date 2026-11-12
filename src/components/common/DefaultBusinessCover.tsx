@@ -59,14 +59,15 @@ export const DefaultBusinessCover: React.FC<DefaultBusinessCoverProps> = ({
       className={`business-default-cover ${className}`}
       style={{
         position: 'relative',
-        height: '120px',
+        height: '100px',
         background: 'linear-gradient(135deg, #0369a1 0%, #009ee3 55%, #38bdf8 100%)',
         borderTopLeftRadius: '13px',
         borderTopRightRadius: '13px',
         overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
+        paddingLeft: '16px',
         ...style
       }}
     >
@@ -89,29 +90,29 @@ export const DefaultBusinessCover: React.FC<DefaultBusinessCoverProps> = ({
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.18) 0%, rgba(2, 132, 199, 0.2) 60%, rgba(3, 105, 161, 0.5) 100%)',
+          background: 'radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.18) 0%, rgba(2, 132, 199, 0.2) 60%, rgba(3, 105, 161, 0.5) 100%)',
           pointerEvents: 'none',
         }}
       />
 
-      {/* Avatar flotante con inicial del negocio */}
+      {/* Avatar flotante con inicial del negocio alineado a la izquierda (Eje Izquierdo Unificado) */}
       <div
         className="business-cover-avatar"
         style={{
           position: 'relative',
           zIndex: 2,
-          width: '66px',
-          height: '66px',
-          borderRadius: '16px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '14px',
           background: '#ffffff',
           color: 'var(--primary-color)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontWeight: 800,
-          fontSize: '1.45rem',
+          fontSize: '1.4rem',
           border: '3px solid rgba(255, 255, 255, 0.95)',
-          boxShadow: '0 8px 20px -2px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 6px 16px -2px rgba(15, 23, 42, 0.22), 0 2px 5px rgba(0, 0, 0, 0.08)',
           userSelect: 'none',
         }}
       >

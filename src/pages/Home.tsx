@@ -35,7 +35,7 @@ const Home: React.FC = () => {
   const searchQuery = searchParams.get('q') || '';
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [page, setPage] = useState(1);
-  const PER_PAGE = 9;
+  const PER_PAGE = 12;
 
   // Estados de Ubicación y Cercanía
   const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
@@ -588,7 +588,7 @@ const Home: React.FC = () => {
 
           {loading ? (
             <div className="business-grid">
-              {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+              {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : paginated.length === 0 ? (
             <div className="empty-state">
@@ -779,15 +779,15 @@ const Home: React.FC = () => {
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
                             {business.services.slice(0, 2).map(s => (
                               <span key={s.id} style={{
-                                fontSize: '0.70rem',
+                                fontSize: '0.71rem',
                                 background: '#f8fafc',
                                 border: '1px solid #e2e8f0',
                                 color: '#475569',
-                                borderRadius: '4px',
-                                padding: '1px 6px',
+                                borderRadius: '6px',
+                                padding: '2px 7px',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                maxWidth: '140px',
+                                maxWidth: '175px',
                                 whiteSpace: 'nowrap'
                               }}>
                                 {s.name}

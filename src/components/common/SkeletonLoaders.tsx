@@ -20,8 +20,8 @@ export const SkeletonBlock: React.FC<{
 
 export const SkeletonCard: React.FC = () => (
   <div className="skeleton-card-container">
-    <div style={{ height: '120px', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <SkeletonBlock width="54px" height="54px" borderRadius="16px" />
+    <div style={{ height: '100px', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: '16px' }}>
+      <SkeletonBlock width="54px" height="54px" borderRadius="14px" />
     </div>
     <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <SkeletonBlock width="70%" height="18px" />
