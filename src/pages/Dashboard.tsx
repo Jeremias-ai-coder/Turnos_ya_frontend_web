@@ -2147,8 +2147,14 @@ const Dashboard: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <span>{selectedBiz.category || 'General'}</span> • <span>ID #{selectedBiz.id}</span>
+                    {selectedBiz.createdAt && (
+                      <>
+                        <span>•</span>
+                        <span>📅 Creado el {format(new Date(selectedBiz.createdAt), "d 'de' MMMM, yyyy", { locale: es })}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

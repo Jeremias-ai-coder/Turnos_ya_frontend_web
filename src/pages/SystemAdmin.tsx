@@ -1548,10 +1548,32 @@ export const SystemAdmin: React.FC = () => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div className="admin-avatar-initials">{initials}</div>
                                 <div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-title)' }}>
-                                    {u.name}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-title)' }}>
+                                      {u.name}
+                                    </span>
+                                    {u.createdAt && (Date.now() - new Date(u.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000 && (
+                                      <span
+                                        style={{
+                                          background: '#dbeafe',
+                                          color: '#1d4ed8',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 800,
+                                          padding: '1px 6px',
+                                          borderRadius: '8px',
+                                        }}
+                                        title="Cuenta creada en los últimos 7 días"
+                                      >
+                                        🆕 Nuevo
+                                      </span>
+                                    )}
                                   </div>
                                   <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
+                                  {u.createdAt && (
+                                    <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: '2px' }}>
+                                      📅 Alta: {format(new Date(u.createdAt), 'dd/MM/yyyy', { locale: es })}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -1848,13 +1870,38 @@ export const SystemAdmin: React.FC = () => {
                                   {initial}
                                 </div>
                                 <div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0369a1' }}>
-                                    {b.name}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0369a1' }}>
+                                      {b.name}
+                                    </span>
+                                    {b.createdAt && (Date.now() - new Date(b.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000 && (
+                                      <span
+                                        style={{
+                                          background: '#dbeafe',
+                                          color: '#1d4ed8',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 800,
+                                          padding: '1px 6px',
+                                          borderRadius: '8px',
+                                        }}
+                                        title="Comercio registrado en los últimos 7 días"
+                                      >
+                                        🆕 Nuevo
+                                      </span>
+                                    )}
                                   </div>
-                                  <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', gap: '6px' }}>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                     <span>ID #{b.id}</span>
                                     <span>•</span>
                                     <span>{b.category || b.categoryRel?.name || 'General'}</span>
+                                    {b.createdAt && (
+                                      <>
+                                        <span>•</span>
+                                        <span style={{ color: '#475569', fontWeight: 600 }}>
+                                          📅 Alta: {format(new Date(b.createdAt), 'dd/MM/yyyy', { locale: es })}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -3248,7 +3295,7 @@ export const SystemAdmin: React.FC = () => {
               </button>
             </div>
 
-            {/* Datos de contacto */}
+            {/* Datos de contacto y trazabilidad de la cuenta */}
             <div
               style={{
                 background: '#f8fafc',
@@ -3258,7 +3305,7 @@ export const SystemAdmin: React.FC = () => {
                 marginBottom: '1.25rem',
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
-                gap: '10px',
+                gap: '12px',
               }}
             >
               <div>
@@ -3275,6 +3322,39 @@ export const SystemAdmin: React.FC = () => {
                 </span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-title)' }}>
                   {inspectedUser.phone || 'Sin registrar'}
+                </span>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, display: 'block' }}>
+                  FECHA DE CREACIÓN DE CUENTA
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                  <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-title)' }}>
+                    {inspectedUser.createdAt
+                      ? format(new Date(inspectedUser.createdAt), "d 'de' MMMM, yyyy · HH:mm 'hs'", { locale: es })
+                      : 'Sin registro'}
+                  </span>
+                  {inspectedUser.createdAt && (Date.now() - new Date(inspectedUser.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000 && (
+                    <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem', fontWeight: 800, padding: '1px 6px', borderRadius: '8px' }}>
+                      🆕 Nuevo (&lt; 7 días)
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, display: 'block' }}>
+                  VERIFICACIÓN DE CORREO
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: inspectedUser.emailVerified ? '#059669' : '#d97706',
+                    display: 'inline-block',
+                    marginTop: '2px',
+                  }}
+                >
+                  {inspectedUser.emailVerified ? '✓ Email Verificado' : '⏳ Pendiente de verificar'}
                 </span>
               </div>
             </div>
@@ -3297,11 +3377,18 @@ export const SystemAdmin: React.FC = () => {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
+                        gap: '8px',
+                        flexWrap: 'wrap',
                       }}
                     >
                       <div>
                         <strong style={{ fontSize: '0.88rem', color: 'var(--text-title)' }}>{b.name}</strong>
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '6px' }}>({b.category})</span>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '6px' }}>({b.category || 'General'})</span>
+                        {b.createdAt && (
+                          <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '2px' }}>
+                            📅 Creado el {format(new Date(b.createdAt), 'dd/MM/yyyy', { locale: es })}
+                          </div>
+                        )}
                       </div>
                       <a
                         href={`/businesses/${b.id}`}
@@ -3491,6 +3578,37 @@ export const SystemAdmin: React.FC = () => {
                       {inspectedBusiness.category || inspectedBusiness.categoryRel?.name || 'General'}
                     </span>
                   </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>
+                      Fecha de Creación del Negocio
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-title)' }}>
+                        {inspectedBusiness.createdAt
+                          ? format(new Date(inspectedBusiness.createdAt), "d 'de' MMMM, yyyy · HH:mm 'hs'", { locale: es })
+                          : 'Sin registro'}
+                      </span>
+                      {inspectedBusiness.createdAt && (Date.now() - new Date(inspectedBusiness.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000 ? (
+                        <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem', fontWeight: 800, padding: '1px 6px', borderRadius: '8px' }}>
+                          🆕 Nuevo (&lt; 7 días)
+                        </span>
+                      ) : (
+                        <span style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.7rem', fontWeight: 700, padding: '1px 6px', borderRadius: '8px' }}>
+                          Establecido
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>
+                      Última Revisión Administrativa
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-title)', marginTop: '2px', display: 'block' }}>
+                      {inspectedBusiness.reviewedAt
+                        ? format(new Date(inspectedBusiness.reviewedAt), "dd/MM/yyyy · HH:mm 'hs'", { locale: es })
+                        : 'Pendiente de primera revisión'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -3647,6 +3765,11 @@ export const SystemAdmin: React.FC = () => {
                       </div>
                       <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
                         {inspectedBusiness.owner?.email || 'Sin correo registrado'}
+                        {inspectedBusiness.owner?.createdAt && (
+                          <span style={{ marginLeft: '6px', color: '#475569', fontWeight: 600 }}>
+                            · Cuenta creada el {format(new Date(inspectedBusiness.owner.createdAt), 'dd/MM/yyyy', { locale: es })}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
