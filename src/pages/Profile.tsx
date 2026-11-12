@@ -330,13 +330,8 @@ const Profile: React.FC = () => {
   };
 
   // Visibilidad de contraseñas
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Estados para "¿Olvidaste tu contraseña?"
-  const [forgotPasswordActive, setForgotPasswordActive] = useState(false);
-  const [forgotPasswordMode, setForgotPasswordMode] = useState<'reset_directly' | 'email_link'>('email_link');
 
   // Estados para verificación de correo progresiva
   const [emailVerificationSending, setEmailVerificationSending] = useState(false);
@@ -533,8 +528,6 @@ const Profile: React.FC = () => {
     setVerificationCode('');
     setTwoFactorPasswordCode('');
     setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    setForgotPasswordActive(false);
-    setForgotPasswordMode('email_link');
 
     const hasEmail = Boolean(profileForm.emailVerified);
     const has2FA = Boolean(profileForm.twoFactorEnabled);
@@ -695,13 +688,6 @@ const Profile: React.FC = () => {
     e.preventDefault();
     setModalMessage(null);
 
-    const isDirectReset = forgotPasswordActive && forgotPasswordMode === 'reset_directly';
-
-    if (!isDirectReset && !securityForm.currentPassword) {
-      setModalMessage({ type: 'error', text: 'Debes ingresar tu contraseña actual.' });
-      return;
-    }
-
     if (!securityForm.newPassword) {
       setModalMessage({ type: 'error', text: 'Debes ingresar la nueva contraseña.' });
       return;
@@ -721,9 +707,8 @@ const Profile: React.FC = () => {
     try {
       const res = await api.post('/auth/submit-password-change', {
         changeAuthToken,
-        currentPassword: isDirectReset ? undefined : securityForm.currentPassword,
         newPassword: securityForm.newPassword,
-        skipCurrentPassword: isDirectReset,
+        skipCurrentPassword: true,
       });
 
       setIsPasswordModalOpen(false);
@@ -736,7 +721,6 @@ const Profile: React.FC = () => {
       setVerificationCode('');
       setChangeToken(null);
       setChangeAuthToken(null);
-      setForgotPasswordActive(false);
     } catch (err: any) {
       setModalMessage({
         type: 'error',
@@ -755,7 +739,6 @@ const Profile: React.FC = () => {
     setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     setChangeToken(null);
     setChangeAuthToken(null);
-    setForgotPasswordActive(false);
   };
 
   const handleNotificationSubmit = async (e: React.FormEvent) => {
@@ -2526,43 +2509,8 @@ const Profile: React.FC = () => {
                     fontWeight: 600,
                   }}
                 >
-                  <CheckCircle2 size={16} color="#059669" /> Correo verificado con éxito. Ya puedes ingresar tu nueva contraseña.
+                  <CheckCircle2 size={16} color="#059669" /> Identidad validada con éxito. Ya podés establecer tu nueva contraseña.
                 </div>
-
-                {(!forgotPasswordActive || forgotPasswordMode !== 'reset_directly') && (
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>Contraseña actual</label>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        type={showCurrentPassword ? 'text' : 'password'}
-                        className="form-control"
-                        placeholder="Ingresa tu contraseña actual"
-                        value={securityForm.currentPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                        required={!forgotPasswordActive || forgotPasswordMode !== 'reset_directly'}
-                        style={{ paddingRight: '2.5rem' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                        style={{
-                          position: 'absolute',
-                          right: '10px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: '#94a3b8',
-                          padding: 0,
-                          display: 'flex',
-                        }}
-                      >
-                        {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
                   <label className="form-label" style={{ fontWeight: 600 }}>Nueva contraseña</label>
@@ -2630,50 +2578,7 @@ const Profile: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ marginTop: '0.6rem', marginBottom: '1.25rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setForgotPasswordActive(!forgotPasswordActive)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--primary-color)',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: 0,
-                      textDecoration: 'underline',
-                    }}
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
 
-                  {forgotPasswordActive && (
-                    <div
-                      style={{
-                        marginTop: '0.75rem',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '10px',
-                        padding: '12px 14px',
-                      }}
-                    >
-                      <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#475569', lineHeight: 1.45 }}>
-                        ¿No recuerdas tu clave actual? Como ya verificaste tu identidad con el código de 6 dígitos enviado a tu correo, puedes crear tu nueva clave directamente.
-                      </p>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => setForgotPasswordMode('reset_directly')}
-                          className="btn btn-primary"
-                          style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                        >
-                          Crear nueva clave directamente
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                 <div className="modal-footer-responsive">
                   <button type="button" className="btn btn-light" onClick={handleClosePasswordModal}>
