@@ -170,7 +170,7 @@ const Profile: React.FC = () => {
   const [profileForm, setProfileForm] = useState<ProfileData>({
     name: user?.name || '',
     email: user?.email || '',
-    phone: user?.phone && !user.phone.includes('3435') ? user.phone : '',
+    phone: user?.phone || '',
     role: user?.role || '',
     emailVerified: user?.emailVerified ?? false,
     emailNotifications: user?.emailNotifications ?? true,
@@ -207,7 +207,7 @@ const Profile: React.FC = () => {
   // Modales interactivos específicos para métodos de seguridad
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [phoneInputValue, setPhoneInputValue] = useState(
-    profileForm.phone && !profileForm.phone.includes('3435') ? profileForm.phone : ''
+    profileForm.phone || ''
   );
   const [phoneSaving, setPhoneSaving] = useState(false);
 
@@ -398,9 +398,21 @@ const Profile: React.FC = () => {
     if (!user) return;
     setLoadingFavorites(true);
     try {
-      const res = await api.get('/businesses/my/favorites');
-      const list = res.data?.data ?? res.data ?? [];
-      setFavoriteBusinesses(Array.isArray(list) ? list : []);
+      const [res, bizRes] = await Promise.all([
+        api.get('/businesses/my/favorites'),
+        api.get('/businesses?limit=100').catch(() => ({ data: [] })),
+      ]);
+      const rawList = res.data?.data ?? res.data ?? [];
+      const list = Array.isArray(rawList) ? rawList : [];
+      const bizRaw = bizRes.data?.data ?? bizRes.data ?? [];
+      const bizList = Array.isArray(bizRaw) ? bizRaw : [];
+      const bizMap = new Map(bizList.map((b: any) => [Number(b.id), b]));
+
+      const enriched = list.map((fav: any) => ({
+        ...fav,
+        business: fav.business || bizMap.get(Number(fav.businessId)),
+      }));
+      setFavoriteBusinesses(enriched);
     } catch {
       // silencioso
     } finally {
@@ -457,7 +469,7 @@ const Profile: React.FC = () => {
       setProfileForm({
         name: freshUser.name || '',
         email: freshUser.email || '',
-        phone: freshUser.phone && !freshUser.phone.includes('3435') ? freshUser.phone : '',
+        phone: freshUser.phone || '',
         role: freshUser.role || '',
         emailVerified: freshUser.emailVerified ?? false,
         emailNotifications: freshUser.emailNotifications ?? true,
@@ -467,9 +479,6 @@ const Profile: React.FC = () => {
 
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
-        if (freshUser.phone && freshUser.phone.includes('3435')) {
-          freshUser.phone = null;
-        }
         login(storedToken, freshUser);
       }
 
@@ -1096,8 +1105,7 @@ const Profile: React.FC = () => {
               type="button"
               className={`security-list-item ${profileForm.phone ? '' : 'is-dimmed'}`}
               onClick={() => {
-                const cleanPhone = profileForm.phone && !profileForm.phone.includes('3435') ? profileForm.phone : '';
-                setPhoneInputValue(cleanPhone);
+                setPhoneInputValue(profileForm.phone || '');
                 setIsPhoneModalOpen(true);
               }}
             >

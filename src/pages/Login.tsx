@@ -202,6 +202,11 @@ const Login: React.FC = () => {
               <GoogleSignInButton
                 buttonText="Continuar con Google"
                 onError={err => setError(err)}
+                onRequire2FA={(tempToken) => {
+                  setRequireTwoFactor(true);
+                  setTwoFactorTempToken(tempToken);
+                  setError('');
+                }}
               />
 
               <div className="divider" style={{ margin: '1.25rem 0' }} />

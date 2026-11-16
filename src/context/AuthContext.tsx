@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { clientCache } from '../services/api';
 import { type User } from '../types';
 
 interface AuthContextType {
@@ -40,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })
         .catch(() => {
           // Token inválido o expirado: limpiar sesión
+          clientCache.clear();
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           setToken(null);
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (newToken: string, newUser: User) => {
+    clientCache.clear();
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
@@ -59,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    clientCache.clear();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setToken(null);

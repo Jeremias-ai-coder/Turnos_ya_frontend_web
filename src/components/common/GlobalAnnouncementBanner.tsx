@@ -49,7 +49,7 @@ export const GlobalAnnouncementBanner: React.FC = () => {
     sessionStorage.setItem(`dismissed_announcement_${announcement.id}`, 'true');
   };
 
-  const config = {
+  const configs: Record<string, any> = {
     info: {
       bg: 'linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%)',
       border: '#bfdbfe',
@@ -78,7 +78,8 @@ export const GlobalAnnouncementBanner: React.FC = () => {
       linkText: '#047857',
       icon: <CheckCircle size={16} color="#059669" style={{ flexShrink: 0 }} />
     }
-  }[announcement.type || 'info'];
+  };
+  const config = configs[(announcement.type || 'info').toLowerCase()] || configs.info;
 
   const isExternal = announcement.linkUrl?.startsWith('http://') || announcement.linkUrl?.startsWith('https://');
 

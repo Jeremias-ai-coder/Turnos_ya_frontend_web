@@ -10,14 +10,14 @@ export const CookieBanner: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     // Check if consent has already been given
     const consent = getStoredCookiePreferences();
     if (!consent) {
       // Small timeout for smooth entrance animation after initial page load
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setIsVisible(true);
       }, 500);
-      return () => clearTimeout(timer);
     }
 
     const handleCookiesUpdated = () => {
@@ -29,6 +29,7 @@ export const CookieBanner: React.FC = () => {
 
     window.addEventListener('turnosya_cookies_updated', handleCookiesUpdated);
     return () => {
+      if (timer) clearTimeout(timer);
       window.removeEventListener('turnosya_cookies_updated', handleCookiesUpdated);
     };
   }, []);

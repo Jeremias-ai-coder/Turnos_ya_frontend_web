@@ -617,9 +617,9 @@ export const SystemAdmin: React.FC = () => {
   const handleToggleAnnouncement = async (ann: any) => {
     try {
       const res = await api.patch(`/admin/announcements/${ann.id}/toggle`);
-      const updated = res.data;
-      setAnnouncements((prev) => prev.map((a) => (a.id === ann.id ? { ...a, isActive: updated.isActive } : a)));
-      showToast(`✓ Aviso ${updated.isActive ? 'activado' : 'pausado'} correctamente`);
+      const nextActive = typeof res.data?.isActive === 'boolean' ? res.data.isActive : !ann.isActive;
+      setAnnouncements((prev) => prev.map((a) => (a.id === ann.id ? { ...a, isActive: nextActive } : a)));
+      showToast(`✓ Aviso ${nextActive ? 'activado' : 'pausado'} correctamente`);
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Error al alternar aviso');
     }

@@ -106,6 +106,10 @@ export class ClientCacheManager {
       this.invalidate('*report*');
       this.invalidate('*stats*');
     }
+    if (cleanUrl.includes('review')) {
+      this.invalidate('*review*');
+      this.invalidate('*business*');
+    }
   }
 }
 

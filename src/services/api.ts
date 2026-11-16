@@ -47,8 +47,15 @@ api.interceptors.response.use(
     if (error.response) {
       const { status, config } = error.response;
 
-      // Si el error es 401 (No autorizado / Token vencido) y no es el endpoint de login
-      if (status === 401 && !config.url?.includes('/auth/login')) {
+      // Si el error es 401 (No autorizado / Token vencido) y no es un endpoint de validación puntual
+      const isAuthCheckEndpoint =
+        config.url?.includes('/auth/login') ||
+        config.url?.includes('/auth/google') ||
+        config.url?.includes('/auth/2fa/login-verify') ||
+        config.url?.includes('/auth/submit-password-change');
+
+      if (status === 401 && !isAuthCheckEndpoint) {
+        clientCache.clear();
         localStorage.removeItem('token');
         localStorage.removeItem('user');
 

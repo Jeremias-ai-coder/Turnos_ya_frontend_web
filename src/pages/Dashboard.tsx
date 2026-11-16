@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { formatTimeToHHMM } from '../utils/timeHelper';
+import { formatTimeToHHMM, toISOTimeString } from '../utils/timeHelper';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Pagination from '../components/common/Pagination';
 import { SkeletonTicket } from '../components/common/SkeletonLoaders';
@@ -363,7 +363,7 @@ const Dashboard: React.FC = () => {
     setSendingBroadcast(true);
     try {
       const res = await api.post(`/businesses/${selectedBiz.id}/broadcasts`, broadcastForm);
-      const sentCount = res.data?.data?.sentCount ?? 0;
+      const sentCount = res.data?.recipientsCount ?? res.data?.data?.recipientsCount ?? res.data?.data?.sentCount ?? 0;
       showToast(`✓ Aviso enviado con éxito a ${sentCount} ${sentCount === 1 ? 'seguidor' : 'seguidores'}`);
       setShowBroadcastModal(false);
       setBroadcastForm({ type: 'PROMO', title: '', message: '' });
@@ -484,8 +484,8 @@ const Dashboard: React.FC = () => {
       await api.post('/appointments', {
         businessId: selectedBiz.id,
         serviceId: Number(manualAptForm.serviceId),
-        date: manualAptForm.date,
-        time: manualAptForm.time,
+        date: manualAptForm.date.includes('T') ? manualAptForm.date : `${manualAptForm.date}T00:00:00.000Z`,
+        time: toISOTimeString(manualAptForm.time),
       });
       showToast('✓ Turno manual registrado en la agenda');
       setShowManualAptModal(false);

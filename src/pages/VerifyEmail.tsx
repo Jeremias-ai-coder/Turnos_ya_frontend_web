@@ -14,12 +14,6 @@ const VerifyEmail: React.FC = () => {
   const [message, setMessage] = useState<string>('');
   const [manualCode, setManualCode] = useState('');
 
-  useEffect(() => {
-    if (tokenFromUrl) {
-      handleVerifyWithToken(tokenFromUrl);
-    }
-  }, [tokenFromUrl]);
-
   const handleVerifyWithToken = async (tokenToVerify: string) => {
     setLoading(true);
     setStatus('loading');
@@ -42,6 +36,12 @@ const VerifyEmail: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (tokenFromUrl) {
+      handleVerifyWithToken(tokenFromUrl);
+    }
+  }, [tokenFromUrl]);
 
   const handleManualCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

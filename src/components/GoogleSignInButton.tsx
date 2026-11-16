@@ -15,12 +15,14 @@ interface GoogleSignInButtonProps {
   buttonText?: string;
   onSuccess?: () => void;
   onError?: (error: string) => void;
+  onRequire2FA?: (tempToken: string) => void;
 }
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   buttonText = 'Continuar con Google',
   onSuccess,
   onError,
+  onRequire2FA,
 }) => {
   const [loading, setLoading] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -124,6 +126,15 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         name: userInfo.name || userInfo.given_name || userInfo.email?.split('@')[0],
         googleId: userInfo.sub,
       });
+
+      if (res.data?.require2FA && res.data?.tempToken) {
+        if (onRequire2FA) {
+          onRequire2FA(res.data.tempToken);
+        } else {
+          navigate('/login', { state: { require2FA: true, tempToken: res.data.tempToken } });
+        }
+        return;
+      }
 
       login(res.data.token, res.data.user);
       onSuccess?.();

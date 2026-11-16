@@ -58,22 +58,6 @@ export const BugReportModal: React.FC = () => {
     };
   }, [isOpen, loading]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) {
-        closeBugReportModal();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [isOpen, loading]);
-
   const handleClose = () => {
     if (loading) return;
     closeBugReportModal();
