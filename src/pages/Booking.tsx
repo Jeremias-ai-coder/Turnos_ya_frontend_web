@@ -1,3 +1,16 @@
+// =========================================================================================
+// ASISTENTE DE RESERVA DE TURNOS EN 2 FASES (Booking.tsx)
+// Capa: Frontend Web / Presentación (React 19 + TypeScript)
+// Responsabilidades:
+//  1. PASO 1 (Servicio): Selección de la prestación comercial (precio y duración).
+//  2. PASO 2 (Fecha y Horario): Renderizado de matriz horaria con disponibilidad en tiempo real.
+//     - Dispara handleHold(): genera un Hold Token en el backend con TTL de 10 minutos
+//       para evitar colisiones y sobreventa (Overbooking) mientras el cliente revisa.
+//  3. PASO 3 (Confirmación): Muestra el temporizador de cuenta regresiva sincronizado.
+//     - Dispara handleConfirm(): canjea el token y promueve el turno a 'CONFIRMED'.
+//  4. Transiciones Nativas: Navegación fluida y sin parpadeos vía View Transitions API.
+// =========================================================================================
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';

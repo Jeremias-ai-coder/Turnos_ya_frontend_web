@@ -1,3 +1,17 @@
+// =========================================================================================
+// PÁGINA DE INICIO DE SESIÓN Y AUTENTICACIÓN 2FA (Login.tsx)
+// Capa: Frontend Web / Presentación (React 19 + TypeScript)
+// Responsabilidades:
+//  1. PASO 1 (Credenciales): Envío de email y contraseña a POST /auth/login.
+//     - Si la cuenta tiene 2FA activo, el backend NO devuelve token de sesión; responde
+//       { require2FA: true, tempToken } con un token temporal de 5 minutos.
+//  2. PASO 2 (Segundo Factor): Despliegue dinámico de la interfaz de verificación TOTP.
+//     - Envío del código de 6 dígitos de Google Authenticator (o código de respaldo de 8 chars)
+//       a POST /auth/2fa/login-verify.
+//  3. Consolidación de Sesión: Al recibir el JWT definitivo { type: 'SESSION' }, actualiza
+//     el AuthContext mediante login(token, user) y navega fluidamente a la ruta de origen.
+// =========================================================================================
+
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +29,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Estados para 2FA en login
+  // Estados para el flujo de segundo factor de autenticación (2FA)
   const [requireTwoFactor, setRequireTwoFactor] = useState(false);
   const [twoFactorTempToken, setTwoFactorTempToken] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
@@ -24,18 +38,25 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ---------------------------------------------------------------------------------------
+  // PASO 1: ENVÍO DE CREDENCIALES INICIALES (Email + Password)
+  // ---------------------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       const response = await api.post('/auth/login', { email, password });
+
+      // Si el backend detecta que la cuenta tiene 2FA habilitado, activa el Paso 2
       if (response.data.require2FA) {
         setRequireTwoFactor(true);
-        setTwoFactorTempToken(response.data.tempToken);
+        setTwoFactorTempToken(response.data.tempToken); // Token efímero con scope: '2fa_pending' (TTL 5m)
         setError('');
         return;
       }
+
+      // Si no tiene 2FA, consolida la sesión directamente con el token definitivo
       login(response.data.token, response.data.user);
       const role = response.data.user?.role;
       const fromLocation = (location.state as any)?.from;
@@ -51,15 +72,21 @@ const Login: React.FC = () => {
     }
   };
 
+  // ---------------------------------------------------------------------------------------
+  // PASO 2: VERIFICACIÓN DEL SEGUNDO FACTOR (Google Authenticator / Backup Code)
+  // ---------------------------------------------------------------------------------------
   const handleTwoFactorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
+      // Envía el código de 6 dígitos junto con el tempToken a validar
       const response = await api.post('/auth/2fa/login-verify', {
         tempToken: twoFactorTempToken,
         code: twoFactorCode,
       });
+
+      // El backend valida el secreto descifrado con AES-256-GCM y emite el JWT { type: 'SESSION' }
       login(response.data.token, response.data.user);
       navigate('/');
     } catch (err: any) {

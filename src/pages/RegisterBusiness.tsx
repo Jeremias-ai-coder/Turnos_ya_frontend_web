@@ -1,3 +1,14 @@
+// =========================================================================================
+// ASISTENTE DE POSTULACIÓN Y ALTA DE COMERCIOS (RegisterBusiness.tsx)
+// Capa: Frontend Web / Presentación (React 19 + TypeScript)
+// Responsabilidades:
+//  1. Alta Guiada en 4 Pasos: Identidad, Ubicación, Evidencias Digitales y Revisión.
+//  2. Validación de Evidencias de Veracidad: CUIT, Instagram, Facebook, Google Maps y Sitio Web.
+//  3. Despacho a Backend: Emite POST /api/v1/businesses para persistencia con estado
+//     'pending_approval' (los comercios no nacen aprobados por políticas anti-fraude).
+//  4. Transición Suave: Redirección al Dashboard mediante la View Transitions API.
+// =========================================================================================
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
