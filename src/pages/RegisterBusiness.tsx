@@ -1,3 +1,14 @@
+// =========================================================================================
+// ASISTENTE DE POSTULACIÓN Y ALTA DE COMERCIOS (RegisterBusiness.tsx)
+// Capa: Frontend Web / Presentación (React 19 + TypeScript)
+// Responsabilidades:
+//  1. Alta Guiada en 4 Pasos: Identidad, Ubicación, Evidencias Digitales y Revisión.
+//  2. Validación de Evidencias de Veracidad: CUIT, Instagram, Facebook, Google Maps y Sitio Web.
+//  3. Despacho a Backend: Emite POST /api/v1/businesses para persistencia con estado
+//     'pending_approval' (los comercios no nacen aprobados por políticas anti-fraude).
+//  4. Transición Suave: Redirección al Dashboard mediante la View Transitions API.
+// =========================================================================================
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
@@ -162,11 +173,16 @@ export const RegisterBusiness: React.FC = () => {
     instagramUrl.trim() || facebookUrl.trim() || googleMapsUrl.trim() || websiteUrl.trim() || cuit.trim()
   );
 
+  // ---------------------------------------------------------------------------------------
+  // ENVÍO DE POSTULACIÓN DE COMERCIO (SUBMIT FINAL)
+  // Construye el payload con datos y evidencias (Instagram, Maps, CUIT) y llama al backend.
+  // ---------------------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSubmitting(true);
 
+    // Normalización y empaquetado de datos
     const payload = {
       name: name.trim(),
       categoryId: Number(categoryId),
@@ -185,12 +201,13 @@ export const RegisterBusiness: React.FC = () => {
 
     try {
       if (editingBusiness?.id) {
-        // Actualizar solicitud rechazada/existente
+        // En caso de reenvío por observaciones previas
         await api.patch(`/businesses/${editingBusiness.id}`, payload);
       } else {
-        // Crear nueva solicitud de alta
+        // Alta inicial: POST /api/v1/businesses (el backend lo crea en 'pending_approval')
         await api.post('/businesses', payload);
       }
+      // Transición suave al panel de control (Dashboard) mediante la View Transitions API
       startSmoothNavigation(navigate, '/dashboard', { state: { submittedNow: true } });
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.response?.data?.detail || 'Error al enviar la solicitud.');

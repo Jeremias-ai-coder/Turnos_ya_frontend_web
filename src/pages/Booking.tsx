@@ -1,3 +1,16 @@
+// =========================================================================================
+// ASISTENTE DE RESERVA DE TURNOS EN 2 FASES (Booking.tsx)
+// Capa: Frontend Web / Presentación (React 19 + TypeScript)
+// Responsabilidades:
+//  1. PASO 1 (Servicio): Selección de la prestación comercial (precio y duración).
+//  2. PASO 2 (Fecha y Horario): Renderizado de matriz horaria con disponibilidad en tiempo real.
+//     - Dispara handleHold(): genera un Hold Token en el backend con TTL de 10 minutos
+//       para evitar colisiones y sobreventa (Overbooking) mientras el cliente revisa.
+//  3. PASO 3 (Confirmación): Muestra el temporizador de cuenta regresiva sincronizado.
+//     - Dispara handleConfirm(): canjea el token y promueve el turno a 'CONFIRMED'.
+//  4. Transiciones Nativas: Navegación fluida y sin parpadeos vía View Transitions API.
+// =========================================================================================
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { startSmoothNavigation } from '../utils/transitionNavigator';
@@ -320,6 +333,10 @@ const Booking: React.FC = () => {
     return false;
   };
 
+  // ---------------------------------------------------------------------------------------
+  // FASE 1: BLOQUEO TEMPORAL (HOLD TOKEN)
+  // Solicita al backend reservar el horario por 10 minutos para evitar que otro usuario lo tome.
+  // ---------------------------------------------------------------------------------------
   const handleHold = async () => {
     if (!selectedDate || !selectedTime || !selectedService) return;
 
@@ -340,14 +357,17 @@ const Booking: React.FC = () => {
     setError('');
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // POST a /appointments/hold para generar el token UUID con TTL de 10 minutos
       const res = await api.post('/appointments/hold', {
         businessId: Number(id),
         serviceId: selectedService.id,
         date: `${dateStr}T00:00:00.000Z`,
         time: toISOTimeString(selectedTime),
       });
+      // Guardar el Hold Token y la fecha de expiración en el estado local
       setHoldToken(res.data.holdToken);
       setExpiresAt(res.data.expiresAt);
+      // Avanzar al Paso 3: Confirmación Final y activar la cuenta regresiva visible
       setStep(3);
     } catch (err: any) {
       setError(err.response?.data?.message || err.response?.data?.detail || 'Error al reservar el horario.');
@@ -356,6 +376,10 @@ const Booking: React.FC = () => {
     }
   };
 
+  // ---------------------------------------------------------------------------------------
+  // FASE 2: CONFIRMACIÓN DEFINITIVA
+  // Envía el Hold Token al backend para promover el turno a 'CONFIRMED' y disparar notificaciones.
+  // ---------------------------------------------------------------------------------------
   const handleConfirm = async () => {
     if (!holdToken || !selectedDate || !selectedTime || !selectedService) return;
 
@@ -363,6 +387,7 @@ const Booking: React.FC = () => {
     setError('');
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // POST a /appointments canjeando el Hold Token
       await api.post('/appointments', {
         businessId: Number(id),
         serviceId: selectedService.id,
@@ -370,6 +395,7 @@ const Booking: React.FC = () => {
         time: toISOTimeString(selectedTime),
         holdToken,
       });
+      // Refrescar campanita de notificaciones y navegar al historial de citas
       window.dispatchEvent(new CustomEvent('notification-refresh'));
       navigate('/my-appointments');
     } catch (err: any) {

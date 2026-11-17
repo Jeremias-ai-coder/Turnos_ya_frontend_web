@@ -1,3 +1,13 @@
+// =========================================================================================
+// CLIENTE HTTP Y GESTIÓN DE TRANSPORTE (api.ts)
+// Capa: Frontend Web / Servicios de Red (Axios)
+// Responsabilidades:
+//  1. Normalización dinámica de VITE_API_URL asegurando el prefijo /api/v1.
+//  2. Request Interceptor: Inyección automática del Bearer Token desde localStorage.
+//  3. Response Interceptor: Manejo centralizado de errores HTTP 401 (desconexión y purga de caché).
+//  4. Caché SWR en memoria (clientCache): Optimización de lecturas repetitivas en el navegador.
+// =========================================================================================
+
 import axios from 'axios';
 
 // Normalizar baseURL: si VITE_API_URL no incluye '/api/v1', se lo añade automáticamente.
