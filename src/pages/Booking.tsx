@@ -320,6 +320,10 @@ const Booking: React.FC = () => {
     return false;
   };
 
+  // ---------------------------------------------------------------------------------------
+  // FASE 1: BLOQUEO TEMPORAL (HOLD TOKEN)
+  // Solicita al backend reservar el horario por 10 minutos para evitar que otro usuario lo tome.
+  // ---------------------------------------------------------------------------------------
   const handleHold = async () => {
     if (!selectedDate || !selectedTime || !selectedService) return;
 
@@ -340,14 +344,17 @@ const Booking: React.FC = () => {
     setError('');
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // POST a /appointments/hold para generar el token UUID con TTL de 10 minutos
       const res = await api.post('/appointments/hold', {
         businessId: Number(id),
         serviceId: selectedService.id,
         date: `${dateStr}T00:00:00.000Z`,
         time: toISOTimeString(selectedTime),
       });
+      // Guardar el Hold Token y la fecha de expiración en el estado local
       setHoldToken(res.data.holdToken);
       setExpiresAt(res.data.expiresAt);
+      // Avanzar al Paso 3: Confirmación Final y activar la cuenta regresiva visible
       setStep(3);
     } catch (err: any) {
       setError(err.response?.data?.message || err.response?.data?.detail || 'Error al reservar el horario.');
@@ -356,6 +363,10 @@ const Booking: React.FC = () => {
     }
   };
 
+  // ---------------------------------------------------------------------------------------
+  // FASE 2: CONFIRMACIÓN DEFINITIVA
+  // Envía el Hold Token al backend para promover el turno a 'CONFIRMED' y disparar notificaciones.
+  // ---------------------------------------------------------------------------------------
   const handleConfirm = async () => {
     if (!holdToken || !selectedDate || !selectedTime || !selectedService) return;
 
@@ -363,6 +374,7 @@ const Booking: React.FC = () => {
     setError('');
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // POST a /appointments canjeando el Hold Token
       await api.post('/appointments', {
         businessId: Number(id),
         serviceId: selectedService.id,
@@ -370,6 +382,7 @@ const Booking: React.FC = () => {
         time: toISOTimeString(selectedTime),
         holdToken,
       });
+      // Refrescar campanita de notificaciones y navegar al historial de citas
       window.dispatchEvent(new CustomEvent('notification-refresh'));
       navigate('/my-appointments');
     } catch (err: any) {

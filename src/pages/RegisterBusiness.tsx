@@ -162,11 +162,16 @@ export const RegisterBusiness: React.FC = () => {
     instagramUrl.trim() || facebookUrl.trim() || googleMapsUrl.trim() || websiteUrl.trim() || cuit.trim()
   );
 
+  // ---------------------------------------------------------------------------------------
+  // ENVÍO DE POSTULACIÓN DE COMERCIO (SUBMIT FINAL)
+  // Construye el payload con datos y evidencias (Instagram, Maps, CUIT) y llama al backend.
+  // ---------------------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSubmitting(true);
 
+    // Normalización y empaquetado de datos
     const payload = {
       name: name.trim(),
       categoryId: Number(categoryId),
@@ -185,12 +190,13 @@ export const RegisterBusiness: React.FC = () => {
 
     try {
       if (editingBusiness?.id) {
-        // Actualizar solicitud rechazada/existente
+        // En caso de reenvío por observaciones previas
         await api.patch(`/businesses/${editingBusiness.id}`, payload);
       } else {
-        // Crear nueva solicitud de alta
+        // Alta inicial: POST /api/v1/businesses (el backend lo crea en 'pending_approval')
         await api.post('/businesses', payload);
       }
+      // Transición suave al panel de control (Dashboard) mediante la View Transitions API
       startSmoothNavigation(navigate, '/dashboard', { state: { submittedNow: true } });
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.response?.data?.detail || 'Error al enviar la solicitud.');
